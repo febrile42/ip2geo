@@ -18,7 +18,7 @@ function getRealIPAddr()
   return $ip;
 }
 
-function ipToLong(string $ip): int {
+function ipToLong(string $ip): string {
     return sprintf('%u', ip2long($ip)); // Handles unsigned 32-bit int
 }
 
@@ -79,15 +79,15 @@ function ipToLong(string $ip): int {
 												<textarea name="ip_list" id="message" rows="5"><?php
 if(!isset($_POST['ip_list']))
 {
-	echo "Here's some example text with the IPs 8.8.8.8 (Google's public DNS) and @#75.75.75.75@#% (Comcast's DNS with some extra characters tucked in the middle). Hit the button below to try it out. We'll see about your IP (".getRealIPAddr().") too, assuming it's IPv4.";
+	echo "Here's some example text with the IPs 8.8.8.8 (Google's public DNS) and @#75.75.75.75@#% (Comcast's DNS with some extra characters tucked in the middle). Hit the button below to try it out. We'll see about your IP (".htmlspecialchars(getRealIPAddr(), ENT_QUOTES, 'UTF-8').") too, assuming it's IPv4.";
 } else {
-	echo $_POST['ip_list'];
+	echo htmlspecialchars($_POST['ip_list'], ENT_QUOTES, 'UTF-8');
 }
 		?></textarea>
 											</div>
 											<div class="field half">
 												<label for="countries_filter">Countries to exclude</label>
-												<input type="text" id="countries_filter" name="countries_filter" value="<?php if (isset($_POST['countries_filter'])) { echo strtoupper($_POST['countries_filter']); } ?>" />
+												<input type="text" id="countries_filter" name="countries_filter" value="<?php if (isset($_POST['countries_filter'])) { echo htmlspecialchars(strtoupper($_POST['countries_filter']), ENT_QUOTES, 'UTF-8'); } ?>" />
 												<sub><a href="https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2" target="_blank">2-letter ISO codes</a>, i.e. US CA GB. Use to filter out non-suspicious IPs.</sub>
 											</div>
 											<div class="field half">
@@ -109,7 +109,8 @@ if($_POST)
 	$con = mysqli_connect($db_host, $db_user, $db_pass, $db_name);
 	if (mysqli_connect_errno())
 	{
-		echo "Failed to connect to MySQL: " . mysqli_connect_error();
+		error_log("ip2geo DB connection failed: " . mysqli_connect_error());
+		echo "Database connection failed. Please try again later.";
 	}
 
 	// Get Country List
@@ -132,12 +133,16 @@ if($_POST)
 	}
 
 	// Make an Array of valid IPs out of the input
+	if (strlen($_POST['ip_list']) > 2097152) { // 2MB hard limit
+		echo '<section id="results" class="wrapper style4 fade-up"><div class="inner"><p>Input exceeds 2MB limit. Please reduce the size of your input.</p></div></section>';
+		exit;
+	}
 	preg_match_all("/\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b/",$_POST['ip_list'],$ip_list);
 	// $ip_list = array_unique(array_filter(filter_var_array(explode("\r\n", $_POST['ip_list']), FILTER_VALIDATE_IP)));
 
 	// Strip: non-IPs, duplicates
 	$ip_list = filter_var_array(array_unique($ip_list[0]));
-	$ip_list = array_splice($ip_list, -10000);
+	$ip_list = array_slice($ip_list, 0, 10000);
 
 	// strip local ips
 	function test_local($ip_to_test)

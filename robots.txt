@@ -1,3 +1,4 @@
-User-agent: * 
+User-agent: *
 Sitemap: https://ip2geo.org/sitemap.xml
-Disallow: 
+Disallow: /rand_ips.php
+Disallow: /maintenance.php
