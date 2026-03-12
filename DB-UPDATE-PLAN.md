@@ -145,7 +145,10 @@ Step 7: Atomic swap
 
 Step 8: Update data version
   - UPDATE db_meta SET value = CURDATE() WHERE key_name = 'data_last_updated';
-  - This surfaces in the ip2geo.org footer as "Data: [Month Year]"
+  - Write db_version.php to both webroots (gitignored; included at top of index.php with zero DB overhead):
+      DATE_LABEL=$(date +"%B %Y")
+      echo "<?php \$db_data_date = '$DATE_LABEL'; ?>" | tee /var/www/ip2geo/db_version.php /var/www/ip2geo-staging/db_version.php
+  - This surfaces in the ip2geo.org footer as "Data: [Month Year]" on all page loads, not just POST
 
 Step 9: Post-swap verification
   - Re-run the 8.8.8.8 spot check against the now-live geoip2_network_current_int

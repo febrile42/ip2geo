@@ -1,6 +1,7 @@
 <?php
 
 require __DIR__ . '/config.php';
+@include_once __DIR__ . '/db_version.php'; // gitignored; written by the monthly DB update script
 
 function getRealIPAddr()
 {
@@ -111,13 +112,6 @@ if($_POST)
 	{
 		error_log("ip2geo DB connection failed: " . mysqli_connect_error());
 		echo "Database connection failed. Please try again later.";
-	}
-
-	// Get data version for footer
-	$db_data_date = null;
-	$meta_result = mysqli_query($con, "SELECT value FROM db_meta WHERE key_name = 'data_last_updated'");
-	if ($meta_result && $meta_row = mysqli_fetch_assoc($meta_result)) {
-		$db_data_date = date('F Y', strtotime($meta_row['value']));
 	}
 
 	// Get Country List
