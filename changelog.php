@@ -50,6 +50,8 @@
 					<section id="main" class="wrapper">
 						<div class="inner">
 							<h1 class="major">Changelog</h1>
+							<h3>2.2.0 - 2026-03-11</h3>
+							<p>Security hardening and grown-up deployment infrastructure. Fixed a handful of XSS vectors (nothing to see here), added a 2MB input cap, and corrected a bug that was silently discarding the <em>first</em> batch of IPs instead of the last. The old versioned index files are gone — git is the version history now, as it was always meant to be. Also introduced a full CI/CD pipeline with a staging environment, because apparently this is a serious project.</p>
 							<h3>2.1.1 - 2025-04-05</h3>
 							<p>Bugfix. Introduction of Changelog. Removed defunct twitter link. Made "About" section slightly more professional (slightly).</p>
 							<h3>2.1.0 - 2025-04-04</h3>
