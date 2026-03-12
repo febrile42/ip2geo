@@ -113,6 +113,13 @@ if($_POST)
 		echo "Database connection failed. Please try again later.";
 	}
 
+	// Get data version for footer
+	$db_data_date = null;
+	$meta_result = mysqli_query($con, "SELECT value FROM db_meta WHERE key_name = 'data_last_updated'");
+	if ($meta_result && $meta_row = mysqli_fetch_assoc($meta_result)) {
+		$db_data_date = date('F Y', strtotime($meta_row['value']));
+	}
+
 	// Get Country List
 	$countries_query = 'SELECT DISTINCT(`country_iso_code`) FROM `locations`';
 	$countries = mysqli_query($con,$countries_query);
@@ -268,7 +275,7 @@ else
 			<footer id="footer" class="wrapper style1-alt">
 				<div class="inner">
 					<ul class="menu">
-						<li>This product includes GeoLite2 data created by MaxMind, available from <a href="http://www.maxmind.com" target="_new">http://www.maxmind.com</a>.</li>
+						<li>This product includes GeoLite2 data created by MaxMind, available from <a href="http://www.maxmind.com" target="_new">http://www.maxmind.com</a>.<?php if (!empty($db_data_date)) { echo ' Data: ' . $db_data_date . '.'; } ?></li>
 					</ul>
 					<ul class="menu">
 						<li><a href="/changelog.php">v2.2.0</a> &ndash; &copy;<?php echo date("Y"); ?></li>
