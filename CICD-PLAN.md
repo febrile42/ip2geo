@@ -495,7 +495,7 @@ The workflow YAML already uses this approach (see Step 6). The public `STAGING_U
 
 **No rollback automation.** If a bad deploy reaches production, the fix is to revert locally and push — which triggers another deploy. Since the whole deploy is a `git pull`, rollback is: `git revert HEAD`, `git push origin main`. Usually under 2 minutes.
 
-**No branch protection yet.** GitHub can be configured to require the `develop` tests to pass before allowing a merge to `main`. This is worthwhile to set up (Settings → Branches → Branch protection rules) and takes 2 minutes, but it's optional until the pipeline is proven stable.
+**No enforced branch protection.** GitHub branch protection rules on private repos require a paid plan (GitHub Pro/Team). The rule has been configured in the repo settings but is not enforced on the free tier. Revisit if the project moves to a paid plan or goes public.
 
 ---
 
