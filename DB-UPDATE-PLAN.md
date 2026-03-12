@@ -63,37 +63,55 @@ WHERE `country_iso_code` IS NOT NULL
 
 This removes `locations` as a table that needs to be maintained going forward.
 
-### 2. Create initial stable-name tables from existing data
+### 2. One-time migration to stable table names (zero-downtime)
 
-On the Linode (one time):
+The key constraint: production is currently running `main`, which still references the old datestamped table names. A `RENAME TABLE` would break production immediately. The solution is to **copy** the tables so both old and new names exist simultaneously during the transition.
 
-```sql
-RENAME TABLE
-  geoip2_network_20250401_int TO geoip2_network_current_int,
-  geoip2_location_20250401 TO geoip2_location_current;
-```
-
-Deploy the PHP change first, then run this rename. The PHP and DB stay in sync.
-
-### 3. ~~Verify `LOAD DATA LOCAL INFILE`~~ ✅ Confirmed
-
-`local_infile` is `ON` on the Linode. No server config change needed. The update script will use `LOAD DATA LOCAL INFILE` (client-side, no `FILE` privilege required) and the `ip2geo` user's existing `CREATE/DROP/ALTER/INSERT` grants cover everything else.
-
-### 4. Drop legacy tables (one-time cleanup)
-
-Several tables in the `ip2geo` database are no longer in use. Drop them after the stable-name rename (step 2 above) is confirmed working:
+**Step A — Drop legacy unused tables first** (frees space, reduces noise):
 
 ```sql
--- Legacy tables with no current code references
 DROP TABLE IF EXISTS geoip2_location;
 DROP TABLE IF EXISTS geoip2_network;
 DROP TABLE IF EXISTS geoip2_network_20250401;   -- non-integer version, superseded by _int
 DROP TABLE IF EXISTS locations;                  -- replaced by querying geoip2_location_current
 ```
 
-> **Before dropping:** confirm none of these appear in any active PHP file. A quick grep: `grep -r "geoip2_location\b\|geoip2_network\b\|geoip2_network_20250401\b\|locations" /var/www/ip2geo/*.php` should return zero results after the `index.php` update is deployed.
+> Confirm none appear in active PHP first: `grep -r "geoip2_location\b\|geoip2_network\b\|geoip2_network_20250401\b\|'\''locations'\''" /var/www/ip2geo/*.php`
 
-### 5. Add new GitHub Secrets
+**Step B — Copy datestamped tables to stable names** (use `LIKE` + `INSERT` to preserve indexes):
+
+```sql
+-- Network table: ~3.3M rows, will take a few minutes — production unaffected throughout
+CREATE TABLE geoip2_network_current_int LIKE geoip2_network_20250401_int;
+INSERT INTO geoip2_network_current_int SELECT * FROM geoip2_network_20250401_int;
+
+-- Location table: ~77k rows, fast
+CREATE TABLE geoip2_location_current LIKE geoip2_location_20250401;
+INSERT INTO geoip2_location_current SELECT * FROM geoip2_location_20250401;
+```
+
+> Do **not** use `CREATE TABLE ... AS SELECT` — it skips indexes, which would kill query performance.
+>
+> Both the old datestamped names and the new stable names now exist simultaneously. Production continues serving from the old names without interruption.
+
+**Step C — Deploy the PHP change and clean up:**
+
+1. Push the `index.php` stable-name changes to `develop` → staging pipeline deploys and tests against the new stable-named tables
+2. Confirm staging passes
+3. Merge `develop → main` → production deploys, now queries `geoip2_network_current_int` — tables already exist → **zero downtime**
+4. Drop the old datestamped tables (now redundant):
+   ```sql
+   DROP TABLE geoip2_network_20250401_int;
+   DROP TABLE geoip2_location_20250401;
+   ```
+
+The monthly automated update has no sequencing issue — it uses shadow tables (`_incoming`) that are fully populated before any rename occurs, and the stable names (`_current`) are always present in production.
+
+### 3. ~~Verify `LOAD DATA LOCAL INFILE`~~ ✅ Confirmed
+
+`local_infile` is `ON` on the Linode. No server config change needed. The update script will use `LOAD DATA LOCAL INFILE` (client-side, no `FILE` privilege required) and the `ip2geo` user's existing `CREATE/DROP/ALTER/INSERT` grants cover everything else.
+
+### 4. Add new GitHub Secrets
 
 | Secret | Value |
 |---|---|
