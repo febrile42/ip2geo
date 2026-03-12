@@ -1,0 +1,149 @@
+name: CI/CD
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+
+jobs:
+
+  # ── Runs on both branches ──────────────────────────────────────────────────
+  lint:
+    name: PHP Syntax Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check all PHP files for syntax errors
+        run: find . -name "*.php" -not -path "./.git/*" | xargs -I{} php -l {}
+
+  # ── develop → staging ─────────────────────────────────────────────────────
+  deploy-staging:
+    name: Deploy to Staging
+    needs: lint
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop'
+    steps:
+      - name: Pull develop on Linode (staging dir)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            cd ${{ secrets.STAGING_PATH }}
+            git pull origin develop
+
+  test-staging:
+    name: Test Staging
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop'
+    steps:
+      - uses: actions/checkout@v4
+
+      # All tests hit the origin directly via lime.febrile.net (not proxied by Cloudflare).
+      # The Host header tells Apache which VirtualHost to serve.
+      # This ensures GET results reflect live PHP health and timing reflects actual DB performance.
+
+      - name: Smoke test — staging origin returns HTTP 200
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Host: staging.ip2geo.org" \
+            "http://${{ secrets.DEPLOY_HOST }}")
+          if [ "$STATUS" != "200" ]; then
+            echo "Smoke test failed: HTTP $STATUS"
+            exit 1
+          fi
+          echo "Smoke test passed: HTTP $STATUS"
+
+      - name: Functional test — known IP lookup returns expected country
+        run: |
+          RESPONSE=$(curl -s -X POST \
+            -H "Host: staging.ip2geo.org" \
+            "http://${{ secrets.DEPLOY_HOST }}" \
+            --data-urlencode "ip_list=8.8.8.8 1.1.1.1 208.67.222.222" \
+            -d "submit=1")
+          if echo "$RESPONSE" | grep -qiE "United States|>US<"; then
+            echo "Functional test passed"
+          else
+            echo "Functional test failed: expected US geo data not found"
+            exit 1
+          fi
+
+      - name: Performance test — staging vs production origin (max 25% regression)
+        run: |
+          # Generate two distinct random 10k IP lists to match real usage and avoid
+          # MariaDB query cache skew from sending the same IPs to both environments.
+          STAGING_IPS=$(python3 -c "
+          import random, ipaddress
+          excl = [ipaddress.ip_network(n) for n in [
+            '10.0.0.0/8','172.16.0.0/12','192.168.0.0/16',
+            '127.0.0.0/8','0.0.0.0/8','169.254.0.0/16',
+            '224.0.0.0/4','240.0.0.0/4','100.64.0.0/10']]
+          ips = []
+          while len(ips) < 10000:
+            ip = ipaddress.IPv4Address(random.randint(16777216, 3758096383))
+            if not any(ip in n for n in excl): ips.append(str(ip))
+          print(' '.join(ips))")
+
+          PROD_IPS=$(python3 -c "
+          import random, ipaddress
+          excl = [ipaddress.ip_network(n) for n in [
+            '10.0.0.0/8','172.16.0.0/12','192.168.0.0/16',
+            '127.0.0.0/8','0.0.0.0/8','169.254.0.0/16',
+            '224.0.0.0/4','240.0.0.0/4','100.64.0.0/10']]
+          ips = []
+          while len(ips) < 10000:
+            ip = ipaddress.IPv4Address(random.randint(16777216, 3758096383))
+            if not any(ip in n for n in excl): ips.append(str(ip))
+          print(' '.join(ips))")
+
+          STAGING_TIME=$(curl -s -o /dev/null -w "%{time_total}" \
+            -X POST -H "Host: staging.ip2geo.org" \
+            "http://${{ secrets.DEPLOY_HOST }}" \
+            --data-urlencode "ip_list=${STAGING_IPS}" -d "submit=1")
+
+          PROD_TIME=$(curl -s -o /dev/null -w "%{time_total}" \
+            -X POST -H "Host: ip2geo.org" \
+            "http://${{ secrets.DEPLOY_HOST }}" \
+            --data-urlencode "ip_list=${PROD_IPS}" -d "submit=1")
+
+          echo "Staging: ${STAGING_TIME}s | Production: ${PROD_TIME}s"
+
+          FAIL=$(awk "BEGIN { print ($STAGING_TIME > $PROD_TIME * 1.25) ? 1 : 0 }")
+          if [ "$FAIL" = "1" ]; then
+            echo "Performance regression: staging is >25% slower than production"
+            exit 1
+          fi
+          echo "Performance check passed"
+
+  # ── main → production ─────────────────────────────────────────────────────
+  deploy-production:
+    name: Deploy to Production
+    needs: lint
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Pull main on Linode (production dir)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            cd ${{ secrets.DEPLOY_PATH }}
+            git pull origin main
+
+      - name: Smoke test — production origin returns HTTP 200
+        run: |
+          sleep 3  # brief pause for Apache to serve updated files
+          # Hit origin directly (lime.febrile.net), bypassing Cloudflare cache
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Host: ip2geo.org" \
+            "http://${{ secrets.DEPLOY_HOST }}")
+          if [ "$STATUS" != "200" ]; then
+            echo "Production smoke test failed: HTTP $STATUS"
+            exit 1
+          fi
+          echo "Production smoke test passed"
