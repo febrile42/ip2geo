@@ -36,7 +36,7 @@ jobs:
           port: ${{ secrets.DEPLOY_PORT }}
           script: |
             cd ${{ secrets.STAGING_PATH }}
-            git pull origin develop
+            git fetch origin && git reset --hard origin/develop
 
   test-staging:
     name: Test Staging
@@ -134,7 +134,7 @@ jobs:
           port: ${{ secrets.DEPLOY_PORT }}
           script: |
             cd ${{ secrets.DEPLOY_PATH }}
-            git pull origin main
+            git fetch origin && git reset --hard origin/main
 
       - name: Smoke test — production origin returns HTTP 200
         run: |
