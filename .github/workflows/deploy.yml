@@ -44,7 +44,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/develop'
     steps:
-      - uses: actions/checkout@v4
+      # No checkout needed — all tests use curl directly against the origin
 
       # All tests hit the origin directly via lime.febrile.net (not proxied by Cloudflare).
       # The Host header tells Apache which VirtualHost to serve.
