@@ -1,0 +1,54 @@
+name: Monthly GeoIP Database Update
+
+on:
+  schedule:
+    - cron: '0 3 1 * *'   # 3am UTC on the 1st of every month
+  workflow_dispatch:        # allow manual trigger from GitHub Actions tab
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  update-geoip:
+    name: Update GeoLite2-City Database
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Run update script on Linode
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT }}
+          command_timeout: 30m
+          script: |
+            ~/bin/update-geoip.sh \
+              "${{ secrets.MAXMIND_ACCOUNT_ID }}" \
+              "${{ secrets.MAXMIND_LICENSE_KEY }}"
+
+      - name: Smoke test — production still returns HTTP 200
+        run: |
+          sleep 5
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Host: ip2geo.org" \
+            "http://${{ secrets.DEPLOY_HOST }}")
+          if [ "$STATUS" != "200" ]; then
+            echo "Post-update smoke test failed: HTTP $STATUS"
+            exit 1
+          fi
+          echo "Smoke test passed"
+
+      - name: Functional test — 8.8.8.8 still resolves to US
+        run: |
+          RESPONSE=$(curl -s -X POST \
+            -H "Host: ip2geo.org" \
+            "http://${{ secrets.DEPLOY_HOST }}" \
+            --data-urlencode "ip_list=8.8.8.8" \
+            -d "submit=1")
+          if echo "$RESPONSE" | grep -qiE "United States|>US<"; then
+            echo "Functional test passed"
+          else
+            echo "Functional test failed: 8.8.8.8 did not resolve to US after update"
+            exit 1
+          fi
