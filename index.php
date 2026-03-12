@@ -115,7 +115,7 @@ if($_POST)
 	}
 
 	// Get Country List
-	$countries_query = 'SELECT DISTINCT(`country_iso_code`) FROM `locations`';
+	$countries_query = 'SELECT DISTINCT(`country_iso_code`) FROM `geoip2_location_current` WHERE `country_iso_code` IS NOT NULL';
 	$countries = mysqli_query($con,$countries_query);
 	while($row = mysqli_fetch_array($countries))
 	{
@@ -165,7 +165,7 @@ if($_POST)
 	$totalduration = 0;
 	foreach ($ip_list as $key => $ip) {
 		$ip = mysqli_real_escape_string($con,$ip); // Just in case of crazy awesome hackers, escape our IP "input"
-		$query = 'SELECT country_iso_code, country_name, subdivision_1_name, city_name FROM( SELECT * FROM geoip2_network_20250401_int WHERE "'.ipToLong($ip).'" >= network_start_integer ORDER BY network_start_integer DESC LIMIT 1) net LEFT JOIN geoip2_location_20250401 location ON ( net.geoname_id = location.geoname_id AND location.locale_code = "en" ) WHERE "'.ipToLong($ip).'" <= network_end_integer';
+		$query = 'SELECT country_iso_code, country_name, subdivision_1_name, city_name FROM( SELECT * FROM geoip2_network_current_int WHERE "'.ipToLong($ip).'" >= network_start_integer ORDER BY network_start_integer DESC LIMIT 1) net LEFT JOIN geoip2_location_current location ON ( net.geoname_id = location.geoname_id AND location.locale_code = "en" ) WHERE "'.ipToLong($ip).'" <= network_end_integer';
 		// $query = 'SELECT country_iso_code,country_name,city_name FROM locations WHERE `geoname_id` = (SELECT geoname_id FROM `blocks` INNER JOIN (SELECT MAX(start_ip) AS start FROM `blocks` WHERE start_ip <= INET_ATON("'.$ip.'")) AS s ON (start_ip = s.start) WHERE end_ip >= INET_ATON("'.$ip.'"))';
 		$starttime = microtime(true);
 		$result = mysqli_query($con,$query);
@@ -269,10 +269,11 @@ else
 			<footer id="footer" class="wrapper style1-alt">
 				<div class="inner">
 					<ul class="menu">
-						<li>This product includes GeoLite2 data created by MaxMind, available from <a href="http://www.maxmind.com" target="_new">http://www.maxmind.com</a>.<?php if (!empty($db_data_date)) { echo ' Data: ' . $db_data_date . '.'; } ?></li>
+						<li>This product includes GeoLite2 data created by MaxMind, available from <a href="http://www.maxmind.com" target="_new">http://www.maxmind.com</a>.</li>
 					</ul>
 					<ul class="menu">
 						<li><a href="/changelog.php">v2.2.0</a> &ndash; &copy;<?php echo date("Y"); ?></li>
+						<?php if (!empty($db_data_date)) { echo '<li>Data: ' . $db_data_date . '</li>'; } ?>
 						<li><a href="/privacy.php">Privacy Policy</a></li>
 						<li>Design: <a href="http://html5up.net">HTML5 UP</a></li>
 					</ul>
