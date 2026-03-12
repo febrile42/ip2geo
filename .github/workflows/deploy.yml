@@ -6,6 +6,9 @@ on:
       - main
       - develop
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
 
   # ── Runs on both branches ──────────────────────────────────────────────────
@@ -74,41 +77,37 @@ jobs:
 
       - name: Performance test — staging vs production origin (max 25% regression)
         run: |
-          # Generate two distinct random 10k IP lists to match real usage and avoid
-          # MariaDB query cache skew from sending the same IPs to both environments.
-          STAGING_IPS=$(python3 -c "
+          # Generate two distinct random 10k IP lists written to temp files.
+          # Using files avoids shell "Argument list too long" errors at this scale,
+          # and distinct lists prevent MariaDB query cache skew between environments.
+          python3 -c "
           import random, ipaddress
           excl = [ipaddress.ip_network(n) for n in [
             '10.0.0.0/8','172.16.0.0/12','192.168.0.0/16',
             '127.0.0.0/8','0.0.0.0/8','169.254.0.0/16',
             '224.0.0.0/4','240.0.0.0/4','100.64.0.0/10']]
-          ips = []
-          while len(ips) < 10000:
-            ip = ipaddress.IPv4Address(random.randint(16777216, 3758096383))
-            if not any(ip in n for n in excl): ips.append(str(ip))
-          print(' '.join(ips))")
+          def gen():
+            ips = []
+            while len(ips) < 10000:
+              ip = ipaddress.IPv4Address(random.randint(16777216, 3758096383))
+              if not any(ip in n for n in excl): ips.append(str(ip))
+            return ' '.join(ips)
+          open('/tmp/staging_ips.txt','w').write(gen())
+          open('/tmp/prod_ips.txt','w').write(gen())
+          "
 
-          PROD_IPS=$(python3 -c "
-          import random, ipaddress
-          excl = [ipaddress.ip_network(n) for n in [
-            '10.0.0.0/8','172.16.0.0/12','192.168.0.0/16',
-            '127.0.0.0/8','0.0.0.0/8','169.254.0.0/16',
-            '224.0.0.0/4','240.0.0.0/4','100.64.0.0/10']]
-          ips = []
-          while len(ips) < 10000:
-            ip = ipaddress.IPv4Address(random.randint(16777216, 3758096383))
-            if not any(ip in n for n in excl): ips.append(str(ip))
-          print(' '.join(ips))")
-
+          # curl reads POST body from file via @filename, bypassing arg length limits
           STAGING_TIME=$(curl -s -o /dev/null -w "%{time_total}" \
             -X POST -H "Host: staging.ip2geo.org" \
             "http://${{ secrets.DEPLOY_HOST }}" \
-            --data-urlencode "ip_list=${STAGING_IPS}" -d "submit=1")
+            --data-urlencode "ip_list@/tmp/staging_ips.txt" \
+            -d "submit=1")
 
           PROD_TIME=$(curl -s -o /dev/null -w "%{time_total}" \
             -X POST -H "Host: ip2geo.org" \
             "http://${{ secrets.DEPLOY_HOST }}" \
-            --data-urlencode "ip_list=${PROD_IPS}" -d "submit=1")
+            --data-urlencode "ip_list@/tmp/prod_ips.txt" \
+            -d "submit=1")
 
           echo "Staging: ${STAGING_TIME}s | Production: ${PROD_TIME}s"
 
