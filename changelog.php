@@ -51,8 +51,8 @@
 						<div class="inner">
 							<h1 class="major">Changelog</h1>
 							<h3>2.6.0 - 2026-03-13</h3>
-							<p>The IP lookup engine got a meaningful tune-up, cutting per-IP database time by about 60%. That cuts a 10,000-IP lookup from roughly 4.5 seconds of database time down to under 2. The site also now fires two Google Analytics events for CSV downloads and ip_count, so there's finally a wee little data on how ip2geo is being used being collected. (All of which is still blocked by every ad blocker extension or your friendly neighborhood <a href="https://pi-hole.net/" target="_blank">pi-hole</a>.)</p>
-								<h3>2.5.1 - 2026-03-13</h3>
+							<p>The IP lookup engine got a meaningful tune-up, cutting per-IP database time by about 60%. That cuts a 10,000-IP lookup from roughly 4.5 seconds of database time down to under 2. The site also now fires two Google Analytics events for CSV downloads and <code>ip_count</code>, so there's finally a wee little data on how ip2geo is being used being collected. (All of which is still blocked by ad blocker extensions or your friendly neighborhood <a href="https://pi-hole.net/" target="_blank">pi-hole</a>.)</p>
+							<h3>2.5.1 - 2026-03-13</h3>
 							<p>Historical cruft cleanup.</p>
 							<h3>2.5.0 - 2026-03-13</h3>
 							<p>Submitting a large batch of IPs used to mean staring at a blank page for several seconds. No more. The form now submits via AJAX and a full-viewport loading overlay appears immediately showing how many IPs are being processed and stays visible until results are ready. The overlay falls back gracefully to a normal form submit if JavaScript isn't available. Page load transitions are also faster site-wide.</p>
