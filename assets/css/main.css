@@ -3313,10 +3313,10 @@ input, select, textarea {
 			-webkit-transform: translateY(0);
 			-ms-transform: translateY(0);
 			transform: translateY(0);
-			-moz-transition: opacity 1s ease, -moz-transform 1s ease;
-			-webkit-transition: opacity 1s ease, -webkit-transform 1s ease;
-			-ms-transition: opacity 1s ease, -ms-transform 1s ease;
-			transition: opacity 1s ease, transform 1s ease;
+			-moz-transition: opacity 0.4s ease, -moz-transform 0.4s ease;
+			-webkit-transition: opacity 0.4s ease, -webkit-transform 0.4s ease;
+			-ms-transition: opacity 0.4s ease, -ms-transform 0.4s ease;
+			transition: opacity 0.4s ease, transform 0.4s ease;
 			opacity: 1.0;
 		}
 
@@ -3334,10 +3334,10 @@ input, select, textarea {
 			-webkit-transform: translateY(0);
 			-ms-transform: translateY(0);
 			transform: translateY(0);
-			-moz-transition: opacity 1s ease, -moz-transform 1s ease;
-			-webkit-transition: opacity 1s ease, -webkit-transform 1s ease;
-			-ms-transition: opacity 1s ease, -ms-transform 1s ease;
-			transition: opacity 1s ease, transform 1s ease;
+			-moz-transition: opacity 0.4s ease, -moz-transform 0.4s ease;
+			-webkit-transition: opacity 0.4s ease, -webkit-transform 0.4s ease;
+			-ms-transition: opacity 0.4s ease, -ms-transform 0.4s ease;
+			transition: opacity 0.4s ease, transform 0.4s ease;
 			opacity: 1.0;
 		}
 
@@ -3351,10 +3351,10 @@ input, select, textarea {
 		}
 
 		.wrapper.fade > .inner {
-			-moz-transition: opacity 1s ease;
-			-webkit-transition: opacity 1s ease;
-			-ms-transition: opacity 1s ease;
-			transition: opacity 1s ease;
+			-moz-transition: opacity 0.4s ease;
+			-webkit-transition: opacity 0.4s ease;
+			-ms-transition: opacity 0.4s ease;
+			transition: opacity 0.4s ease;
 			opacity: 1.0;
 		}
 

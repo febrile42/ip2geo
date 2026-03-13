@@ -360,6 +360,60 @@ else
 			</footer>
 
 		<!-- Scripts -->
+		<script>
+		(function() {
+			var form = document.getElementById('iplookup');
+			if (!form) return;
+			form.addEventListener('submit', async function(e) {
+				e.preventDefault();
+
+				var raw = document.getElementById('message').value;
+				var count = raw.trim().split(/\s+/).filter(function(t) { return t.length > 0; }).length;
+
+				var style = document.createElement('style');
+				style.textContent = '#loading-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.88);display:flex;align-items:center;justify-content:center;z-index:9999}#loading-msg{font-family:monospace;font-size:1.1em;color:#fff;letter-spacing:0.05em;animation:lp 1.4s ease-in-out infinite}@keyframes lp{0%,100%{opacity:1}50%{opacity:0.35}}';
+				document.head.appendChild(style);
+
+				var overlay = document.createElement('div');
+				overlay.id = 'loading-overlay';
+				overlay.innerHTML = '<p id="loading-msg">Processing ' + count.toLocaleString() + ' IP' + (count !== 1 ? 's' : '') + '\u2026</p>';
+				document.body.appendChild(overlay);
+
+				var cleanup = function() {
+					overlay.remove();
+					style.remove();
+				};
+
+				try {
+					var resp = await fetch(window.location.pathname, {
+						method: 'POST',
+						body: new FormData(form)
+					});
+					if (!resp.ok) throw new Error('HTTP ' + resp.status);
+					var html = await resp.text();
+					var doc = new DOMParser().parseFromString(html, 'text/html');
+					var newResults = doc.getElementById('results');
+					if (!newResults) throw new Error('no results section in response');
+
+					cleanup();
+
+					var existing = document.getElementById('results');
+					var frag = document.createRange().createContextualFragment(newResults.outerHTML);
+					if (existing) {
+						existing.replaceWith(frag);
+					} else {
+						document.getElementById('intro').after(frag);
+					}
+					var inserted = document.getElementById('results');
+					if (inserted) inserted.scrollIntoView({ behavior: 'smooth' });
+
+				} catch (err) {
+					cleanup();
+					HTMLFormElement.prototype.submit.call(form);
+				}
+			});
+		})();
+		</script>
 			<script src="assets/js/jquery.min.js"></script>
 			<script src="assets/js/jquery.scrollex.min.js"></script>
 			<script src="assets/js/jquery.scrolly.min.js"></script>
