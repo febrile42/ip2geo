@@ -1,0 +1,6 @@
+Options -Indexes
+
+# Block direct HTTP access to shell scripts
+<Files "*.sh">
+    Require all denied
+</Files>

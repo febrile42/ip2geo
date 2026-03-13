@@ -2,7 +2,7 @@
 # Monthly GeoLite2-City database update
 # Usage: update-geoip.sh ACCOUNT_ID LICENSE_KEY
 #
-# Runs on the Linode as shadows. Install to ~/bin/update-geoip.sh and chmod +x.
+# Runs on the deployment server. Install to ~/bin/update-geoip.sh and chmod +x.
 # Triggered monthly by .github/workflows/update-db.yml via SSH.
 set -euo pipefail
 
@@ -11,7 +11,7 @@ LICENSE_KEY="${2:?MaxMind License Key required}"
 
 PROD_PATH="/var/www/ip2geo"
 STAGING_PATH="/var/www/ip2geo-staging"
-WORK_DIR="/home/shadows/geoip-update"
+WORK_DIR="$HOME/geoip-update"
 
 # Read DB credentials from config.php (single source of truth)
 DB_HOST=$(php -r "require '$PROD_PATH/config.php'; echo \$db_host;")

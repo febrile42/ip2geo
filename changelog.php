@@ -22,16 +22,6 @@
 		<noscript><link rel="stylesheet" href="assets/css/noscript.css" /></noscript>
 	</head>
 	<body class="is-preload">
-<script>
-  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
-  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
-  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
-  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
-
-  ga('create', 'UA-102801602-1', 'auto');
-  ga('send', 'pageview');
-
-</script>
 
 		<!-- Header -->
 			<header id="header">
@@ -50,6 +40,8 @@
 					<section id="main" class="wrapper">
 						<div class="inner">
 							<h1 class="major">Changelog</h1>
+							<h3>2.6.1 - 2026-03-13</h3>
+							<p>Pre-publication housekeeping ahead of open-sourcing the repo. Added defensive HTML escaping on database output values (correct in principle, harmless in practice given the source). Removed a dead Google Universal Analytics snippet still haunting a couple of pages two years after UA shut down. Tidied internal server references out of CI workflow comments, and fixed <code>rand_ips.php</code> to use <code>random_int()</code> so generated test IPs actually cover the full IPv4 address space instead of just the lower half.</p>
 							<h3>2.6.0 - 2026-03-13</h3>
 							<p>The IP lookup engine got a meaningful tune-up, cutting per-IP database time by about 60%. That cuts a 10,000-IP lookup from roughly 4.5 seconds of database time down to under 2. The site also now fires two Google Analytics events for CSV downloads and <code>ip_count</code>, so there's finally a wee little data on how ip2geo is being used being collected. (All of which is still blocked by ad blocker extensions or your friendly neighborhood <a href="https://pi-hole.net/" target="_blank">pi-hole</a>.)</p>
 							<h3>2.5.1 - 2026-03-13</h3>

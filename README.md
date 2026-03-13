@@ -2,7 +2,7 @@
 
 Bulk IPv4 geolocation lookup tool. Paste in a wall of text, log output, or a list of IPs — it finds the addresses, queries the database, and returns country, region, and city for each one. Handles up to 10,000 IPs per request.
 
-Live at [ip2geo.org](https://ip2geo.org).
+Live at [ip2geo.org](https://ip2geo.org) since 2017.
 
 ---
 
@@ -78,7 +78,7 @@ git checkout main && git merge develop && git push origin main
 
 Tests run on GitHub's infrastructure (zero load on the server). All test requests bypass Cloudflare by hitting the origin directly with `Host:` headers — this ensures smoke tests reflect actual PHP health and performance numbers reflect actual database query time, not CDN cache hits.
 
-See `CICD-PLAN.md` for the full pipeline design and setup instructions.
+See `.github/workflows/` for the full pipeline definition.
 
 ### Database Updates
 
@@ -103,7 +103,6 @@ A few intentional choices worth noting for anyone picking this up:
 - **No Composer, no npm.** Dependencies add surface area. The stack is PHP + SQL and that's sufficient.
 - **Speed is a priority.** The app runs on shared hosting with constrained resources. Query design and data structure decisions optimize for this.
 - **`config.php` is the only secret.** DB credentials live there, it's gitignored, and it's the only file that needs to be managed separately on the server.
-- **Git is the version history.** Old versioned `index-2.x.x.php` files are gone. If you need to see what changed, that's what `git log` is for.
 
 ---
 
@@ -111,3 +110,4 @@ A few intentional choices worth noting for anyone picking this up:
 
 - Geolocation data: [MaxMind GeoLite2](https://dev.maxmind.com/geoip/geolite2-free-geolocation-data). This product includes GeoLite2 data created by MaxMind, available from [maxmind.com](http://www.maxmind.com).
 - HTML/CSS template: [Hyperspace](https://html5up.net/hyperspace) by [HTML5 UP](https://html5up.net), released under the [CCA 3.0 license](https://html5up.net/license).
+- and [Claude Code](https://claude.com/product/claude-code) for helping implement all [my](https://github.com/febrile42/) lingering to-dos and experiments.

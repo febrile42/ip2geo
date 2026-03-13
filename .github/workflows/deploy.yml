@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/develop'
     steps:
-      - name: Pull develop on Linode (staging dir)
+      - name: Pull develop on server (staging dir)
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DEPLOY_HOST }}
@@ -46,9 +46,9 @@ jobs:
     steps:
       # No checkout needed — all tests use curl directly against the origin
 
-      # All tests hit the origin directly via lime.febrile.net (not proxied by Cloudflare).
+      # All tests hit the origin server directly (bypassing Cloudflare) using the DEPLOY_HOST secret.
       # The Host header tells Apache which VirtualHost to serve.
-      # This ensures GET results reflect live PHP health and timing reflects actual DB performance.
+      # This ensures results reflect live PHP health and timing reflects actual DB performance.
 
       - name: Smoke test — staging origin returns HTTP 200
         run: |
@@ -125,7 +125,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     steps:
-      - name: Pull main on Linode (production dir)
+      - name: Pull main on server (production dir)
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DEPLOY_HOST }}
@@ -139,7 +139,7 @@ jobs:
       - name: Smoke test — production origin returns HTTP 200
         run: |
           sleep 3  # brief pause for Apache to serve updated files
-          # Hit origin directly (lime.febrile.net), bypassing Cloudflare cache
+          # Hit origin directly (DEPLOY_HOST), bypassing Cloudflare cache
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
             -H "Host: ip2geo.org" \
             "http://${{ secrets.DEPLOY_HOST }}")

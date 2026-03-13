@@ -179,11 +179,11 @@ if($_POST)
 			if(!in_array($row['country_iso_code'],$good_countries))
 			{
 				$rows_html .= '<tr>';
-				$rows_html .= '<td>'.$ip.'</td>';
-				$rows_html .= '<td>'.$row['country_iso_code'].'</td>';
-				$rows_html .= '<td>'.$row['country_name'].'</td>';
-				$rows_html .= '<td>'.$row['subdivision_1_name'].'</td>';
-				$rows_html .= '<td>'.$row['city_name'].'</td>';
+				$rows_html .= '<td>'.htmlspecialchars($ip, ENT_QUOTES, 'UTF-8').'</td>';
+				$rows_html .= '<td>'.htmlspecialchars($row['country_iso_code'], ENT_QUOTES, 'UTF-8').'</td>';
+				$rows_html .= '<td>'.htmlspecialchars($row['country_name'], ENT_QUOTES, 'UTF-8').'</td>';
+				$rows_html .= '<td>'.htmlspecialchars($row['subdivision_1_name'], ENT_QUOTES, 'UTF-8').'</td>';
+				$rows_html .= '<td>'.htmlspecialchars($row['city_name'], ENT_QUOTES, 'UTF-8').'</td>';
 				$rows_html .= '</tr>';
 				$matches_total++;
 			} else {
@@ -309,7 +309,7 @@ else
 						<li>This product includes GeoLite2 data created by MaxMind, available from <a href="http://www.maxmind.com" target="_new">http://www.maxmind.com</a>.</li>
 					</ul>
 					<ul class="menu">
-						<li><a href="/changelog.php">v2.6.0</a> &ndash; &copy;<?php echo date("Y"); ?></li>
+						<li><a href="/changelog.php">v2.6.1</a> &ndash; &copy;<?php echo date("Y"); ?></li>
 						<?php if (!empty($db_data_date)) { echo '<li>Data: ' . $db_data_date . '</li>'; } ?>
 						<li><a href="/privacy.php">Privacy Policy</a></li>
 						<li>Design: <a href="http://html5up.net">HTML5 UP</a></li>
