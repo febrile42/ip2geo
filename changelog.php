@@ -50,7 +50,9 @@
 					<section id="main" class="wrapper">
 						<div class="inner">
 							<h1 class="major">Changelog</h1>
-							<h3>2.4.0 - 2026-03-12</h3>
+							<h3>2.5.0 - 2026-03-13</h3>
+						<p>Submitting a large batch of IPs used to mean staring at a blank page for several seconds. No more. The form now submits via AJAX — a full-viewport loading overlay appears immediately, shows how many IPs are being processed (counted from the actual text, not the word count), and stays visible until results are ready. The page never navigates away. The overlay picks up the site's purple-to-pink gradient, includes an animated ellipsis, and falls back gracefully to a normal form submit if JavaScript isn't available. Page load transitions are also faster site-wide.</p>
+						<h3>2.4.0 - 2026-03-12</h3>
 						<p>Two releases in one day. We're on a roll. Results are now exportable: a Download CSV button appears above the table after any lookup, generating a properly-quoted RFC 4180 file client-side with no second round-trip to the server. IPs that returned no geo data get their own toggleable section so they're out of the way but not silently discarded. The summary stats below results got a full makeover — monospace, column-aligned, and actually informative (submitted vs. matched vs. filtered vs. unresolved, all accounted for). Also quietly retired <code>about.php</code> and its legacy UA analytics snippet, which had no business still existing.</p>
 						<h3>2.3.0 - 2026-03-12</h3>
 						<p>Taught ip2geo.org to update its own data. MaxMind's GeoLite2-City database now refreshes automatically on the first of every month: downloaded, converted, imported into shadow tables, verified against a known IP, then swapped in atomically while the old data keeps serving. If anything looks off, it rolls back and files a strongly-worded GitHub Actions failure notification. Also added a data freshness date to the footer, because it turns out people care how old their geolocation data is.</p>
