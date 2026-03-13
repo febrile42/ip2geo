@@ -371,12 +371,13 @@ else
 				e.stopPropagation();
 
 				var raw = document.getElementById('message').value;
-				var count = raw.trim().split(/\s+/).filter(function(t) { return t.length > 0; }).length;
+				var matches = raw.match(/\b(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\b/g);
+				var count = matches ? matches.length : 0;
 
 				var overlay = document.createElement('div');
-				overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.88);display:flex;align-items:center;justify-content:center;z-index:2147483647;';
+				overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:linear-gradient(to right,rgba(94,66,166,0.97),rgba(183,78,145,0.97));display:flex;align-items:center;justify-content:center;z-index:2147483647;';
 				var msg = document.createElement('div');
-				msg.style.cssText = 'font-family:monospace;font-size:1.1em;color:#fff;letter-spacing:0.05em;';
+				msg.style.cssText = 'font-family:monospace;font-size:1.1em;color:#fff;letter-spacing:0.05em;opacity:0.9;';
 				msg.textContent = 'Processing ' + count.toLocaleString() + ' IP' + (count !== 1 ? 's' : '') + '\u2026';
 				overlay.appendChild(msg);
 				document.body.appendChild(overlay);
