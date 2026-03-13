@@ -3919,4 +3919,13 @@ input, select, textarea {
 		background: none;
 	}
 
+	#stats-table td {
+		padding: 1px 0;
+	}
+
+	#stats-table td:first-child {
+		padding-right: 1em;
+		text-align: right;
+	}
+
 		}

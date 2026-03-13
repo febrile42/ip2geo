@@ -222,15 +222,15 @@ if($_POST)
 	// --- Summary stats ---
 	$submitted = count($ip_list);
 	echo '<table id="stats-table" style="font-family:monospace;font-size:0.8em;border-collapse:collapse;margin-top:0.5em;width:auto">';
-	echo '<tr><td style="padding:1px 1em 1px 0;text-align:right">'.$submitted.'</td><td>IP'.($submitted !== 1 ? 's' : '').' submitted (valid, unique, non-private)</td></tr>';
-	echo '<tr><td style="padding:1px 1em 1px 0;text-align:right">'.$matches_total.'</td><td>returned geo results</td></tr>';
+	echo '<tr><td>'.$submitted.'</td><td>IP'.($submitted !== 1 ? 's' : '').' submitted (valid, unique, non-private)</td></tr>';
+	echo '<tr><td>'.$matches_total.'</td><td>returned geo results</td></tr>';
 	if ($filtered_total > 0) {
-		echo '<tr><td style="padding:1px 1em 1px 0;text-align:right">'.$filtered_total.'</td><td>excluded by country filter</td></tr>';
+		echo '<tr><td>'.$filtered_total.'</td><td>excluded by country filter</td></tr>';
 	}
-	echo '<tr><td style="padding:1px 1em 1px 0;text-align:right">'.count($no_result_ips).'</td><td>returned no geo data</td></tr>';
-	echo '<tr><td style="padding:1px 1em 1px 0;text-align:right">'.round($totalduration,3).'s</td><td>query duration</td></tr>';
+	echo '<tr><td>'.count($no_result_ips).'</td><td>returned no geo data</td></tr>';
+	echo '<tr><td>'.round($totalduration,3).'s</td><td>query duration</td></tr>';
 	if (!empty($good_countries)) {
-		echo '<tr><td style="padding:1px 1em 1px 0;text-align:right">—</td><td>excluded countries: '.htmlspecialchars(implode(' ', $good_countries)).'</td></tr>';
+		echo '<tr><td>—</td><td>excluded countries: '.htmlspecialchars(implode(' ', $good_countries)).'</td></tr>';
 	}
 	echo '</table>';
 
