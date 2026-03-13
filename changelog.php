@@ -50,7 +50,9 @@
 					<section id="main" class="wrapper">
 						<div class="inner">
 							<h1 class="major">Changelog</h1>
-							<h3>2.5.0 - 2026-03-13</h3>
+							<h3>2.5.1 - 2026-03-13</h3>
+						<p>Historical cruft cleanup.</p>
+						<h3>2.5.0 - 2026-03-13</h3>
 							<p>Submitting a large batch of IPs used to mean staring at a blank page for several seconds. No more. The form now submits via AJAX and a full-viewport loading overlay appears immediately showing how many IPs are being processed and stays visible until results are ready. The overlay falls back gracefully to a normal form submit if JavaScript isn't available. Page load transitions are also faster site-wide.</p>
 							<h3>2.4.0 - 2026-03-12</h3>
 							<p>Two releases in one day. We're on a roll. Results are now exportable: a Download CSV button appears above the table after any lookup, generating a properly-quoted RFC 4180 file client-side with no second round-trip to the server. IPs that returned no geo data get their own toggleable section so they're out of the way but not silently discarded. The summary stats below results got a full makeover — monospace, column-aligned, and actually informative (submitted vs. matched vs. filtered vs. unresolved, all accounted for). Also quietly retired <code>about.php</code> and its legacy UA analytics snippet, which had no business still existing.</p>

@@ -309,7 +309,7 @@ else
 						<li>This product includes GeoLite2 data created by MaxMind, available from <a href="http://www.maxmind.com" target="_new">http://www.maxmind.com</a>.</li>
 					</ul>
 					<ul class="menu">
-						<li><a href="/changelog.php">v2.5.0</a> &ndash; &copy;<?php echo date("Y"); ?></li>
+						<li><a href="/changelog.php">v2.5.1</a> &ndash; &copy;<?php echo date("Y"); ?></li>
 						<?php if (!empty($db_data_date)) { echo '<li>Data: ' . $db_data_date . '</li>'; } ?>
 						<li><a href="/privacy.php">Privacy Policy</a></li>
 						<li>Design: <a href="http://html5up.net">HTML5 UP</a></li>
