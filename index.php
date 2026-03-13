@@ -364,8 +364,11 @@ else
 		(function() {
 			var form = document.getElementById('iplookup');
 			if (!form) return;
-			form.addEventListener('submit', async function(e) {
+			var btn = form.querySelector('input[type="submit"]');
+			if (!btn) return;
+			btn.addEventListener('click', async function(e) {
 				e.preventDefault();
+				e.stopPropagation();
 
 				var raw = document.getElementById('message').value;
 				var count = raw.trim().split(/\s+/).filter(function(t) { return t.length > 0; }).length;
