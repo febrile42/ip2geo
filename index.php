@@ -367,6 +367,7 @@ else
 					if (!newResults) throw new Error('no results section in response');
 
 					cleanup();
+					gtag('event', 'lookup_submit', { ip_count: count });
 
 					var existing = document.getElementById('results');
 					if (existing) {
@@ -385,6 +386,7 @@ else
 		// CSV download (delegated — works after AJAX injection)
 		document.addEventListener('click', function(e) {
 			if (e.target.id !== 'download-csv') return;
+			gtag('event', 'download_csv');
 			var bom = '\uFEFF';
 			var headers = ['IP','Country Code','Country','State/Province','City'];
 			var rows = [headers];
