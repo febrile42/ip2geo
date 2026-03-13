@@ -235,46 +235,6 @@ if($_POST)
 	echo '</table>';
 
 	// --- Inline JS: CSV download + unresolved toggle ---
-	?>
-	<script>
-	(function() {
-		// CSV download
-		document.getElementById('download-csv').addEventListener('click', function() {
-			var bom = '\uFEFF';
-			var headers = ['IP','Country Code','Country','State/Province','City'];
-			var rows = [headers];
-			var trs = document.querySelectorAll('#results-table tbody tr');
-			trs.forEach(function(tr) {
-				if (tr.parentElement.style.display === 'none') return;
-				var cols = tr.querySelectorAll('td');
-				var row = [];
-				cols.forEach(function(td) {
-					var val = td.textContent.replace(/"/g, '""');
-					row.push(/[,"\n]/.test(val) ? '"' + val + '"' : val);
-				});
-				rows.push(row);
-			});
-			var csv = bom + rows.map(function(r) { return r.join(','); }).join('\r\n');
-			var a = document.createElement('a');
-			a.href = URL.createObjectURL(new Blob([csv], {type: 'text/csv;charset=utf-8;'}));
-			a.download = 'ip2geo-results.csv';
-			a.click();
-			URL.revokeObjectURL(a.href);
-		});
-
-		// Toggle unresolved rows
-		var toggleBtn = document.getElementById('toggle-unresolved');
-		if (toggleBtn) {
-			var unresolvedBody = document.getElementById('unresolved-rows');
-			var n = unresolvedBody.rows.length;
-			toggleBtn.addEventListener('click', function() {
-				var hidden = unresolvedBody.style.display === 'none';
-				unresolvedBody.style.display = hidden ? '' : 'none';
-				toggleBtn.textContent = (hidden ? 'Hide ' : 'Show ') + n + ' unresolved IP' + (n !== 1 ? 's' : '');
-			});
-		}
-	})();
-	</script>
 	<?php
 	echo '</section></section>';
 }
@@ -411,11 +371,10 @@ else
 					cleanup();
 
 					var existing = document.getElementById('results');
-					var frag = document.createRange().createContextualFragment(newResults.outerHTML);
 					if (existing) {
-						existing.replaceWith(frag);
+						existing.outerHTML = newResults.outerHTML;
 					} else {
-						document.getElementById('intro').after(frag);
+						document.getElementById('intro').insertAdjacentHTML('afterend', newResults.outerHTML);
 					}
 					var inserted = document.getElementById('results');
 					if (inserted) inserted.scrollIntoView({ behavior: 'smooth' });
@@ -425,6 +384,40 @@ else
 					HTMLFormElement.prototype.submit.call(form);
 				}
 			});
+		// CSV download (delegated — works after AJAX injection)
+		document.addEventListener('click', function(e) {
+			if (e.target.id !== 'download-csv') return;
+			var bom = '\uFEFF';
+			var headers = ['IP','Country Code','Country','State/Province','City'];
+			var rows = [headers];
+			document.querySelectorAll('#results-table tbody tr').forEach(function(tr) {
+				if (tr.parentElement.style.display === 'none') return;
+				var row = [];
+				tr.querySelectorAll('td').forEach(function(td) {
+					var val = td.textContent.replace(/"/g, '""');
+					row.push(/[,"\n]/.test(val) ? '"' + val + '"' : val);
+				});
+				rows.push(row);
+			});
+			var csv = bom + rows.map(function(r) { return r.join(','); }).join('\r\n');
+			var a = document.createElement('a');
+			a.href = URL.createObjectURL(new Blob([csv], {type: 'text/csv;charset=utf-8;'}));
+			a.download = 'ip2geo-results.csv';
+			a.click();
+			URL.revokeObjectURL(a.href);
+		});
+
+		// Toggle unresolved rows (delegated — works after AJAX injection)
+		document.addEventListener('click', function(e) {
+			if (e.target.id !== 'toggle-unresolved') return;
+			var unresolvedBody = document.getElementById('unresolved-rows');
+			if (!unresolvedBody) return;
+			var hidden = unresolvedBody.style.display === 'none';
+			unresolvedBody.style.display = hidden ? '' : 'none';
+			var n = unresolvedBody.rows.length;
+			e.target.textContent = (hidden ? 'Hide ' : 'Show ') + n + ' unresolved IP' + (n !== 1 ? 's' : '');
+		});
+
 		})();
 		</script>
 			<script src="assets/js/jquery.min.js"></script>
