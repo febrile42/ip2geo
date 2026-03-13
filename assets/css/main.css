@@ -3906,4 +3906,15 @@ input, select, textarea {
 				background-attachment: scroll;
 			}
 
+/* ip2geo customizations */
+
+	#stats-table tbody tr {
+		border: none;
+		background: none;
+	}
+
+	#stats-table tbody tr:nth-child(2n + 1) {
+		background: none;
+	}
+
 		}
