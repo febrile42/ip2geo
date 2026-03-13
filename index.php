@@ -360,8 +360,8 @@ else
 			</footer>
 
 		<!-- Scripts -->
-		<script>
-		document.addEventListener('DOMContentLoaded', function() {
+		<script data-cfasync="false">
+		(function() {
 			var form = document.getElementById('iplookup');
 			if (!form) return;
 			form.addEventListener('submit', async function(e) {
@@ -410,7 +410,7 @@ else
 					HTMLFormElement.prototype.submit.call(form);
 				}
 			});
-		});
+		})();
 		</script>
 			<script src="assets/js/jquery.min.js"></script>
 			<script src="assets/js/jquery.scrollex.min.js"></script>
