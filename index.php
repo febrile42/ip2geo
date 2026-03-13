@@ -361,7 +361,7 @@ else
 
 		<!-- Scripts -->
 		<script>
-		(function() {
+		document.addEventListener('DOMContentLoaded', function() {
 			var form = document.getElementById('iplookup');
 			if (!form) return;
 			form.addEventListener('submit', async function(e) {
@@ -370,19 +370,16 @@ else
 				var raw = document.getElementById('message').value;
 				var count = raw.trim().split(/\s+/).filter(function(t) { return t.length > 0; }).length;
 
-				var style = document.createElement('style');
-				style.textContent = '#loading-msg{font-family:monospace;font-size:1.1em;color:#fff;letter-spacing:0.05em;animation:lp 1.4s ease-in-out infinite}@keyframes lp{0%,100%{opacity:1}50%{opacity:0.35}}';
-				document.head.appendChild(style);
-
 				var overlay = document.createElement('div');
-				overlay.id = 'loading-overlay';
 				overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.88);display:flex;align-items:center;justify-content:center;z-index:2147483647;';
-				overlay.innerHTML = '<p id="loading-msg">Processing ' + count.toLocaleString() + ' IP' + (count !== 1 ? 's' : '') + '\u2026</p>';
+				var msg = document.createElement('div');
+				msg.style.cssText = 'font-family:monospace;font-size:1.1em;color:#fff;letter-spacing:0.05em;';
+				msg.textContent = 'Processing ' + count.toLocaleString() + ' IP' + (count !== 1 ? 's' : '') + '\u2026';
+				overlay.appendChild(msg);
 				document.body.appendChild(overlay);
 
 				var cleanup = function() {
 					overlay.remove();
-					style.remove();
 				};
 
 				try {
@@ -413,7 +410,7 @@ else
 					HTMLFormElement.prototype.submit.call(form);
 				}
 			});
-		})();
+		});
 		</script>
 			<script src="assets/js/jquery.min.js"></script>
 			<script src="assets/js/jquery.scrollex.min.js"></script>
