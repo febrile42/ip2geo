@@ -14,4 +14,8 @@
   <loc>https://ip2geo.org/privacy.php</loc>
   <changefreq>monthly</changefreq>
 </url>
+<url>
+  <loc>https://ip2geo.org/changelog.php</loc>
+  <changefreq>monthly</changefreq>
+</url>
 </urlset>

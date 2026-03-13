@@ -3,3 +3,6 @@ config.php
 
 # Written by the monthly MaxMind update script; not tracked in git
 db_version.php
+
+# Google Search Console verification — place manually on server if needed
+google*.html
