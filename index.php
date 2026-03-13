@@ -166,7 +166,7 @@ if($_POST)
 	$rows_html = '';
 	foreach ($ip_list as $key => $ip) {
 		$ip = mysqli_real_escape_string($con,$ip); // Just in case of crazy awesome hackers, escape our IP "input"
-		$query = 'SELECT country_iso_code, country_name, subdivision_1_name, city_name FROM( SELECT * FROM geoip2_network_current_int WHERE "'.ipToLong($ip).'" >= network_start_integer ORDER BY network_start_integer DESC LIMIT 1) net LEFT JOIN geoip2_location_current location ON ( net.geoname_id = location.geoname_id AND location.locale_code = "en" ) WHERE "'.ipToLong($ip).'" <= network_end_integer';
+		$query = 'SELECT country_iso_code, country_name, subdivision_1_name, city_name FROM( SELECT geoname_id, network_end_integer FROM geoip2_network_current_int WHERE "'.ipToLong($ip).'" >= network_start_integer ORDER BY network_start_integer DESC LIMIT 1) net LEFT JOIN geoip2_location_current location ON ( net.geoname_id = location.geoname_id AND location.locale_code = "en" ) WHERE "'.ipToLong($ip).'" <= network_end_integer';
 		// $query = 'SELECT country_iso_code,country_name,city_name FROM locations WHERE `geoname_id` = (SELECT geoname_id FROM `blocks` INNER JOIN (SELECT MAX(start_ip) AS start FROM `blocks` WHERE start_ip <= INET_ATON("'.$ip.'")) AS s ON (start_ip = s.start) WHERE end_ip >= INET_ATON("'.$ip.'"))';
 		$starttime = microtime(true);
 		$result = mysqli_query($con,$query);
