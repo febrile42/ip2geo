@@ -54,9 +54,6 @@ DROP TABLE IF EXISTS geoip2_network_incoming_int;
 DROP TABLE IF EXISTS geoip2_location_incoming;
 CREATE TABLE geoip2_network_incoming_int LIKE geoip2_network_current_int;
 CREATE TABLE geoip2_location_incoming LIKE geoip2_location_current;
-ALTER TABLE geoip2_network_incoming_int
-  MODIFY COLUMN network_start varbinary(16) NULL,
-  MODIFY COLUMN network_end varbinary(16) NULL;
 SQL
 
 echo "[5/10] Importing network blocks (~3.3M rows, takes a few minutes)..."
@@ -69,7 +66,7 @@ IGNORE 1 ROWS
 (network_start_integer, @net_last, geoname_id, registered_country_geoname_id, represented_country_geoname_id,
  is_anonymous_proxy, is_satellite_provider, postal_code, latitude, longitude,
  accuracy_radius, is_anycast)
-SET network_start = NULL, network_end = NULL, network_end_integer = @net_last;"
+SET network_end_integer = @net_last;"
 
 echo "[6/10] Importing location data..."
 $MYSQL --local-infile=1 -e "
