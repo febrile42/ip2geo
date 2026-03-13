@@ -221,18 +221,18 @@ if($_POST)
 
 	// --- Summary stats ---
 	$submitted = count($ip_list);
-	echo '<ul>';
-	echo '<li>'.$submitted.' IP'.($submitted !== 1 ? 's' : '').' submitted (valid, unique, non-private)</li>';
-	echo '<li>'.$matches_total.' returned geo results</li>';
+	echo '<table style="font-family:monospace;font-size:0.8em;border-collapse:collapse;margin-top:0.5em">';
+	echo '<tr><td style="padding:1px 1em 1px 0;text-align:right">'.$submitted.'</td><td>IP'.($submitted !== 1 ? 's' : '').' submitted (valid, unique, non-private)</td></tr>';
+	echo '<tr><td style="padding:1px 1em 1px 0;text-align:right">'.$matches_total.'</td><td>returned geo results</td></tr>';
 	if ($filtered_total > 0) {
-		echo '<li>'.$filtered_total.' excluded by country filter</li>';
+		echo '<tr><td style="padding:1px 1em 1px 0;text-align:right">'.$filtered_total.'</td><td>excluded by country filter</td></tr>';
 	}
-	echo '<li>'.count($no_result_ips).' returned no geo data</li>';
-	echo '<li>Query duration: '.round($totalduration,3).'s</li>';
+	echo '<tr><td style="padding:1px 1em 1px 0;text-align:right">'.count($no_result_ips).'</td><td>returned no geo data</td></tr>';
+	echo '<tr><td style="padding:1px 1em 1px 0;text-align:right">'.round($totalduration,3).'s</td><td>query duration</td></tr>';
 	if (!empty($good_countries)) {
-		echo '<li>Excluded countries: '.implode(' ', $good_countries).'</li>';
+		echo '<tr><td style="padding:1px 1em 1px 0;text-align:right">—</td><td>excluded countries: '.htmlspecialchars(implode(' ', $good_countries)).'</td></tr>';
 	}
-	echo '</ul>';
+	echo '</table>';
 
 	// --- Inline JS: CSV download + unresolved toggle ---
 	?>
