@@ -159,10 +159,11 @@ if($_POST)
 	// What're our acceptable countries?
 	// $good_countries = array('US','CA');
 
-	echo '<section id="results" class="wrapper style4 fade-up"><div class="inner"><div class="table-wrapper"><h2 id="result">Lookup Results</h2><table><thead><th>IP</th><th>Country Code</th><th>Country</th><th>State/Province</th><th>City</th></thead><tbody>';
-
 	$matches_total = 0;
+	$filtered_total = 0;
+	$no_result_ips = [];
 	$totalduration = 0;
+	$rows_html = '';
 	foreach ($ip_list as $key => $ip) {
 		$ip = mysqli_real_escape_string($con,$ip); // Just in case of crazy awesome hackers, escape our IP "input"
 		$query = 'SELECT country_iso_code, country_name, subdivision_1_name, city_name FROM( SELECT * FROM geoip2_network_current_int WHERE "'.ipToLong($ip).'" >= network_start_integer ORDER BY network_start_integer DESC LIMIT 1) net LEFT JOIN geoip2_location_current location ON ( net.geoname_id = location.geoname_id AND location.locale_code = "en" ) WHERE "'.ipToLong($ip).'" <= network_end_integer';
@@ -171,32 +172,110 @@ if($_POST)
 		$result = mysqli_query($con,$query);
 		$endtime = microtime(true);
 		$duration = $endtime - $starttime;
+		$geo_found = false;
 		while($row = mysqli_fetch_array($result))
 		{
+			$geo_found = true;
 			if(!in_array($row['country_iso_code'],$good_countries))
 			{
-				echo '<tr>';
-				echo '<td>'.$ip.'</td>';
-				echo '<td>'.$row['country_iso_code'].'</td>';
-				echo '<td>'.$row['country_name'].'</td>';
-				echo '<td>'.$row['subdivision_1_name'].'</td>';
-				echo '<td>'.$row['city_name'].'</td>';
-				// echo '<td><small>('.round($duration,3).'s)</small></td>';
-				echo '</tr>';
+				$rows_html .= '<tr>';
+				$rows_html .= '<td>'.$ip.'</td>';
+				$rows_html .= '<td>'.$row['country_iso_code'].'</td>';
+				$rows_html .= '<td>'.$row['country_name'].'</td>';
+				$rows_html .= '<td>'.$row['subdivision_1_name'].'</td>';
+				$rows_html .= '<td>'.$row['city_name'].'</td>';
+				$rows_html .= '</tr>';
 				$matches_total++;
+			} else {
+				$filtered_total++;
 			}
 		}
+		if (!$geo_found) $no_result_ips[] = $ip;
 		$totalduration = $totalduration + $duration;
 	}
-	echo '</tbody></table></div>';
-	echo '<ul><li>Total valid, unique IPs submitted: '.count($ip_list).'</li><li>Total Geo Matches: '.$matches_total.'</li><li>Query Duration: '.round($totalduration,3).'s</li>';
-	echo '<li>IPs filtered: ';
-	if (empty($good_countries)) {
-		echo "none";
-	} else {
-		echo implode(" ", $good_countries);
+
+	// --- Output results section (counts are now known) ---
+	echo '<section id="results" class="wrapper style4 fade-up"><div class="inner"><div class="table-wrapper">';
+	echo '<h2 id="result">Lookup Results</h2>';
+	echo '<p style="margin-bottom:1em">';
+	echo '<button id="download-csv" class="button small">&#8595; Download CSV</button>';
+	if (!empty($no_result_ips)) {
+		$n = count($no_result_ips);
+		echo ' <button id="toggle-unresolved" class="button small alt">Show '.$n.' unresolved IP'.($n !== 1 ? 's' : '').'</button>';
 	}
-	echo '</li></ul>';
+	echo '</p>';
+
+	echo '<table id="results-table"><thead><th>IP</th><th>Country Code</th><th>Country</th><th>State/Province</th><th>City</th></thead><tbody>';
+	echo $rows_html;
+	echo '</tbody>';
+
+	if (!empty($no_result_ips)) {
+		echo '<tbody id="unresolved-rows" style="display:none">';
+		foreach ($no_result_ips as $unresolved_ip) {
+			echo '<tr><td>'.htmlspecialchars($unresolved_ip, ENT_QUOTES, 'UTF-8').'</td><td></td><td></td><td></td><td></td></tr>';
+		}
+		echo '</tbody>';
+	}
+
+	echo '</table></div>';
+
+	// --- Summary stats ---
+	$submitted = count($ip_list);
+	echo '<ul>';
+	echo '<li>'.$submitted.' IP'.($submitted !== 1 ? 's' : '').' submitted (valid, unique, non-private)</li>';
+	echo '<li>'.$matches_total.' returned geo results</li>';
+	if ($filtered_total > 0) {
+		echo '<li>'.$filtered_total.' excluded by country filter</li>';
+	}
+	echo '<li>'.count($no_result_ips).' returned no geo data</li>';
+	echo '<li>Query duration: '.round($totalduration,3).'s</li>';
+	if (!empty($good_countries)) {
+		echo '<li>Excluded countries: '.implode(' ', $good_countries).'</li>';
+	}
+	echo '</ul>';
+
+	// --- Inline JS: CSV download + unresolved toggle ---
+	?>
+	<script>
+	(function() {
+		// CSV download
+		document.getElementById('download-csv').addEventListener('click', function() {
+			var bom = '\uFEFF';
+			var headers = ['IP','Country Code','Country','State/Province','City'];
+			var rows = [headers];
+			var trs = document.querySelectorAll('#results-table tbody tr');
+			trs.forEach(function(tr) {
+				if (tr.parentElement.style.display === 'none') return;
+				var cols = tr.querySelectorAll('td');
+				var row = [];
+				cols.forEach(function(td) {
+					var val = td.textContent.replace(/"/g, '""');
+					row.push(/[,"\n]/.test(val) ? '"' + val + '"' : val);
+				});
+				rows.push(row);
+			});
+			var csv = bom + rows.map(function(r) { return r.join(','); }).join('\r\n');
+			var a = document.createElement('a');
+			a.href = URL.createObjectURL(new Blob([csv], {type: 'text/csv;charset=utf-8;'}));
+			a.download = 'ip2geo-results.csv';
+			a.click();
+			URL.revokeObjectURL(a.href);
+		});
+
+		// Toggle unresolved rows
+		var toggleBtn = document.getElementById('toggle-unresolved');
+		if (toggleBtn) {
+			var unresolvedBody = document.getElementById('unresolved-rows');
+			var n = unresolvedBody.rows.length;
+			toggleBtn.addEventListener('click', function() {
+				var hidden = unresolvedBody.style.display === 'none';
+				unresolvedBody.style.display = hidden ? '' : 'none';
+				toggleBtn.textContent = (hidden ? 'Hide ' : 'Show ') + n + ' unresolved IP' + (n !== 1 ? 's' : '');
+			});
+		}
+	})();
+	</script>
+	<?php
 	echo '</section></section>';
 }
 else
