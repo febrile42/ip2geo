@@ -378,13 +378,16 @@ else
 				overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:linear-gradient(to right,rgba(94,66,166,0.97),rgba(183,78,145,0.97));display:flex;align-items:center;justify-content:center;z-index:2147483647;';
 				var msg = document.createElement('div');
 				msg.style.cssText = 'font-family:monospace;font-size:1.1em;color:#fff;letter-spacing:0.05em;opacity:0.9;';
-				var baseText = 'Processing ' + count.toLocaleString() + ' IP' + (count !== 1 ? 's' : '') + ' ';
+				msg.textContent = 'Processing ' + count.toLocaleString() + ' IP' + (count !== 1 ? 's' : '') + ' ';
+				var dotSpan = document.createElement('span');
+				dotSpan.style.cssText = 'display:inline-block;width:1.8em;text-align:left;';
 				var dots = ['.', '..', '...'];
 				var dotIdx = 0;
-				msg.textContent = baseText + dots[dotIdx];
+				dotSpan.textContent = dots[dotIdx];
+				msg.appendChild(dotSpan);
 				var dotTimer = setInterval(function() {
 					dotIdx = (dotIdx + 1) % dots.length;
-					msg.textContent = baseText + dots[dotIdx];
+					dotSpan.textContent = dots[dotIdx];
 				}, 400);
 				overlay.appendChild(msg);
 				document.body.appendChild(overlay);
