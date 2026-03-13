@@ -234,8 +234,6 @@ if($_POST)
 	}
 	echo '</table>';
 
-	// --- Inline JS: CSV download + unresolved toggle ---
-	<?php
 	echo '</section></section>';
 }
 else
