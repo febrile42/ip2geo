@@ -41,7 +41,13 @@
 						<div class="inner">
 							<h1 class="major">Changelog</h1>
 							<h3>2.6.1 - 2026-03-13</h3>
-							<p>Pre-publication housekeeping ahead of open-sourcing the repo. Added defensive HTML escaping on database output values (correct in principle, harmless in practice given the source). Removed a dead Google Universal Analytics snippet still haunting a couple of pages two years after UA shut down. Tidied internal server references out of CI workflow comments, and fixed <code>rand_ips.php</code> to use <code>random_int()</code> so generated test IPs actually cover the full IPv4 address space instead of just the lower half.</p>
+							<p>Housekeeping ahead of open-sourcing the repo:</p>
+							<ul>
+								<li>Added defensive HTML escaping.</li>
+								<li>Tidied internal server references out of CI workflow comments.</li>
+								<li>Removed a dead Google Universal Analytics snippet still haunting a couple of pages.</li>
+								<li>Fixed testing tools to use <code>random_int()</code> so generated test IPs actually cover the full IPv4 address space.</li>
+							</ul>
 							<h3>2.6.0 - 2026-03-13</h3>
 							<p>The IP lookup engine got a meaningful tune-up, cutting per-IP database time by about 60%. That cuts a 10,000-IP lookup from roughly 4.5 seconds of database time down to under 2. The site also now fires two Google Analytics events for CSV downloads and <code>ip_count</code>, so there's finally a wee little data on how ip2geo is being used being collected. (All of which is still blocked by ad blocker extensions or your friendly neighborhood <a href="https://pi-hole.net/" target="_blank">pi-hole</a>.)</p>
 							<h3>2.5.1 - 2026-03-13</h3>
