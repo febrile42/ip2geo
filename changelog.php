@@ -40,6 +40,8 @@
 					<section id="main" class="wrapper">
 						<div class="inner">
 							<h1 class="major">Changelog</h1>
+							<h3>2.6.2 - 2026-03-13</h3>
+							<p>Removed the PayPal donation button. Coffee is better anyway, and PayPal's UX is bad.</p>
 							<h3>2.6.1 - 2026-03-13</h3>
 							<p>Housekeeping ahead of open-sourcing the repo:</p>
 							<ul>

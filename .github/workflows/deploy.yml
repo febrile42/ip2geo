@@ -6,9 +6,6 @@ on:
       - main
       - develop
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
 
   # ── Runs on both branches ──────────────────────────────────────────────────
@@ -16,7 +13,7 @@ jobs:
     name: PHP Syntax Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5.0.1
       - name: Check all PHP files for syntax errors
         run: find . -name "*.php" -not -path "./.git/*" | xargs -I{} php -l {}
 
@@ -28,7 +25,7 @@ jobs:
     if: github.ref == 'refs/heads/develop'
     steps:
       - name: Pull develop on server (staging dir)
-        uses: appleboy/ssh-action@v1.0.3
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
@@ -126,7 +123,7 @@ jobs:
     if: github.ref == 'refs/heads/main'
     steps:
       - name: Pull main on server (production dir)
-        uses: appleboy/ssh-action@v1.0.3
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
