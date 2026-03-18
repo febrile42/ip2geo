@@ -1,6 +1,8 @@
 # ip2geo.org
 
-Bulk IPv4 geolocation lookup tool. Paste in a wall of text, log output, or a list of IPs — it finds the addresses, queries the database, and returns country, region, and city for each one. Handles up to 10,000 IPs per request.
+Bulk IPv4 geolocation lookup tool. Paste in a wall of text, log output, or a raw list of IPs — it extracts the addresses, queries the database, and returns country, region, and city for each one. Handles up to 10,000 IPs per request.
+
+Useful if you've just stared at a wall of `fail2ban` output and thought "I wonder where all these are coming from."
 
 Live at [ip2geo.org](https://ip2geo.org) since 2017.
 
@@ -9,7 +11,7 @@ Live at [ip2geo.org](https://ip2geo.org) since 2017.
 ## Stack
 
 - **PHP** — server-side lookup logic
-- **MariaDB** — hosts the MaxMind GeoLite2-City data
+- **MySQL** (or MariaDB) — hosts the MaxMind GeoLite2-City data
 - **MaxMind GeoLite2-City** — the geolocation data, updated automatically on the 1st of each month
 - **HTML/CSS** — based on [Hyperspace](https://html5up.net/hyperspace) by HTML5 UP (CCA 3.0)
 - **GitHub Actions** — CI/CD pipeline (lint → staging → production) and monthly DB updates
@@ -23,20 +25,20 @@ No frameworks. No package managers. No build step. It's fast on purpose.
 ### Prerequisites
 
 - PHP 8.x
-- MariaDB (or MySQL)
+- MySQL or MariaDB
 - [`geoip2-csv-converter`](https://github.com/maxmind/geoip2-csv-converter) installed on the server
 - A MaxMind account with a GeoLite2 license key ([free signup](https://dev.maxmind.com/geoip/geolite2-free-geolocation-data))
 
 ### Database
 
-The database schema consists of two tables populated from MaxMind's GeoLite2-City CSV files:
+Two tables, populated from MaxMind's GeoLite2-City CSV files:
 
 | Table | Contents |
 |-------|----------|
-| `geoip2_network_current_int` | IPv4 network ranges with integer start/end for fast range lookups |
-| `geoip2_location_current` | Geoname ID → country, region, city |
+| `geoip2_network_current_int` | IPv4 network ranges stored as integer pairs for fast range lookups |
+| `geoip2_location_current` | GeoName ID → country, region, city |
 
-To populate initially, download the GeoLite2-City CSV package from MaxMind, run `geoip2-csv-converter` on the blocks file with `-include-integer-range`, then import both the converted network CSV and the locations CSV via `LOAD DATA LOCAL INFILE`. See `scripts/update-geoip.sh` for the exact procedure — the same script runs automatically each month.
+To populate initially: download the GeoLite2-City CSV package from MaxMind, run `geoip2-csv-converter` on the blocks file with `-include-integer-range`, then import both the converted network CSV and the locations CSV via `LOAD DATA LOCAL INFILE`. See `scripts/update-geoip.sh` for the exact procedure — the same script runs automatically each month, so it's worth understanding.
 
 ### Configuration
 
@@ -76,7 +78,9 @@ git checkout main && git merge develop && git push origin main
 
 ### CI/CD Pipeline
 
-Tests run on GitHub's infrastructure (zero load on the server). All test requests bypass Cloudflare by hitting the origin directly with `Host:` headers — this ensures smoke tests reflect actual PHP health and performance numbers reflect actual database query time, not CDN cache hits.
+Tests run on GitHub's infrastructure, not on the server. All test requests bypass Cloudflare by hitting the origin directly with `Host:` headers — smoke tests reflect actual PHP health, and performance numbers reflect actual database query time rather than whatever the CDN cached.
+
+The performance test compares staging against production and fails if it regresses by more than 25%. This has caught real problems.
 
 See `.github/workflows/` for the full pipeline definition.
 
@@ -85,24 +89,25 @@ See `.github/workflows/` for the full pipeline definition.
 `scripts/update-geoip.sh` handles the monthly GeoLite2 refresh:
 
 1. Downloads the latest GeoLite2-City CSV from MaxMind
-2. Converts network blocks to integer ranges
+2. Converts network blocks to integer ranges via `geoip2-csv-converter`
 3. Imports into shadow tables (`geoip2_network_incoming_int`, `geoip2_location_incoming`)
-4. Verifies row counts (≥90% of current) and spot-checks a known IP
+4. Verifies row counts (≥90% of current) and spot-checks a known IP (8.8.8.8 → US)
 5. Atomically swaps shadow tables into production via `RENAME TABLE`
 6. Updates the data freshness date displayed in the footer
 7. Rolls back automatically if anything looks wrong
 
-This runs on the 1st of each month via `update-db.yml`. It can also be triggered manually from the Actions tab.
+This runs on the 1st of each month via `update-db.yml`. It can also be triggered manually from the Actions tab if you don't feel like waiting.
 
 ---
 
 ## Design Notes
 
-A few intentional choices worth noting for anyone picking this up:
+A few intentional choices worth noting:
 
 - **No Composer, no npm.** Dependencies add surface area. The stack is PHP + SQL and that's sufficient.
-- **Speed is a priority.** The app runs on shared hosting with constrained resources. Query design and data structure decisions optimize for this.
-- **`config.php` is the only secret.** DB credentials live there, it's gitignored, and it's the only file that needs to be managed separately on the server.
+- **Speed is a priority.** The app runs on shared hosting with constrained resources. IPs are pre-converted to unsigned 32-bit integers for range queries — this cut lookup time by ~60% over `INET6_ATON()`. A 10,000-IP batch completes in under 2 seconds of database time.
+- **`config.php` is the only secret.** DB credentials live there, it's gitignored, and it's the only file that needs to be managed separately on the server. Keep it that way.
+- **Private IPs are filtered server-side.** RFC 1918 ranges (10.x, 192.168.x, 172.16–31.x), loopback (127.x, ::1), and duplicates are stripped before any database queries happen.
 
 ---
 
@@ -110,4 +115,4 @@ A few intentional choices worth noting for anyone picking this up:
 
 - Geolocation data: [MaxMind GeoLite2](https://dev.maxmind.com/geoip/geolite2-free-geolocation-data). This product includes GeoLite2 data created by MaxMind, available from [maxmind.com](http://www.maxmind.com).
 - HTML/CSS template: [Hyperspace](https://html5up.net/hyperspace) by [HTML5 UP](https://html5up.net), released under the [CCA 3.0 license](https://html5up.net/license).
-- and [Claude Code](https://claude.com/product/claude-code) for helping implement all [my](https://github.com/febrile42/) lingering to-dos and experiments.
+- [Claude Code](https://claude.com/product/claude-code) for helping implement all [my](https://github.com/febrile42/) lingering to-dos and then some.
