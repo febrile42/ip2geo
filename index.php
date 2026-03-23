@@ -32,15 +32,8 @@ function ipToLong(string $ip): string {
 -->
 <html lang="en">
 	<head>
-		<!-- Google tag (gtag.js) -->
-		<script async src="https://www.googletagmanager.com/gtag/js?id=G-RZE952QHFN"></script>
-		<script>
-		  window.dataLayer = window.dataLayer || [];
-		  function gtag(){dataLayer.push(arguments);}
-		  gtag('js', new Date());
-
-		  gtag('config', 'G-RZE952QHFN');
-		</script>
+		<!-- Umami -->
+		<script defer src="https://cloud.umami.is/script.js" data-website-id="656d7a15-6282-4079-af1e-b8ed857fba2e"></script>
 		<title>Bulk IP Lookup & Location Finder - Free IP Geolocation Lookup Tool</title>
 		<meta charset="utf-8" />
 		<meta name="description" content="Free tool to filter up to 10,000 IP addresses from an arbitrary text blob and list their geographic location." />
@@ -309,7 +302,7 @@ else
 						<li>This product includes GeoLite2 data created by MaxMind, available from <a href="http://www.maxmind.com" target="_new">http://www.maxmind.com</a>.</li>
 					</ul>
 					<ul class="menu">
-						<li><a href="/changelog.php">v2.6.2</a> &ndash; &copy;<?php echo date("Y"); ?></li>
+						<li><a href="/changelog.php">v2.6.3</a> &ndash; &copy;<?php echo date("Y"); ?></li>
 						<?php if (!empty($db_data_date)) { echo '<li>Data: ' . $db_data_date . '</li>'; } ?>
 						<li><a href="/privacy.php">Privacy Policy</a></li>
 						<li>Design: <a href="http://html5up.net">HTML5 UP</a></li>
@@ -367,7 +360,7 @@ else
 					if (!newResults) throw new Error('no results section in response');
 
 					cleanup();
-					gtag('event', 'lookup_submit', { ip_count: count });
+					umami.track('lookup_submit', { ip_count: count });
 
 					var existing = document.getElementById('results');
 					if (existing) {
@@ -386,7 +379,7 @@ else
 		// CSV download (delegated — works after AJAX injection)
 		document.addEventListener('click', function(e) {
 			if (e.target.id !== 'download-csv') return;
-			gtag('event', 'download_csv');
+			umami.track('download_csv');
 			var bom = '\uFEFF';
 			var headers = ['IP','Country Code','Country','State/Province','City'];
 			var rows = [headers];

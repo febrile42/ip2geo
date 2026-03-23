@@ -6,15 +6,8 @@
 -->
 <html>
 	<head>
-		<!-- Google tag (gtag.js) -->
-		<script async src="https://www.googletagmanager.com/gtag/js?id=G-RZE952QHFN"></script>
-		<script>
-		  window.dataLayer = window.dataLayer || [];
-		  function gtag(){dataLayer.push(arguments);}
-		  gtag('js', new Date());
-
-		  gtag('config', 'G-RZE952QHFN');
-		</script>
+		<!-- Umami -->
+		<script defer src="https://cloud.umami.is/script.js" data-website-id="656d7a15-6282-4079-af1e-b8ed857fba2e"></script>
 		<title>ip2geo.org Changelog</title>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
@@ -41,6 +34,8 @@
 					<section id="main" class="wrapper">
 						<div class="inner">
 							<h1 class="major">Changelog</h1>
+								<h3>2.6.3 - 2026-03-23</h3>
+							<p>Swapped Google Analytics for <a href="https://umami.is/" target="_blank">Umami</a>. Same lookup and CSV download events are tracked, same visitor stats — just without sending your data to Google first. Umami is open-source and privacy-friendly, which feels more in keeping with a tool that doesn't log IPs.</p>
 							<h3>2.6.2 - 2026-03-13</h3>
 							<p>Removed the PayPal donation button. Coffee is better anyway, and PayPal's UX is bad.</p>
 							<h3>2.6.1 - 2026-03-13</h3>

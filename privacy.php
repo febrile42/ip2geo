@@ -6,15 +6,8 @@
 -->
 <html>
 	<head>
-		<!-- Google tag (gtag.js) -->
-		<script async src="https://www.googletagmanager.com/gtag/js?id=G-RZE952QHFN"></script>
-		<script>
-		  window.dataLayer = window.dataLayer || [];
-		  function gtag(){dataLayer.push(arguments);}
-		  gtag('js', new Date());
-
-		  gtag('config', 'G-RZE952QHFN');
-		</script>
+		<!-- Umami -->
+		<script defer src="https://cloud.umami.is/script.js" data-website-id="656d7a15-6282-4079-af1e-b8ed857fba2e"></script>
 		<title>ip2geo.org Privacy Policy</title>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
@@ -48,7 +41,7 @@
 							</ol>
 							<h3>Information Collection, Use, and Sharing</h3>
 							<p>We are the sole owners of the information collected on this site. We only have access to/collect information that you voluntarily give us via email or other direct contact from you. We will not sell or rent this information to anyone.</p>
-							<p>At this time, <b>no data is collected on this site</b> except via Google Analytics tools. No searches are logged and any data used is transient.</p>
+							<p>At this time, <b>no data is collected on this site</b> except via Umami analytics. No searches are logged and any data used is transient.</p>
 							<h3>Security</h3>
 							<p>Wherever we collect information, that information is encrypted and transmitted to us in a secure way. You can verify this by looking for a lock icon in the address bar and looking for "https" at the beginning of the address of the Web page.</p>
 						</div>
