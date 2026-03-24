@@ -5,18 +5,17 @@ require __DIR__ . '/config.php';
 
 function getRealIPAddr()
 {
-  //check ip from share internet
-  if (!empty($_SERVER['HTTP_CLIENT_IP'])) {
-    $ip = $_SERVER['HTTP_CLIENT_IP'];
-  }
-  //to check ip is pass from proxy
-  elseif (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
-    $ip = $_SERVER['HTTP_X_FORWARDED_FOR'];
-  } else {
-    $ip = $_SERVER['REMOTE_ADDR'];
-  }
+	// Check for IP from shared internet / proxy
+	if (!empty($_SERVER['HTTP_CLIENT_IP'])) {
+		$ip = $_SERVER['HTTP_CLIENT_IP'];
+	}
+	elseif (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+		$ip = $_SERVER['HTTP_X_FORWARDED_FOR'];
+	} else {
+		$ip = $_SERVER['REMOTE_ADDR'];
+	}
 
-  return $ip;
+	return $ip;
 }
 
 function ipToLong(string $ip): string {
@@ -45,17 +44,17 @@ function ipToLong(string $ip): string {
 	<body class="is-preload">
 
 		<!-- Sidebar -->
-	    <section id="sidebar">
-	        <div class="inner">
-	            <nav>
-	                <ul>
-	                    <li><a href="#intro">Bulk IP Location Lookup</a></li>
-	                    <li><a href="#contribute">Contact / Contribute</a></li>
-	                    <li><a href="#about">About</a></li>
-	                </ul>
-	            </nav>
-	        </div>
-	    </section>
+		<section id="sidebar">
+			<div class="inner">
+				<nav>
+					<ul>
+						<li><a href="#intro">Bulk IP Location Lookup</a></li>
+						<li><a href="#contribute">Contact / Contribute</a></li>
+						<li><a href="#about">About</a></li>
+					</ul>
+				</nav>
+			</div>
+		</section>
 
 		<!-- Wrapper -->
 			<div id="wrapper">
@@ -72,7 +71,7 @@ function ipToLong(string $ip): string {
 											<div class="field">
 												<label for="message">Text containing IPv4 Addresses</label>
 												<textarea name="ip_list" id="message" rows="5"><?php
-if(!isset($_POST['ip_list']))
+if (!isset($_POST['ip_list']))
 {
 	echo "Here's some example text with the IPs 8.8.8.8 (Google's public DNS) and @#75.75.75.75@#% (Comcast's DNS with some extra characters tucked in the middle). Hit the button below to try it out. We'll see about your IP (".htmlspecialchars(getRealIPAddr(), ENT_QUOTES, 'UTF-8').") too, assuming it's IPv4.";
 } else {
@@ -99,7 +98,7 @@ if(!isset($_POST['ip_list']))
 <?php
 
 
-if($_POST)
+if ($_POST)
 {
 	$con = mysqli_connect($db_host, $db_user, $db_pass, $db_name);
 	if (mysqli_connect_errno())
@@ -110,17 +109,17 @@ if($_POST)
 
 	// Get Country List
 	$countries_query = 'SELECT DISTINCT(`country_iso_code`) FROM `geoip2_location_current` WHERE `country_iso_code` IS NOT NULL';
-	$countries = mysqli_query($con,$countries_query);
-	while($row = mysqli_fetch_array($countries))
+	$countries = mysqli_query($con, $countries_query);
+	while ($row = mysqli_fetch_array($countries))
 	{
 		$countries_all[$row['country_iso_code']] = $row['country_iso_code'];
 	}
-	$countries_all = array_filter($countries_all); // remove random blank from unknown source wtf?
+	$countries_all = array_filter($countries_all); // remove spurious empty entries
 
-	// now parse country box / strip bad shit / escape all the things
-	$good_countries = array_filter(explode(" ", mysqli_real_escape_string($con,strtoupper($_POST['countries_filter']))));
+	// parse country filter: normalize, sanitize, and validate against known country codes
+	$good_countries = array_filter(explode(" ", mysqli_real_escape_string($con, strtoupper($_POST['countries_filter']))));
 	foreach ($good_countries as $key => $value) {
-		if(!in_array($value, $countries_all))
+		if (!in_array($value, $countries_all))
 		{
 			// echo 'unset('.$good_countries[$key].');<br/>';
 			unset($good_countries[$key]);
@@ -132,7 +131,7 @@ if($_POST)
 		echo '<section id="results" class="wrapper style4 fade-up"><div class="inner"><p>Input exceeds 2MB limit. Please reduce the size of your input.</p></div></section>';
 		exit;
 	}
-	preg_match_all("/\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b/",$_POST['ip_list'],$ip_list);
+	preg_match_all("/\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b/", $_POST['ip_list'], $ip_list);
 	// $ip_list = array_unique(array_filter(filter_var_array(explode("\r\n", $_POST['ip_list']), FILTER_VALIDATE_IP)));
 
 	// Strip: non-IPs, duplicates
@@ -159,18 +158,18 @@ if($_POST)
 	$totalduration = 0;
 	$rows_html = '';
 	foreach ($ip_list as $key => $ip) {
-		$ip = mysqli_real_escape_string($con,$ip); // Just in case of crazy awesome hackers, escape our IP "input"
+		$ip = mysqli_real_escape_string($con, $ip); // Just in case of crazy awesome hackers, escape our IP "input"
 		$query = 'SELECT country_iso_code, country_name, subdivision_1_name, city_name FROM( SELECT geoname_id, network_end_integer FROM geoip2_network_current_int WHERE "'.ipToLong($ip).'" >= network_start_integer ORDER BY network_start_integer DESC LIMIT 1) net LEFT JOIN geoip2_location_current location ON ( net.geoname_id = location.geoname_id AND location.locale_code = "en" ) WHERE "'.ipToLong($ip).'" <= network_end_integer';
 		// $query = 'SELECT country_iso_code,country_name,city_name FROM locations WHERE `geoname_id` = (SELECT geoname_id FROM `blocks` INNER JOIN (SELECT MAX(start_ip) AS start FROM `blocks` WHERE start_ip <= INET_ATON("'.$ip.'")) AS s ON (start_ip = s.start) WHERE end_ip >= INET_ATON("'.$ip.'"))';
 		$starttime = microtime(true);
-		$result = mysqli_query($con,$query);
+		$result = mysqli_query($con, $query);
 		$endtime = microtime(true);
 		$duration = $endtime - $starttime;
 		$geo_found = false;
-		while($row = mysqli_fetch_array($result))
+		while ($row = mysqli_fetch_array($result))
 		{
 			$geo_found = true;
-			if(!in_array($row['country_iso_code'],$good_countries))
+			if (!in_array($row['country_iso_code'], $good_countries))
 			{
 				$rows_html .= '<tr>';
 				$rows_html .= '<td>'.htmlspecialchars($ip, ENT_QUOTES, 'UTF-8').'</td>';
@@ -241,35 +240,36 @@ else
 
 
 				<!-- Contact / Contribute -->
-		        <section id="contribute" class="wrapper style1 fade-up">
-		            <div class="inner">
-		            	<h2>Contact / Contribute</h2>
-		            	<p>ip2geo.org is maintained and run by me, Josh. Hi. If this tool was helpful, feel free to say hello &mdash; or help contribute to hosting if this really saved the day.</p>
-		        		<div class="row">
-		                <div class="col-6 col-12-medium">
-		                    <ul class="contact">
-		                        <li>
-		                        	<h3>Social</h3>
-		                            <ul>
-		                                <li><a href="https://joshgister.com/" target="_blank">Personal Site</a></li>
-		                                <li><a href="https://www.linkedin.com/in/joshgister/" target="_blank">LinkedIn</a></li>
-		                                <li><a rel="me" href="https://ioc.exchange/@joshgister" target="_blank">Mastodon</a></li>
-		                            </ul>
-		                        </li>
-		                	</ul>
-		                </div>
-		                <div class="col-6 col-12-medium">
-		                	<ul class="contact">
-		                        <li>
-		                        	<h3>Donate</h3>
-		                            <ul>
-		                                <li><a href="https://www.buymeacoffee.com/ip2geo" target="_blank">Buy me a coffee</a></li>
-		                            </ul>
-		                        </li>
-		                    </ul>
-		            	</div>
-		            </div></div>
-		        </section>
+				<section id="contribute" class="wrapper style1 fade-up">
+					<div class="inner">
+						<h2>Contact / Contribute</h2>
+						<p>ip2geo.org is maintained and run by me, Josh. Hi. If this tool was helpful, feel free to say hello &mdash; or help contribute to hosting if this really saved the day.</p>
+						<div class="row">
+							<div class="col-6 col-12-medium">
+								<ul class="contact">
+									<li>
+										<h3>Social</h3>
+										<ul>
+											<li><a href="https://joshgister.com/" target="_blank">Personal Site</a></li>
+											<li><a href="https://www.linkedin.com/in/joshgister/" target="_blank">LinkedIn</a></li>
+											<li><a rel="me" href="https://ioc.exchange/@joshgister" target="_blank">Mastodon</a></li>
+										</ul>
+									</li>
+								</ul>
+							</div>
+							<div class="col-6 col-12-medium">
+								<ul class="contact">
+									<li>
+										<h3>Donate</h3>
+										<ul>
+											<li><a href="https://www.buymeacoffee.com/ip2geo" target="_blank">Buy me a coffee</a></li>
+										</ul>
+									</li>
+								</ul>
+							</div>
+						</div>
+					</div>
+				</section>
 
 
 				<!-- About -->

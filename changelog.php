@@ -68,8 +68,7 @@
 
 			</div>
 
-		<!-- Footer -->
-		<!-- Footer -->
+	<!-- Footer -->
 			<footer id="footer" class="wrapper style1-alt">
 				<div class="inner">
 					<ul class="menu">
