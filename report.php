@@ -100,6 +100,7 @@ if ($status === 'redeemed') {
     // Serve cached report
     $report = json_decode($row['report_json'], true);
     mysqli_close($con);
+    maybe_serve_script_download($report, $token);
     render_report($report, $token, $row['report_expires_at']);
     exit;
 }
@@ -172,44 +173,7 @@ $stmt->execute();
 $stmt->close();
 mysqli_close($con);
 
-// ── .sh download: serve before rendering the HTML page ───────────────────────
-if (isset($_GET['format']) && in_array($_GET['format'], ['sh-iptables', 'sh-ufw'], true)) {
-    $fmt  = $_GET['format'];
-    $ips  = array_column($report['top25'], 'ip');
-
-    if ($fmt === 'sh-iptables') {
-        $lines = array_map(fn($ip) => 'iptables -A INPUT -s ' . $ip . ' -j DROP', $ips);
-        $preamble = '#!/bin/bash
-# ip2geo threat report — iptables block rules
-# Generated: ' . date('Y-m-d') . '
-# Token: ' . $token . '
-# Block ' . count($ips) . ' IPs flagged as scanning / proxy infrastructure
-
-set -euo pipefail
-';
-        $filename = 'block-iptables.sh';
-    } else {
-        $lines = array_map(fn($ip) => 'ufw deny from ' . $ip . ' to any', $ips);
-        $preamble = '#!/bin/bash
-# ip2geo threat report — ufw block rules
-# Generated: ' . date('Y-m-d') . '
-# Token: ' . $token . '
-# Block ' . count($ips) . ' IPs flagged as scanning / proxy infrastructure
-
-set -euo pipefail
-';
-        $filename = 'block-ufw.sh';
-    }
-
-    $script = $preamble . implode("\n", $lines) . "\n";
-
-    header('Content-Type: text/x-sh; charset=utf-8');
-    header('Content-Disposition: attachment; filename="' . $filename . '"');
-    header('Content-Length: ' . strlen($script));
-    echo $script;
-    exit;
-}
-
+maybe_serve_script_download($report, $token);
 render_report($report, $token, $report_expires);
 exit;
 
@@ -347,6 +311,49 @@ function enrich_abuseipdb(array $ips, $con, string $api_key): array {
     return $ips;
 }
 
+// ── Script download helper ────────────────────────────────────────────────────
+// Called from both the redeemed (cached) and newly-generated paths so that
+// ?format= requests work regardless of how the token was resolved.
+
+function maybe_serve_script_download(array $report, string $token): void {
+    if (!isset($_GET['format'])) return;
+    $fmt = $_GET['format'];
+    if (!in_array($fmt, ['sh-iptables', 'sh-ufw'], true)) return;
+
+    $ips = array_column($report['top25'], 'ip');
+
+    if ($fmt === 'sh-iptables') {
+        $lines    = array_map(fn($ip) => 'iptables -A INPUT -s ' . $ip . ' -j DROP', $ips);
+        $preamble = '#!/bin/bash
+# ip2geo threat report — iptables block rules
+# Generated: ' . date('Y-m-d') . '
+# Token: ' . $token . '
+# Block ' . count($ips) . ' IPs flagged as scanning / proxy infrastructure
+
+set -euo pipefail
+';
+        $filename = 'block-iptables.sh';
+    } else {
+        $lines    = array_map(fn($ip) => 'ufw deny from ' . $ip . ' to any', $ips);
+        $preamble = '#!/bin/bash
+# ip2geo threat report — ufw block rules
+# Generated: ' . date('Y-m-d') . '
+# Token: ' . $token . '
+# Block ' . count($ips) . ' IPs flagged as scanning / proxy infrastructure
+
+set -euo pipefail
+';
+        $filename = 'block-ufw.sh';
+    }
+
+    $script = $preamble . implode("\n", $lines) . "\n";
+    header('Content-Type: text/x-sh; charset=utf-8');
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    header('Content-Length: ' . strlen($script));
+    echo $script;
+    exit;
+}
+
 // ── Rendering ─────────────────────────────────────────────────────────────────
 
 function render_error(string $msg): void {
@@ -470,7 +477,8 @@ function render_report(array $report, string $token, ?string $expires_at): void 
     </section>
     <script>
     document.getElementById('share-link-btn').addEventListener('click', function() {
-        navigator.clipboard.writeText(window.location.href).then(function() {
+        var cleanUrl = window.location.origin + window.location.pathname + '?token=' + <?php echo json_encode($token); ?>;
+        navigator.clipboard.writeText(cleanUrl).then(function() {
             var btn = document.getElementById('share-link-btn');
             var orig = btn.textContent;
             btn.textContent = 'Link copied!';
