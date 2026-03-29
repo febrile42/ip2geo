@@ -34,7 +34,7 @@ jobs:
           script: |
             cd ${{ secrets.STAGING_PATH }}
             git fetch origin && git reset --hard origin/develop
-            composer install --no-dev --no-interaction --quiet
+            ~/bin/composer install --no-dev --no-interaction --quiet
 
   test-staging:
     name: Test Staging
@@ -133,7 +133,7 @@ jobs:
           script: |
             cd ${{ secrets.DEPLOY_PATH }}
             git fetch origin && git reset --hard origin/main
-            composer install --no-dev --no-interaction --quiet
+            ~/bin/composer install --no-dev --no-interaction --quiet
 
       - name: Smoke test — production origin returns HTTP 200
         run: |
