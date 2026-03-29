@@ -44,7 +44,6 @@
 
 #filter-panel {
     padding: 0.5em 0 0.4em;
-    font-size: 0.78em;   /* ~17px at desktop, scales with body breakpoints */
     display: flex;
     gap: 1.5em;
     flex-wrap: wrap;
@@ -55,52 +54,79 @@
 #filter-countries > strong,
 #filter-categories > strong {
     display: block;
-    font-size: 0.8em;
+    font-size: 0.72em;
     text-transform: uppercase;
     letter-spacing: 0.06em;
     opacity: 0.5;
-    margin-bottom: 0.35em;
+    margin-bottom: 0.4em;
 }
 
-/* Scrollable chip container for countries (handles large IP lists) */
+/* Scrollable chip container for countries */
 #filter-countries .filter-chips {
     max-height: 8em;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
-    gap: 0.15em;
+    gap: 0.3em;
 }
 
 #filter-categories {
     display: flex;
     flex-direction: column;
-    gap: 0.15em;
+    gap: 0.3em;
 }
 
-/* Toggle chip labels — off state */
+/* Toggle chip labels — off state
+   font-size here overrides main.css label { font-size: 1.1em } */
 #filter-countries label,
 #filter-categories label {
+    font-size: 0.75em;
+    font-weight: normal;
     display: block;
-    padding: 0.2em 0.55em;
+    padding: 0.25em 0.75em;
     border: 1px solid rgba(255,255,255,0.18);
-    border-radius: 3px;
+    border-radius: 2em;
     cursor: pointer;
     opacity: 0.45;
     transition: opacity 0.12s ease, border-color 0.12s ease, background 0.12s ease;
     user-select: none;
     white-space: nowrap;
     margin: 0;
+    line-height: 1.6;
 }
 
 /* On state */
 #filter-countries label:has(input:checked),
 #filter-categories label:has(input:checked) {
     opacity: 1;
-    border-color: rgba(255,255,255,0.45);
-    background: rgba(255,255,255,0.06);
+    border-color: rgba(255,255,255,0.4);
+    background: rgba(255,255,255,0.05);
 }
 
-/* Hide native checkbox visually; keep it in the tab order for a11y */
+/* ASN category chip colors (active text color, border matches) */
+#filter-categories label.cat-scanning { color: #e06c9f; }
+#filter-categories label.cat-cloud    { color: #8ab4d4; }
+#filter-categories label.cat-vpn      { color: #e0a85a; }
+#filter-categories label.cat-residential { color: #6cb87a; }
+#filter-categories label.cat-unknown  { color: #aaa; }
+
+/* Active category chip: border uses the same accent color */
+#filter-categories label.cat-scanning:has(input:checked)    { border-color: #e06c9f; }
+#filter-categories label.cat-cloud:has(input:checked)       { border-color: #8ab4d4; }
+#filter-categories label.cat-vpn:has(input:checked)         { border-color: #e0a85a; }
+#filter-categories label.cat-residential:has(input:checked) { border-color: #6cb87a; }
+#filter-categories label.cat-unknown:has(input:checked)     { border-color: #aaa; }
+
+/* Zero-count chip: heavily dimmed, indicates nothing to filter */
+#filter-countries label.chip--empty,
+#filter-categories label.chip--empty {
+    opacity: 0.15;
+}
+
+/* Chip count number: slightly softer */
+.chip-count { opacity: 0.8; }
+
+/* Hide native checkbox; keep in tab order for a11y */
 #filter-countries input[type="checkbox"],
 #filter-categories input[type="checkbox"] {
     position: absolute;
@@ -110,10 +136,19 @@
     pointer-events: none;
 }
 
+/* --- Export buttons row (below chip panel) --- */
+#export-buttons {
+    padding: 0.6em 0 0.25em;
+    display: flex;
+    gap: 0.5em;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
 /* --- Rules blocks --- */
 .rules-block {
     position: relative;
-    margin-top: 0.75em;
+    margin-top: 0.5em;
 }
 .rules-block pre {
     background: rgba(255,255,255,0.05);
@@ -125,7 +160,7 @@
     white-space: pre;
     max-height: 300px;
     overflow-y: auto;
-    margin-top: 2em;
+    margin-top: 2.5em;
 }
 .rules-block .copy-rules {
     position: absolute;
@@ -151,6 +186,7 @@
 @media (max-width: 767px) {
     #filter-details:not([open]) #filter-panel { display: none; }
     #filter-panel { flex-direction: column; gap: 0.75em; }
+    #export-buttons { flex-direction: column; align-items: flex-start; }
 }
 
 /* --- Cancel notice --- */

@@ -279,30 +279,32 @@ if ($_POST)
 	echo '<summary id="filter-summary">Filter &amp; Export &mdash; Showing <span id="filter-count">'.$matches_total.'</span> of '.$matches_total.' IPs</summary>';
 	echo '<div id="filter-panel">';
 
-	// Country checkboxes
+	// ASN category checkboxes (left column — highest signal, goes first)
+	$cat_labels = ['scanning' => 'Scanning', 'cloud' => 'Cloud exit', 'vpn' => 'VPN/Proxy', 'residential' => 'Residential', 'unknown' => 'Unknown'];
+	echo '<div id="filter-categories">';
+	echo '<strong>ASN Categories</strong>';
+	foreach ($cat_labels as $cat => $cat_label) {
+		if (($category_counts[$cat] ?? 0) === 0) continue;
+		$cat_safe = htmlspecialchars($cat, ENT_QUOTES, 'UTF-8');
+		echo '<label class="cat-'.$cat_safe.'"><input type="checkbox" class="filter-category" value="'.$cat_safe.'" checked><span class="chip-label">'.$cat_label.'</span> <span class="chip-count">('.$category_counts[$cat].')</span></label>';
+	}
+	echo '</div>';
+
+	// Country checkboxes (right column)
 	echo '<div id="filter-countries">';
 	echo '<strong>Countries</strong>';
 	echo '<div class="filter-chips">';
 	foreach ($country_counts as $cc => $count) {
 		$cc_safe = htmlspecialchars($cc, ENT_QUOTES, 'UTF-8');
-		echo '<label><input type="checkbox" class="filter-country" value="'.$cc_safe.'" checked>'.$cc_safe.' ('.$count.')</label>';
+		echo '<label><input type="checkbox" class="filter-country" value="'.$cc_safe.'" checked><span class="chip-label">'.$cc_safe.'</span> <span class="chip-count">('.$count.')</span></label>';
 	}
 	echo '</div>';
 	echo '</div>';
 
-	// ASN category checkboxes
-	echo '<div id="filter-categories">';
-	echo '<strong>ASN Categories</strong>';
-	$cat_labels = ['scanning' => 'Scanning', 'cloud' => 'Cloud exit', 'vpn' => 'VPN/Proxy', 'residential' => 'Residential', 'unknown' => 'Unknown'];
-	foreach ($cat_labels as $cat => $label) {
-		if (($category_counts[$cat] ?? 0) === 0) continue;
-		$cat_safe = htmlspecialchars($cat, ENT_QUOTES, 'UTF-8');
-		echo '<label><input type="checkbox" class="filter-category" value="'.$cat_safe.'" checked>'.$label.' ('.$category_counts[$cat].')</label>';
-	}
-	echo '</div>';
+	echo '</div>'; // end #filter-panel
 
-	// Export buttons
-	echo '<div id="export-buttons" style="margin-top:1em">';
+	// Export/rules — full-width row, outside the flex chip panel
+	echo '<div id="export-buttons">';
 	echo '<button class="button small" id="show-iptables">Show iptables rules</button> ';
 	echo '<button class="button small" id="show-ufw">Show ufw rules</button> ';
 	echo '<button class="button small" id="show-nginx">Show nginx block</button>';
@@ -311,7 +313,7 @@ if ($_POST)
 	echo '<div id="rules-ufw"      class="rules-block" style="display:none" aria-label="ufw deny rules"><button class="button small copy-rules" data-target="rules-ufw-pre">Copy</button><pre id="rules-ufw-pre"></pre></div>';
 	echo '<div id="rules-nginx"    class="rules-block" style="display:none" aria-label="nginx geo block"><button class="button small copy-rules" data-target="rules-nginx-pre">Copy</button><pre id="rules-nginx-pre"></pre></div>';
 
-	echo '</div></details></div>';
+	echo '</details></div>'; // end #filter-details, #filter-export
 
 	// --- Results table ---
 	echo '<div class="table-wrapper" style="overflow-x:auto">';

@@ -69,16 +69,28 @@
 
         var allRows = document.querySelectorAll('#results-table tbody:not(#unresolved-rows) tr');
         var visible = 0;
+
+        // Per-chip cross-filter counts: how many rows pass the *other* filter dimension
+        var catCounts = {};      // rows passing country filter, keyed by category
+        var countryCounts = {};  // rows passing category filter, keyed by country
+
         allRows.forEach(function (row) {
             var country  = row.dataset.country   || '';
             var category = row.dataset.category  || '';
-            // A row is visible if its country AND category are both checked
-            // Empty country rows (no geo data) pass the country filter
             var countryOk  = country === '' || checkedCountries.has(country);
             var categoryOk = checkedCategories.has(category);
             var show = countryOk && categoryOk;
             row.style.display = show ? '' : 'none';
             if (show) visible++;
+
+            // Count for category chips: rows that pass the country filter
+            if (countryOk) {
+                catCounts[category] = (catCounts[category] || 0) + 1;
+            }
+            // Count for country chips: rows that pass the category filter
+            if (categoryOk && country !== '') {
+                countryCounts[country] = (countryCounts[country] || 0) + 1;
+            }
         });
 
         // Update the showing count in the summary
@@ -88,6 +100,24 @@
         // Empty state
         var emptyMsg = document.getElementById('empty-filter-msg');
         if (emptyMsg) emptyMsg.style.display = visible === 0 ? '' : 'none';
+
+        // Update per-chip counts and empty state
+        document.querySelectorAll('.filter-category').forEach(function (input) {
+            var count = catCounts[input.value] || 0;
+            var label = input.closest('label');
+            if (!label) return;
+            var countEl = label.querySelector('.chip-count');
+            if (countEl) countEl.textContent = '(' + count + ')';
+            label.classList.toggle('chip--empty', count === 0);
+        });
+        document.querySelectorAll('.filter-country').forEach(function (input) {
+            var count = countryCounts[input.value] || 0;
+            var label = input.closest('label');
+            if (!label) return;
+            var countEl = label.querySelector('.chip-count');
+            if (countEl) countEl.textContent = '(' + count + ')';
+            label.classList.toggle('chip--empty', count === 0);
+        });
 
         // Debounced rule update
         scheduleRuleUpdate();
