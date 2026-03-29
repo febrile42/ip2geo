@@ -265,8 +265,8 @@ if ($_POST)
 		<p class="asn-verdict asn-verdict--<?php echo htmlspecialchars(strtolower($verdict_level), ENT_QUOTES, 'UTF-8'); ?>">
 			<?php echo htmlspecialchars($verdict_level, ENT_QUOTES, 'UTF-8'); ?> THREAT
 		</p>
-		<p><?php echo $scanning_pct; ?>% of IPs from scanning or proxy infrastructure
-			(<?php echo $scanning_proxy_count; ?> of <?php echo $matches_total; ?> IPs)</p>
+		<p><?php echo round($non_residential_pct * 100); ?>% of IPs from cloud, scanning, or proxy infrastructure
+			(<?php echo $non_residential_count; ?> of <?php echo $matches_total; ?> IPs)</p>
 		<p>
 			<form method="POST" action="/get-report.php" id="cta-form" style="display:inline">
 			<input type="hidden" name="ip_classified_json" id="ip-classified-json"
