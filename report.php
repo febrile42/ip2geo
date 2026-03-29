@@ -15,6 +15,8 @@ require __DIR__ . '/asn_classification.php';
 require __DIR__ . '/report_functions.php';
 require __DIR__ . '/vendor/autoload.php';
 
+define('DEMO_TOKEN', '00000000-0000-0000-0000-000000000000');
+
 // ── Token validation ──────────────────────────────────────────────────────────
 
 $token = isset($_GET['token']) ? trim($_GET['token']) : '';
@@ -397,9 +399,18 @@ function render_report(array $report, string $token, ?string $expires_at): void 
         default    => "ip2geo threat report: LOW risk — {$total} IPs analyzed, no significant threat patterns.",
     };
 
+    $is_demo = ($token === DEMO_TOKEN);
+
     render_page_open('Threat Report — ip2geo.org', $meta_desc); ?>
     <section id="report" class="wrapper style4 fade-up">
         <div class="inner">
+            <?php if ($is_demo): ?>
+            <div style="background:rgba(224,168,90,0.12);border-left:3px solid #e0a85a;padding:0.6em 1em;margin-bottom:1.5em;font-size:0.9em">
+                <strong>Demo Report</strong> &mdash; These are real Tor exit nodes with real AbuseIPDB data.
+                This is what a HIGH-threat report looks like.
+                <a href="/" style="margin-left:1em">Run your own lookup &rarr;</a>
+            </div>
+            <?php endif; ?>
             <h2>Threat Report</h2>
             <p style="opacity:0.6;font-size:0.85em;margin-top:-1em">
                 <?php echo number_format($total); ?> IPs &middot;
@@ -427,19 +438,22 @@ function render_report(array $report, string $token, ?string $expires_at): void 
                         <th scope="col" style="font-family:monospace">IP</th>
                         <th scope="col">ASN Org</th>
                         <th scope="col">Category</th>
-                        <th scope="col">AbuseIPDB Score</th>
+                        <th scope="col" title="Times this IP appeared in the submitted log">Hits</th>
+                        <th scope="col">AbuseIPDB</th>
                     </tr>
                 </thead>
                 <tbody>
                 <?php foreach ($top25 as $entry):
                     $cat = $entry['classification'] ?? 'unknown';
                     $score = $entry['abuse_score'] ?? null;
+                    $freq = $entry['freq'] ?? 1;
                     $asn_org_full = ($entry['asn'] ?? '') . ($entry['asn'] && ($entry['asn_org'] ?? '') ? ' ' : '') . ($entry['asn_org'] ?? '');
                 ?>
                     <tr>
                         <td style="font-family:monospace"><?php echo htmlspecialchars($entry['ip'] ?? '', ENT_QUOTES, 'UTF-8'); ?></td>
                         <td class="cell-asn-org" title="<?php echo htmlspecialchars($asn_org_full, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($asn_org_full, ENT_QUOTES, 'UTF-8'); ?></td>
                         <td class="asn-category asn-category--<?php echo htmlspecialchars($cat, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($cat, ENT_QUOTES, 'UTF-8'); ?></td>
+                        <td style="font-family:monospace"><?php echo $freq > 1 ? '<strong>' . $freq . 'x</strong>' : '1x'; ?></td>
                         <td><?php echo $score !== null ? htmlspecialchars((string)$score, ENT_QUOTES, 'UTF-8') : '<span style="opacity:0.4">—</span>'; ?></td>
                     </tr>
                 <?php endforeach; ?>
@@ -447,8 +461,10 @@ function render_report(array $report, string $token, ?string $expires_at): void 
             </table>
             </div>
             <p style="font-size:0.8em;opacity:0.6">
-                AbuseIPDB confidence score (0–100). Top 25 by weighted frequency
-                (scanning/VPN sources weighted 2×).
+                Top 25 by weighted frequency (scanning/VPN weighted 2&times;). Hits = times
+                this IP appeared in your submitted log. AbuseIPDB score 0–100; a score of 0
+                means no community reports on file — common for Asian ISP ranges that are
+                underreported in AbuseIPDB, not a signal the IP is clean.
                 <?php if ($report['abuseipdb_note'] ?? null): ?>
                     <?php echo htmlspecialchars($report['abuseipdb_note'], ENT_QUOTES, 'UTF-8'); ?>
                 <?php endif; ?>
@@ -470,7 +486,7 @@ function render_report(array $report, string $token, ?string $expires_at): void 
             <p>
                 <button id="share-link-btn" class="button small">&#128203; Copy report link</button>
             </p>
-            <?php if ($expires_fmt): ?>
+            <?php if ($expires_fmt && !$is_demo): ?>
             <p style="font-size:0.85em;opacity:0.6">
                 Report expires: <?php echo htmlspecialchars($expires_fmt, ENT_QUOTES, 'UTF-8'); ?>.
                 Save this link to access your report.

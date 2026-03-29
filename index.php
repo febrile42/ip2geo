@@ -315,6 +315,7 @@ if ($_POST || $view_token_mode)
 		</p>
 		<p style="font-size:0.8em;opacity:0.7;margin-top:-0.5em">
 			One-time payment. No account required. Report accessible for 30 days.
+			<a href="/report.php?token=00000000-0000-0000-0000-000000000000" target="_blank" style="opacity:0.8;margin-left:0.5em">See a sample report &rarr;</a>
 		</p>
 		<hr />
 	</div>

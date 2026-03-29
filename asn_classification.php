@@ -53,6 +53,12 @@ $known_asns = [
     'AS4766'   => 'scanning',  // Korea Telecom (heavy scanning source)
     'AS9121'   => 'scanning',  // Turk Telekom (heavy scanning source)
 
+    // --- Tor exit infrastructure ---
+    'AS60729'  => 'scanning',  // Zwiebelfreunde e.V. (185.220.101.x Tor exits)
+    'AS205100' => 'scanning',  // Freiheitsfoo e.V. (185.220.100.x Tor exits)
+    'AS208323' => 'scanning',  // Artikel 10 e.V. (Tor exits)
+    'AS200052' => 'scanning',  // Tor Exit AS (torservers.net)
+
     // --- Known high-volume scanning sources ---
     'AS4134'   => 'scanning',  // China Telecom (Chinanet)
     'AS4837'   => 'scanning',  // China Unicom
