@@ -134,22 +134,18 @@ if ($_POST)
 		exit;
 	}
 	preg_match_all("/\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b/", $_POST['ip_list'], $ip_list);
-	// $ip_list = array_unique(array_filter(filter_var_array(explode("\r\n", $_POST['ip_list']), FILTER_VALIDATE_IP)));
 
-	// Strip: non-IPs, duplicates
-	$ip_list = filter_var_array(array_unique($ip_list[0]));
-	$ip_list = array_slice($ip_list, 0, 10000);
-
-	// strip local ips
-	function test_local($ip_to_test)
-	{
-		// Ignore Local & NAT-only IPs
-		if (!preg_match("/(^127\.)|(^192\.168\.)|(^10\.)|(^172\.1[6-9]\.)|(^172\.2[0-9]\.)|(^172\.3[0-1]\.)|(^::1$)/", $ip_to_test))
-		{
-			return true;
-		}
+	// Count occurrences before dedup — repeat appearances are a meaningful threat signal
+	// (an IP hammering your SSH 400 times ranks higher than one that appeared once).
+	// array_count_values produces [ip => count]; slicing the map preserves the 10K cap
+	// on unique IPs; then private ranges are stripped from the keyset.
+	function test_local($ip) {
+		return !preg_match('/^(127\.|192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.|::1$)/', $ip);
 	}
-	$ip_list = array_filter($ip_list, "test_local");
+	$ip_freq = array_count_values($ip_list[0]);
+	$ip_freq = array_slice($ip_freq, 0, 10000, true);
+	$ip_freq = array_filter($ip_freq, 'test_local', ARRAY_FILTER_USE_KEY);
+	$ip_list = array_keys($ip_freq);
 
 	// What're our acceptable countries?
 	// $good_countries = array('US','CA');
@@ -213,7 +209,7 @@ if ($_POST)
 					'asn'            => $asn_num !== '' ? 'AS' . $asn_num : '',
 					'classification' => $category,
 					'country'        => $country_code,
-					'freq'           => 1,
+					'freq'           => $ip_freq[$ip] ?? 1,
 				];
 				$rows_html .= '<tr data-category="'.htmlspecialchars($category, ENT_QUOTES, 'UTF-8').'" data-country="'.htmlspecialchars($country_code, ENT_QUOTES, 'UTF-8').'">';
 				$rows_html .= '<td>'.htmlspecialchars($ip, ENT_QUOTES, 'UTF-8').'</td>';
