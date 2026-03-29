@@ -11,6 +11,8 @@
         // Remove ?cancelled=1 from the URL without a page reload
         history.replaceState(null, '', window.location.pathname);
 
+        umami && umami.track('stripe_cancel');
+
         var pending = sessionStorage.getItem('ip2geo_pending_ips');
         if (pending) {
             sessionStorage.removeItem('ip2geo_pending_ips');
@@ -55,6 +57,7 @@
         if (textarea && textarea.value) {
             sessionStorage.setItem('ip2geo_pending_ips', textarea.value);
         }
+        umami && umami.track('cta_click');
         // Let the form submit proceed normally
     });
 
@@ -266,6 +269,7 @@
                 // Exclusive select: only this country
                 all.forEach(function (i) { i.checked = false; });
                 clicked.checked = true;
+                umami && umami.track('filter_country', { country: clicked.value });
             }
         }
 
@@ -287,7 +291,11 @@
     // ── Wire up filter checkboxes (delegated — works after AJAX inject) ────
     // Handles category chips (always toggle) and keyboard-driven country changes.
     document.addEventListener('change', function (e) {
-        if (e.target && (e.target.classList.contains('filter-country') || e.target.classList.contains('filter-category'))) {
+        if (!e.target) return;
+        if (e.target.classList.contains('filter-category')) {
+            umami && umami.track('filter_category', { category: e.target.value, checked: e.target.checked });
+            applyFilters();
+        } else if (e.target.classList.contains('filter-country')) {
             applyFilters();
         }
     });
