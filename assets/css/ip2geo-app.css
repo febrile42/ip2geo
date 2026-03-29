@@ -176,12 +176,13 @@
     white-space: pre;
     max-height: 300px;
     overflow-y: auto;
-    margin-top: 2.5em;
+    margin-top: 0;
 }
 .rules-block .copy-rules {
     position: absolute;
-    top: 0;
-    right: 0;
+    top: 0.4em;
+    right: 0.4em;
+    z-index: 1;
 }
 
 /* --- abbr tooltips in results table --- */
