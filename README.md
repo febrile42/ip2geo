@@ -73,7 +73,7 @@ The paid report flow requires a Stripe account and three values in `config.php`:
 | Checkout Sessions | Write |
 | Everything else | None |
 
-Webhook signature verification uses the `whsec_...` signing secret — it's pure HMAC, not an API call, so no additional key permissions are needed.
+Stripe automatically grants implied read access on related resources (Payment Intents, Products, etc.) when Checkout Sessions is set to Write — that's expected and fine. Webhook signature verification uses the `whsec_...` signing secret — it's pure HMAC, not an API call, so no additional key permissions are needed.
 
 Use the same restricted key pattern for production. A leaked key scoped to Checkout writes only can create payment sessions — it cannot read payment data, list customers, or issue refunds.
 
