@@ -275,11 +275,40 @@ if ($_POST)
 
 	// --- Filter & Export (above table) ---
 	echo '<div id="filter-export" role="region" aria-label="Filter and Export">';
-	echo '<details id="filter-details">';
+	echo '<details id="filter-details" open>';
 	echo '<summary id="filter-summary">Filter &amp; Export &mdash; Showing <span id="filter-count">'.$matches_total.'</span> of '.$matches_total.' IPs</summary>';
-	echo '<div id="filter-panel">';
+	echo '<div id="filter-layout">';
 
-	// ASN category checkboxes (left column — highest signal, goes first)
+	// Left column: action buttons + firewall rules output
+	echo '<div id="filter-left">';
+
+	// Row 1: primary export actions
+	echo '<div id="action-buttons-primary">';
+	echo '<button id="download-csv" class="button small">&#8595; Download CSV</button>';
+	if (!empty($no_result_ips)) {
+		$n = count($no_result_ips);
+		echo '<button id="toggle-unresolved" class="button small alt">Show '.$n.' unresolved IP'.($n !== 1 ? 's' : '').'</button>';
+	}
+	echo '</div>';
+
+	// Row 2: firewall rule generators
+	echo '<div id="export-buttons">';
+	echo '<button class="button small" id="show-iptables">Show iptables rules</button>';
+	echo '<button class="button small" id="show-ufw">Show ufw rules</button>';
+	echo '<button class="button small" id="show-nginx">Show nginx block</button>';
+	echo '</div>';
+
+	// Firewall rule output (shown on demand)
+	echo '<div id="rules-iptables" class="rules-block" style="display:none" aria-label="iptables block rules"><button class="button small copy-rules" data-target="rules-iptables-pre">Copy</button><pre id="rules-iptables-pre"></pre></div>';
+	echo '<div id="rules-ufw"      class="rules-block" style="display:none" aria-label="ufw deny rules"><button class="button small copy-rules" data-target="rules-ufw-pre">Copy</button><pre id="rules-ufw-pre"></pre></div>';
+	echo '<div id="rules-nginx"    class="rules-block" style="display:none" aria-label="nginx geo block"><button class="button small copy-rules" data-target="rules-nginx-pre">Copy</button><pre id="rules-nginx-pre"></pre></div>';
+
+	echo '</div>'; // end #filter-left
+
+	// Right column: filter chips
+	echo '<div id="filter-right">';
+
+	// ASN category chips (leftmost — highest signal)
 	$cat_labels = ['scanning' => 'Scanning', 'cloud' => 'Cloud exit', 'vpn' => 'VPN/Proxy', 'residential' => 'Residential', 'unknown' => 'Unknown'];
 	echo '<div id="filter-categories">';
 	echo '<strong>ASN Categories</strong>';
@@ -290,7 +319,7 @@ if ($_POST)
 	}
 	echo '</div>';
 
-	// Country checkboxes (right column)
+	// Country chips
 	echo '<div id="filter-countries">';
 	echo '<strong>Countries</strong>';
 	echo '<div class="filter-chips">';
@@ -301,29 +330,12 @@ if ($_POST)
 	echo '</div>';
 	echo '</div>';
 
-	echo '</div>'; // end #filter-panel
-
-	// Export/rules — full-width row, outside the flex chip panel
-	echo '<div id="export-buttons">';
-	echo '<button class="button small" id="show-iptables">Show iptables rules</button> ';
-	echo '<button class="button small" id="show-ufw">Show ufw rules</button> ';
-	echo '<button class="button small" id="show-nginx">Show nginx block</button>';
-	echo '</div>';
-	echo '<div id="rules-iptables" class="rules-block" style="display:none" aria-label="iptables block rules"><button class="button small copy-rules" data-target="rules-iptables-pre">Copy</button><pre id="rules-iptables-pre"></pre></div>';
-	echo '<div id="rules-ufw"      class="rules-block" style="display:none" aria-label="ufw deny rules"><button class="button small copy-rules" data-target="rules-ufw-pre">Copy</button><pre id="rules-ufw-pre"></pre></div>';
-	echo '<div id="rules-nginx"    class="rules-block" style="display:none" aria-label="nginx geo block"><button class="button small copy-rules" data-target="rules-nginx-pre">Copy</button><pre id="rules-nginx-pre"></pre></div>';
-
+	echo '</div>'; // end #filter-right
+	echo '</div>'; // end #filter-layout
 	echo '</details></div>'; // end #filter-details, #filter-export
 
 	// --- Results table ---
 	echo '<div class="table-wrapper" style="overflow-x:auto">';
-	echo '<p style="margin-bottom:1em">';
-	echo '<button id="download-csv" class="button small">&#8595; Download CSV</button>';
-	if (!empty($no_result_ips)) {
-		$n = count($no_result_ips);
-		echo ' <button id="toggle-unresolved" class="button small alt">Show '.$n.' unresolved IP'.($n !== 1 ? 's' : '').'</button>';
-	}
-	echo '</p>';
 
 	echo '<table id="results-table"><thead><tr>';
 	echo '<th scope="col">IP</th>';
