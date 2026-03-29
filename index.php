@@ -232,7 +232,15 @@ if ($_POST)
 	}
 
 	// --- CTA threshold ---
-	$show_cta = $matches_total > 0 && ($scanning_proxy_count / $matches_total) > 0.20;
+	// "Non-residential" = confirmed scanners/VPNs + cloud/VPS egress.
+	// Cloud IPs hitting your infrastructure at volume is itself suspicious,
+	// so both categories count toward the trigger.
+	$non_residential_count = $scanning_proxy_count + $category_counts['cloud'];
+	$non_residential_pct   = $matches_total > 0 ? $non_residential_count / $matches_total : 0;
+	$show_cta = $matches_total >= 5 && (
+		$scanning_proxy_count >= 3 ||
+		$non_residential_pct >= 0.15
+	);
 	$scanning_pct = $matches_total > 0 ? round(($scanning_proxy_count / $matches_total) * 100) : 0;
 	if ($matches_total > 0 && ($scanning_proxy_count / $matches_total) >= 0.80) {
 		$verdict_level = 'HIGH';
