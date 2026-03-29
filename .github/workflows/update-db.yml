@@ -128,7 +128,7 @@ jobs:
             --title "ASN classification updates — $MONTH" \
             --body-file "$PR_BODY_FILE" \
             --draft \
-            --base main \
+            --base develop \
             --head "$BRANCH"
 
           rm -f "$PR_BODY_FILE"
