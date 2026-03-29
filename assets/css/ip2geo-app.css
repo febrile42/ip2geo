@@ -192,6 +192,12 @@
 /* Body is 16.5pt (~22px); 0.85em ≈ 18.7px at desktop, scales with breakpoints */
 #results-table { font-size: 0.85em; }
 
+/* Alternating row stripes — JS-managed so filtering keeps correct alternation.
+   Override the theme's nth-child rule (which counts hidden rows) with an explicit class. */
+#results-table tbody tr:nth-child(2n + 1) { background-color: transparent; }
+#results-table tbody tr.row-stripe        { background-color: rgba(255,255,255,0.05); }
+#results-table tbody tr.row-hidden        { display: none; }
+
 /* --- Touch targets (a11y) --- */
 .button.small { min-height: 44px; }
 

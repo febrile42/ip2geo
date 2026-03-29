@@ -58,6 +58,18 @@
         // Let the form submit proceed normally
     });
 
+    // ── Row striping ──────────────────────────────────────────────────────
+    // nth-child counts hidden rows, breaking alternating colors when filtered.
+    // We manage stripes explicitly with a class so only visible rows stripe.
+    function restripe() {
+        var idx = 0;
+        document.querySelectorAll('#results-table tbody:not(#unresolved-rows) tr').forEach(function (row) {
+            var hidden = row.classList.contains('row-hidden');
+            row.classList.toggle('row-stripe', !hidden && idx % 2 === 0);
+            if (!hidden) idx++;
+        });
+    }
+
     // ── Filter logic ───────────────────────────────────────────────────────
     function applyFilters() {
         var checkedCountries = new Set(
@@ -80,7 +92,7 @@
             var countryOk  = country === '' || checkedCountries.has(country);
             var categoryOk = checkedCategories.has(category);
             var show = countryOk && categoryOk;
-            row.style.display = show ? '' : 'none';
+            row.classList.toggle('row-hidden', !show);
             if (show) visible++;
 
             // Count for category chips: rows that pass the country filter
@@ -92,6 +104,8 @@
                 countryCounts[country] = (countryCounts[country] || 0) + 1;
             }
         });
+
+        restripe();
 
         // Update the showing count in the summary
         var countEl = document.getElementById('filter-count');
@@ -133,7 +147,7 @@
     function getVisibleIPs() {
         var ips = [];
         document.querySelectorAll('#results-table tbody:not(#unresolved-rows) tr').forEach(function (row) {
-            if (row.style.display === 'none') return;
+            if (row.classList.contains('row-hidden')) return;
             var ip = row.querySelector('td');
             if (ip) ips.push(ip.textContent.trim());
         });
@@ -226,6 +240,7 @@
             });
         });
         if (!resultsAdded) return;
+        restripe();
         generateRules();
         if (sessionStorage.getItem('ip2geo_show_cancel_notice')) {
             sessionStorage.removeItem('ip2geo_show_cancel_notice');
@@ -233,5 +248,8 @@
         }
     });
     observer.observe(document.body, { childList: true, subtree: true });
+
+    // Apply stripes on initial server-rendered load (observer only fires on AJAX re-renders)
+    restripe();
 
 })();
