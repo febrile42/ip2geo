@@ -30,30 +30,84 @@
 /* --- Filter panel --- */
 #filter-details > summary {
     cursor: pointer;
-    padding: 0.5em 0;
+    padding: 0.4em 0;
+    font-size: 0.8em;
     font-weight: bold;
     list-style: none;
 }
 #filter-details > summary::-webkit-details-marker { display: none; }
 #filter-details > summary::before {
     content: '▸ ';
-    font-size: 0.8em;
+    font-size: 0.85em;
 }
 #filter-details[open] > summary::before { content: '▾ '; }
 
 #filter-panel {
-    padding: 0.75em 0 0.5em;
+    padding: 0.5em 0 0.4em;
+    font-size: 0.78em;   /* ~17px at desktop, scales with body breakpoints */
+    display: flex;
+    gap: 1.5em;
+    flex-wrap: wrap;
+    align-items: flex-start;
 }
+
+/* Section headers */
+#filter-countries > strong,
+#filter-categories > strong {
+    display: block;
+    font-size: 0.8em;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    opacity: 0.5;
+    margin-bottom: 0.35em;
+}
+
+/* Scrollable chip container for countries (handles large IP lists) */
+#filter-countries .filter-chips {
+    max-height: 8em;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15em;
+}
+
+#filter-categories {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15em;
+}
+
+/* Toggle chip labels — off state */
 #filter-countries label,
 #filter-categories label {
-    display: inline-block;
-    margin: 0.2em 0.5em 0.2em 0;
+    display: block;
+    padding: 0.2em 0.55em;
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 3px;
     cursor: pointer;
+    opacity: 0.45;
+    transition: opacity 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+    user-select: none;
+    white-space: nowrap;
+    margin: 0;
 }
+
+/* On state */
+#filter-countries label:has(input:checked),
+#filter-categories label:has(input:checked) {
+    opacity: 1;
+    border-color: rgba(255,255,255,0.45);
+    background: rgba(255,255,255,0.06);
+}
+
+/* Hide native checkbox visually; keep it in the tab order for a11y */
 #filter-countries input[type="checkbox"],
 #filter-categories input[type="checkbox"] {
-    accent-color: #e06c9f;
-    cursor: pointer;
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+    pointer-events: none;
 }
 
 /* --- Rules blocks --- */
@@ -96,8 +150,7 @@
 /* --- Mobile: filter accordion collapsed by default --- */
 @media (max-width: 767px) {
     #filter-details:not([open]) #filter-panel { display: none; }
-    #filter-countries,
-    #filter-categories { display: block; margin-bottom: 0.75em; }
+    #filter-panel { flex-direction: column; gap: 0.75em; }
 }
 
 /* --- Cancel notice --- */

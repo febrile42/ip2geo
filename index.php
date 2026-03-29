@@ -281,21 +281,23 @@ if ($_POST)
 
 	// Country checkboxes
 	echo '<div id="filter-countries">';
-	echo '<strong>Countries</strong><br>';
+	echo '<strong>Countries</strong>';
+	echo '<div class="filter-chips">';
 	foreach ($country_counts as $cc => $count) {
 		$cc_safe = htmlspecialchars($cc, ENT_QUOTES, 'UTF-8');
-		echo '<label><input type="checkbox" class="filter-country" value="'.$cc_safe.'" checked> '.$cc_safe.' ('.$count.')</label> ';
+		echo '<label><input type="checkbox" class="filter-country" value="'.$cc_safe.'" checked>'.$cc_safe.' ('.$count.')</label>';
 	}
+	echo '</div>';
 	echo '</div>';
 
 	// ASN category checkboxes
-	echo '<div id="filter-categories" style="margin-top:0.75em">';
-	echo '<strong>ASN Categories</strong><br>';
+	echo '<div id="filter-categories">';
+	echo '<strong>ASN Categories</strong>';
 	$cat_labels = ['scanning' => 'Scanning', 'cloud' => 'Cloud exit', 'vpn' => 'VPN/Proxy', 'residential' => 'Residential', 'unknown' => 'Unknown'];
 	foreach ($cat_labels as $cat => $label) {
 		if (($category_counts[$cat] ?? 0) === 0) continue;
 		$cat_safe = htmlspecialchars($cat, ENT_QUOTES, 'UTF-8');
-		echo '<label><input type="checkbox" class="filter-category" value="'.$cat_safe.'" checked> '.$label.' ('.$category_counts[$cat].')</label> ';
+		echo '<label><input type="checkbox" class="filter-category" value="'.$cat_safe.'" checked>'.$label.' ('.$category_counts[$cat].')</label>';
 	}
 	echo '</div>';
 
