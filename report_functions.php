@@ -51,6 +51,80 @@ function maybe_upgrade_verdict(string $verdict, array $top25): string {
 }
 
 /**
+ * Convert an integer start/end pair from geoip2_asn_current_int to CIDR notation.
+ * The table uses INT UNSIGNED (IPv4 only), so long2ip() is always safe.
+ */
+function int_range_to_cidr(int $start, int $end): string {
+    $size = $end - $start + 1;
+    $host_bits = $size > 0 ? (int)log($size, 2) : 0;
+    return long2ip($start) . '/' . (32 - $host_bits);
+}
+
+/**
+ * For each unique scanning/VPN ASN in $top25, fetch its CIDR prefixes from the DB.
+ * Returns up to 10 ranges per ASN, ordered largest-first.
+ *
+ * Requires an open mysqli $con connected to the ip2geo database.
+ *
+ * @return array  [ ['asn'=>'AS16276','org'=>'OVH SAS','cidrs'=>[...],'total'=>N], ... ]
+ */
+function fetch_asn_ranges($con, array $top25): array {
+    $asn_nums = [];
+    foreach ($top25 as $entry) {
+        if (!in_array($entry['classification'] ?? '', ['scanning', 'vpn'], true)) continue;
+        $raw = preg_replace('/^AS/i', '', trim($entry['asn'] ?? ''));
+        if ($raw === '' || !ctype_digit($raw)) continue;
+        $asn_nums[(int)$raw] = true;
+    }
+
+    if (empty($asn_nums)) return [];
+
+    $nums         = array_keys($asn_nums);
+    $placeholders = implode(',', array_fill(0, count($nums), '?'));
+    $types        = str_repeat('i', count($nums));
+
+    $stmt = $con->prepare(
+        'SELECT autonomous_system_number, autonomous_system_org,
+                network_start_integer, network_end_integer
+         FROM geoip2_asn_current_int
+         WHERE autonomous_system_number IN (' . $placeholders . ')
+         ORDER BY autonomous_system_number,
+                  (network_end_integer - network_start_integer) DESC'
+    );
+    $stmt->bind_param($types, ...$nums);
+    $stmt->execute();
+    $res = $stmt->get_result();
+
+    $by_asn = [];
+    while ($r = $res->fetch_assoc()) {
+        $num = (int)$r['autonomous_system_number'];
+        if (!isset($by_asn[$num])) {
+            $by_asn[$num] = ['org' => $r['autonomous_system_org'] ?? '', 'cidrs' => []];
+        }
+        $by_asn[$num]['cidrs'][] = int_range_to_cidr(
+            (int)$r['network_start_integer'],
+            (int)$r['network_end_integer']
+        );
+    }
+    $stmt->close();
+
+    $result = [];
+    foreach ($nums as $num) {
+        if (!isset($by_asn[$num])) continue;
+        $all   = $by_asn[$num]['cidrs'];
+        $total = count($all);
+        $result[] = [
+            'asn'   => 'AS' . $num,
+            'org'   => $by_asn[$num]['org'],
+            'cidrs' => array_slice($all, 0, 10),
+            'total' => $total,
+        ];
+    }
+
+    return $result;
+}
+
+/**
  * Rank IP entries by threat weight: freq × (2 if scanning/vpn, else 1).
  *
  * @param array $ip_data  Array of entries with keys: ip, classification, freq

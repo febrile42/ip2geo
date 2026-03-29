@@ -155,6 +155,9 @@ $verdict = maybe_upgrade_verdict($verdict, $top25);
 arsort($country_counts);
 $top_countries = array_slice($country_counts, 0, 5, true);
 
+// ASN ranges for scanning/VPN ASNs (DB must still be open here)
+$asn_ranges = fetch_asn_ranges($con, $top25);
+
 $report = [
     'verdict'         => $verdict,
     'total_ips'       => $total,
@@ -164,6 +167,7 @@ $report = [
     'top_countries'   => $top_countries,
     'top25'           => $top25,
     'block_ips'       => $block_ips,
+    'asn_ranges'      => $asn_ranges,
     'generated_at'    => date('Y-m-d H:i:s'),
     'abuseipdb_note'  => null,
 ];
@@ -388,7 +392,7 @@ function render_report(array $report, string $token, ?string $expires_at): void 
     $expires_fmt = $expires_at ? date('F j, Y', strtotime($expires_at)) : null;
 
     $verdict_text = [
-        'HIGH'     => 'This traffic shows a high concentration of known scanning infrastructure. Block the top ASN ranges below to stop the majority of it.',
+        'HIGH'     => 'This traffic shows a high concentration of known scanning infrastructure. The ASN ranges below cover all current prefixes for these networks — blocking them will stop the majority of it.',
         'MODERATE' => 'This traffic is mixed — some scanning, some legitimate. Review the top sources below before blocking.',
         'LOW'      => 'No significant threat patterns detected. Most traffic appears to be from residential or commercial ISPs.',
     ][$verdict];
@@ -469,6 +473,39 @@ function render_report(array $report, string $token, ?string $expires_at): void 
                     <?php echo htmlspecialchars($report['abuseipdb_note'], ENT_QUOTES, 'UTF-8'); ?>
                 <?php endif; ?>
             </p>
+            <?php endif; ?>
+
+            <!-- ASN Ranges -->
+            <?php if (!empty($report['asn_ranges'])): ?>
+            <h3>ASN Ranges to Block</h3>
+            <p style="font-size:0.9em;opacity:0.7">
+                These CIDR ranges cover all current prefixes advertised by the scanning/VPN
+                ASNs above. Blocking by range is more resilient than individual IPs — the
+                ranges stay valid even as specific IPs rotate.
+            </p>
+            <?php foreach ($report['asn_ranges'] as $group):
+                $shown = count($group['cidrs']);
+                $total_ranges = $group['total'];
+            ?>
+            <div style="margin-bottom:1.2em">
+                <strong><?php echo htmlspecialchars($group['asn'], ENT_QUOTES, 'UTF-8'); ?></strong>
+                <?php if ($group['org']): ?>
+                <span style="opacity:0.7;font-size:0.9em"><?php echo htmlspecialchars($group['org'], ENT_QUOTES, 'UTF-8'); ?></span>
+                <?php endif; ?>
+                <span style="font-size:0.8em;opacity:0.5">
+                    &mdash; <?php if ($total_ranges > $shown): ?>
+                        <?php echo $shown; ?> of <?php echo number_format($total_ranges); ?> ranges
+                    <?php else: ?>
+                        <?php echo $total_ranges; ?> range<?php echo $total_ranges === 1 ? '' : 's'; ?>
+                    <?php endif; ?>
+                </span>
+                <pre style="font-size:0.82em;overflow-x:auto;background:rgba(0,0,0,0.2);padding:0.55em 0.8em;margin:0.35em 0 0;line-height:1.6"><?php
+                    foreach ($group['cidrs'] as $cidr) {
+                        echo htmlspecialchars($cidr, ENT_QUOTES, 'UTF-8') . "\n";
+                    }
+                ?></pre>
+            </div>
+            <?php endforeach; ?>
             <?php endif; ?>
 
             <!-- Block script downloads -->

@@ -255,6 +255,13 @@ $block_entries = array_values(array_filter($ip_data, fn($e) => in_array($e['clas
 usort($block_entries, fn($a, $b) => ($b['freq'] ?? 1) <=> ($a['freq'] ?? 1));
 $block_ips = array_column($block_entries, 'ip');
 
+// ASN ranges for scanning/VPN ASNs
+echo "Fetching ASN ranges...\n";
+$asn_ranges = fetch_asn_ranges($con, $top25);
+foreach ($asn_ranges as $g) {
+    echo "  " . $g['asn'] . " (" . $g['org'] . "): " . $g['total'] . " ranges\n";
+}
+
 $report = [
     'verdict'        => $verdict,
     'total_ips'      => $total,
@@ -264,6 +271,7 @@ $report = [
     'top_countries'  => $top_countries,
     'top25'          => $top25,
     'block_ips'      => $block_ips,
+    'asn_ranges'     => $asn_ranges,
     'generated_at'   => date('Y-m-d H:i:s'),
     'abuseipdb_note' => null,
 ];
