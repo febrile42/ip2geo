@@ -12,7 +12,9 @@ Live at [ip2geo.org](https://ip2geo.org) since 2017.
 
 - **PHP** — server-side lookup logic
 - **MySQL** (or MariaDB) — hosts the MaxMind GeoLite2-City data
-- **MaxMind GeoLite2-City** — the geolocation data, updated automatically on the 1st of each month
+- **MaxMind GeoLite2-City + GeoLite2-ASN** — geolocation and ASN data, updated automatically on the 1st of each month
+- **Stripe Checkout** — one-time payment for paid threat reports (`get-report.php` → `report.php`)
+- **AbuseIPDB** — IP reputation enrichment on paid reports (free tier: 1,000 checks/day)
 - **HTML/CSS** — based on [Hyperspace](https://html5up.net/hyperspace) by HTML5 UP (CCA 3.0)
 - **GitHub Actions** — CI/CD pipeline (lint → staging → production) and monthly DB updates
 
@@ -42,13 +44,52 @@ To populate initially: download the GeoLite2-City CSV package from MaxMind, run 
 
 ### Configuration
 
-Copy `config.sample.php` to `config.php` and fill in your database credentials:
+Copy `config.sample.php` to `config.php` and fill in your credentials:
 
 ```bash
 cp config.sample.php config.php
 ```
 
 `config.php` is gitignored and should never be committed. On the server it lives alongside the codebase and survives deploys untouched.
+
+### Stripe
+
+The paid report flow requires a Stripe account and three values in `config.php`: a secret API key, a webhook signing secret, and (optionally) an AbuseIPDB key.
+
+**Recommended: use a Stripe Sandbox** for QA and staging. Sandboxes are isolated environments — each has its own API keys and webhook endpoints, Stripe delivers events directly to your webhook URL, and no Stripe CLI relay is needed.
+
+1. Stripe Dashboard → account menu → **Sandboxes** → create one (e.g. "ip2geo QA")
+2. Switch into the sandbox → Developers → API keys → copy the `sk_test_...` secret key
+3. Developers → Webhooks → Add endpoint:
+   - URL: `https://yourdomain.com/webhook.php`
+   - Event: `checkout.session.completed`
+   - Copy the signing secret (`whsec_...`)
+4. Add both to `config.php` on the server
+
+**Minimum API key permissions.** The app makes exactly one Stripe API call: `Checkout\Session::create()`. Create a **restricted key** (Developers → API keys → Create restricted key) with only:
+
+| Permission | Access |
+|------------|--------|
+| Checkout Sessions | Write |
+| Everything else | None |
+
+Webhook signature verification uses the `whsec_...` signing secret — it's pure HMAC, not an API call, so no additional key permissions are needed.
+
+Use the same restricted key pattern for production. A leaked key scoped to Checkout writes only can create payment sessions — it cannot read payment data, list customers, or issue refunds.
+
+**Test cards** (sandbox and test mode):
+
+| Card number | Behaviour |
+|-------------|-----------|
+| `4242 4242 4242 4242` | Successful payment |
+| `4000 0000 0000 9995` | Card declined |
+| `4000 0025 0000 3155` | 3D Secure required |
+
+Any future expiry date, any 3-digit CVC, any ZIP.
+
+### AbuseIPDB
+
+Sign up at [abuseipdb.com](https://www.abuseipdb.com/account/api) — the free tier provides 1,000 checks/day, which covers most QA and light production usage. Add the key to `config.php`. Leave the value empty (`''`) to disable enrichment without breaking anything else.
 
 ---
 
@@ -106,7 +147,7 @@ A few intentional choices worth noting:
 
 - **No Composer, no npm.** Dependencies add surface area. The stack is PHP + SQL and that's sufficient.
 - **Speed is a priority.** The app runs on shared hosting with constrained resources. IPs are pre-converted to unsigned 32-bit integers for range queries — this cut lookup time by ~60% over `INET6_ATON()`. A 10,000-IP batch completes in under 2 seconds of database time.
-- **`config.php` is the only secret.** DB credentials live there, it's gitignored, and it's the only file that needs to be managed separately on the server. Keep it that way.
+- **`config.php` is the only secret.** DB credentials, Stripe keys, and the AbuseIPDB key all live there. It's gitignored and the only file that needs to be managed separately on the server. Keep it that way.
 - **Private IPs are filtered server-side.** RFC 1918 ranges (10.x, 192.168.x, 172.16–31.x), loopback (127.x, ::1), and duplicates are stripped before any database queries happen.
 
 ---
