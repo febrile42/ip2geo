@@ -276,7 +276,7 @@ if ($_POST)
 	// --- Filter & Export (above table) ---
 	echo '<div id="filter-export" role="region" aria-label="Filter and Export">';
 	echo '<details id="filter-details" open>';
-	echo '<summary id="filter-summary">Filter &amp; Export &mdash; Showing <span id="filter-count">'.$matches_total.'</span> of '.$matches_total.' IPs</summary>';
+	echo '<summary id="filter-summary">Filter &amp; Export &mdash; Showing <span id="filter-count">'.$matches_total.'</span> of '.count($ip_list).' IPs</summary>';
 	echo '<div id="filter-layout">';
 
 	// Left column: action buttons + firewall rules output
