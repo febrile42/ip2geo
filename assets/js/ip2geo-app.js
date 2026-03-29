@@ -217,7 +217,45 @@
         });
     });
 
+    // ── Country chip clicks: exclusive-select / shift+click multi-select ─────
+    // Plain click  → show ONLY that country (click again to restore all).
+    // Shift+click  → toggle this country in/out of the current selection.
+    // Keyboard nav → falls through to the change handler below (toggle behaviour).
+    document.addEventListener('click', function (e) {
+        var label = e.target && e.target.closest('#filter-countries label');
+        if (!label) return;
+
+        e.preventDefault(); // stop the label from auto-toggling its checkbox
+
+        var clicked = label.querySelector('input[type="checkbox"]');
+        if (!clicked) return;
+
+        var all = Array.from(document.querySelectorAll('.filter-country'));
+
+        if (e.shiftKey) {
+            // Shift+click: add or remove this country from the selection
+            clicked.checked = !clicked.checked;
+            // If nothing would remain checked, restore all
+            if (!all.some(function (i) { return i.checked; })) {
+                all.forEach(function (i) { i.checked = true; });
+            }
+        } else {
+            var soloActive = all.filter(function (i) { return i.checked; }).length === 1 && clicked.checked;
+            if (soloActive) {
+                // Clicking the already-lone active chip restores all countries
+                all.forEach(function (i) { i.checked = true; });
+            } else {
+                // Exclusive select: only this country
+                all.forEach(function (i) { i.checked = false; });
+                clicked.checked = true;
+            }
+        }
+
+        applyFilters();
+    });
+
     // ── Wire up filter checkboxes (delegated — works after AJAX inject) ────
+    // Handles category chips (always toggle) and keyboard-driven country changes.
     document.addEventListener('change', function (e) {
         if (e.target && (e.target.classList.contains('filter-country') || e.target.classList.contains('filter-category'))) {
             applyFilters();
