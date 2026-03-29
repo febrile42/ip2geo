@@ -87,9 +87,11 @@
     margin-bottom: 0.5em;
 }
 
-/* Scrollable chip container for countries */
+/* Scrollable chip container for countries.
+   9.8em lands mid-chip (~5.5 rows), so a partial chip peeks out when
+   there are 6+ countries — natural scroll affordance, no extra markup. */
 #filter-countries .filter-chips {
-    max-height: 11em;
+    max-height: 9.8em;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
