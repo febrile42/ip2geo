@@ -12,6 +12,9 @@ jobs:
   update-geoip:
     name: Update GeoLite2-City Database
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
 
     steps:
       - name: Run update script on server
