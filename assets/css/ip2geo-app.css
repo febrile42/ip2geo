@@ -82,14 +82,6 @@
 /* --- Touch targets (a11y) --- */
 .button.small { min-height: 44px; }
 
-/* --- Results table: pinned IP column --- */
-#results-table tbody td:first-child,
-#results-table thead th:first-child {
-    position: sticky;
-    left: 0;
-    background: #1d1d2e;
-    z-index: 1;
-}
 
 /* --- Mobile: filter accordion collapsed by default --- */
 @media (max-width: 767px) {

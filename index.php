@@ -216,12 +216,11 @@ if ($_POST)
 					'freq'           => 1,
 				];
 				$rows_html .= '<tr data-category="'.htmlspecialchars($category, ENT_QUOTES, 'UTF-8').'" data-country="'.htmlspecialchars($country_code, ENT_QUOTES, 'UTF-8').'">';
-				$rows_html .= '<td style="font-family:monospace">'.htmlspecialchars($ip, ENT_QUOTES, 'UTF-8').'</td>';
-				$rows_html .= '<td>'.htmlspecialchars($country_code, ENT_QUOTES, 'UTF-8').'</td>';
-				$rows_html .= '<td>'.htmlspecialchars($row['country_name'] ?? '', ENT_QUOTES, 'UTF-8').'</td>';
+				$rows_html .= '<td>'.htmlspecialchars($ip, ENT_QUOTES, 'UTF-8').'</td>';
+				$rows_html .= '<td title="'.htmlspecialchars($row['country_name'] ?? '', ENT_QUOTES, 'UTF-8').'">'.htmlspecialchars($country_code, ENT_QUOTES, 'UTF-8').'</td>';
 				$rows_html .= '<td>'.htmlspecialchars($row['subdivision_1_name'] ?? '', ENT_QUOTES, 'UTF-8').'</td>';
 				$rows_html .= '<td>'.htmlspecialchars($row['city_name'] ?? '', ENT_QUOTES, 'UTF-8').'</td>';
-				$rows_html .= '<td style="font-family:monospace">'.htmlspecialchars($asn_num !== '' ? 'AS'.$asn_num : '', ENT_QUOTES, 'UTF-8').'</td>';
+				$rows_html .= '<td>'.htmlspecialchars($asn_num !== '' ? 'AS'.$asn_num : '', ENT_QUOTES, 'UTF-8').'</td>';
 				$rows_html .= '<td>'.htmlspecialchars($asn_org, ENT_QUOTES, 'UTF-8').'</td>';
 				$rows_html .= '<td class="asn-category asn-category--'.htmlspecialchars($category, ENT_QUOTES, 'UTF-8').'">'.htmlspecialchars($category, ENT_QUOTES, 'UTF-8').'</td>';
 				$rows_html .= '</tr>';
@@ -323,8 +322,8 @@ if ($_POST)
 	echo '</p>';
 
 	echo '<table id="results-table"><thead><tr>';
-	echo '<th scope="col" style="position:sticky;left:0;background:#1d1d2e;z-index:1">IP</th>';
-	echo '<th scope="col">CC</th><th scope="col">Country</th><th scope="col">State/Province</th><th scope="col">City</th>';
+	echo '<th scope="col">IP</th>';
+	echo '<th scope="col" title="Country Code">CC</th><th scope="col">State/Province</th><th scope="col">City</th>';
 	echo '<th scope="col">ASN</th><th scope="col">ASN Org</th><th scope="col">Category</th>';
 	echo '</tr></thead><tbody>';
 	echo $rows_html;
@@ -333,7 +332,7 @@ if ($_POST)
 	if (!empty($no_result_ips)) {
 		echo '<tbody id="unresolved-rows" style="display:none">';
 		foreach ($no_result_ips as $unresolved_ip) {
-			echo '<tr><td style="font-family:monospace">'.htmlspecialchars($unresolved_ip, ENT_QUOTES, 'UTF-8').'</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>';
+			echo '<tr><td>'.htmlspecialchars($unresolved_ip, ENT_QUOTES, 'UTF-8').'</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>';
 		}
 		echo '</tbody>';
 	}
@@ -521,7 +520,7 @@ else
 			if (e.target.id !== 'download-csv') return;
 			umami.track('download_csv');
 			var bom = '\uFEFF';
-			var headers = ['IP','Country Code','Country','State/Province','City'];
+			var headers = ['IP','CC','State/Province','City','ASN','ASN Org','Category'];
 			var rows = [headers];
 			document.querySelectorAll('#results-table tbody tr').forEach(function(tr) {
 				if (tr.parentElement.style.display === 'none') return;
