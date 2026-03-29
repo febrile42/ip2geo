@@ -182,15 +182,24 @@
 
     // ── After AJAX results inject: init filters + show cancel notice ───────
     // The existing AJAX handler in index.php replaces #results via outerHTML.
-    // We use a MutationObserver to detect when #results appears or changes.
-    var observer = new MutationObserver(function () {
-        var results = document.getElementById('results');
-        if (results) {
-            generateRules();
-            if (sessionStorage.getItem('ip2geo_show_cancel_notice')) {
-                sessionStorage.removeItem('ip2geo_show_cancel_notice');
-                showCancelNotice('Changed your mind? Your threat report is still ready.');
-            }
+    // We use a MutationObserver to detect when #results is newly added to the DOM.
+    //
+    // IMPORTANT: only check addedNodes, not document.getElementById('results').
+    // generateRules() writes to <pre> elements which are subtree children of body,
+    // so a naive "does #results exist?" check re-fires on every DOM write it causes,
+    // creating an infinite loop that freezes the browser tab.
+    var observer = new MutationObserver(function (mutations) {
+        var resultsAdded = mutations.some(function (m) {
+            return Array.from(m.addedNodes).some(function (node) {
+                return node.nodeType === 1 &&
+                    (node.id === 'results' || (node.querySelector && node.querySelector('#results')));
+            });
+        });
+        if (!resultsAdded) return;
+        generateRules();
+        if (sessionStorage.getItem('ip2geo_show_cancel_notice')) {
+            sessionStorage.removeItem('ip2geo_show_cancel_notice');
+            showCancelNotice('Changed your mind? Your threat report is still ready.');
         }
     });
     observer.observe(document.body, { childList: true, subtree: true });
