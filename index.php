@@ -555,16 +555,7 @@ else
 			URL.revokeObjectURL(a.href);
 		});
 
-		// Toggle unresolved rows (delegated — works after AJAX injection)
-		document.addEventListener('click', function(e) {
-			if (e.target.id !== 'toggle-unresolved') return;
-			var unresolvedBody = document.getElementById('unresolved-rows');
-			if (!unresolvedBody) return;
-			var hidden = unresolvedBody.style.display === 'none';
-			unresolvedBody.style.display = hidden ? '' : 'none';
-			var n = unresolvedBody.rows.length;
-			e.target.textContent = (hidden ? 'Hide ' : 'Show ') + n + ' unresolved IP' + (n !== 1 ? 's' : '');
-		});
+		// Toggle unresolved rows — handler moved to ip2geo-app.js so it can call applyFilters()
 
 		})();
 		</script>

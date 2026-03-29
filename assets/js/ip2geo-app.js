@@ -107,6 +107,12 @@
 
         restripe();
 
+        // Add unresolved rows to the visible count if that tbody is currently shown
+        var unresolvedBody = document.getElementById('unresolved-rows');
+        if (unresolvedBody && unresolvedBody.style.display !== 'none') {
+            visible += unresolvedBody.rows.length;
+        }
+
         // Update the showing count in the summary
         var countEl = document.getElementById('filter-count');
         if (countEl) countEl.textContent = visible;
@@ -256,6 +262,18 @@
         }
 
         applyFilters();
+    });
+
+    // ── Toggle unresolved rows ─────────────────────────────────────────────
+    document.addEventListener('click', function (e) {
+        if (!e.target || e.target.id !== 'toggle-unresolved') return;
+        var unresolvedBody = document.getElementById('unresolved-rows');
+        if (!unresolvedBody) return;
+        var hidden = unresolvedBody.style.display === 'none';
+        unresolvedBody.style.display = hidden ? '' : 'none';
+        var n = unresolvedBody.rows.length;
+        e.target.textContent = (hidden ? 'Hide ' : 'Show ') + n + ' unresolved IP' + (n !== 1 ? 's' : '');
+        applyFilters(); // update "Showing X of Y" to include/exclude unresolved rows
     });
 
     // ── Wire up filter checkboxes (delegated — works after AJAX inject) ────
