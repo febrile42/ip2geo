@@ -62,11 +62,9 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Fetch Spamhaus ASN-DROP list (lines starting with ; are comments)
-          SPAMHAUS_ASNS=$(curl -sf https://www.spamhaus.org/drop/asndrop.txt \
-            | grep -v '^;' \
-            | awk '{print $1}' \
-            | grep -E '^AS[0-9]+$' \
+          # Fetch Spamhaus ASN-DROP list (NDJSON format — one JSON object per line)
+          SPAMHAUS_ASNS=$(curl -sf https://www.spamhaus.org/drop/asndrop.json \
+            | jq -r '"AS" + (.asn | tostring)' \
             | sort -u)
 
           # Extract ASN keys already in our classification array
@@ -114,7 +112,7 @@ jobs:
           printf '%s\n' \
             '## Spamhaus ASN-DROP diff' \
             '' \
-            'These ASNs appear in the [Spamhaus ASN-DROP list](https://www.spamhaus.org/drop/asndrop.txt)' \
+            'These ASNs appear in the [Spamhaus ASN-DROP list](https://www.spamhaus.org/drop/asndrop.json)' \
             'but are not in `asn_classification.php`.' \
             '' \
             'Review `asn_classification_candidates.txt` and move confirmed entries into' \
