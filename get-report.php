@@ -117,7 +117,7 @@ try {
         ]],
         'mode'                 => 'payment',
         'client_reference_id'  => $token,
-        'success_url'          => $base_url . '/report.php?token=' . urlencode($token),
+        'success_url'          => $base_url . '/report.php?token=' . urlencode($token) . '&session_id={CHECKOUT_SESSION_ID}',
         'cancel_url'           => $base_url . '/?cancelled=1',
     ]);
 } catch (\Stripe\Exception\ApiErrorException $e) {

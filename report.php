@@ -45,16 +45,49 @@ if (!$row) {
 $status = $row['status'];
 
 if ($status === 'pending') {
-    // Check if pending token has expired
     if (strtotime($row['pending_expires_at']) < time()) {
         mysqli_close($con);
         render_error('This report link has expired (payment window was 1 hour). If you completed payment, contact us at josh@ip2geo.org with your payment confirmation and we will restore your report.');
         exit;
     }
-    // Pending but not expired: payment hasn't completed yet (user arrived before webhook)
-    mysqli_close($con);
-    render_error('Your payment is being processed. Please wait a moment and reload this page. If this message persists, contact josh@ip2geo.org.');
-    exit;
+
+    // Primary success path: Stripe appends ?session_id= to the success_url.
+    // Retrieve the session and verify payment_status before generating the report.
+    $stripe_session_id = isset($_GET['session_id']) ? trim($_GET['session_id']) : '';
+    if ($stripe_session_id === '') {
+        // No session_id — user navigated directly before webhook fired
+        mysqli_close($con);
+        render_error('Your payment is being processed. Please wait a moment and reload this page. If this message persists, contact josh@ip2geo.org.');
+        exit;
+    }
+
+    \Stripe\Stripe::setApiKey($stripe_secret_key);
+    try {
+        $stripe_session = \Stripe\Checkout\Session::retrieve($stripe_session_id);
+    } catch (\Stripe\Exception\ApiErrorException $e) {
+        error_log('ip2geo report.php Stripe retrieve failed: ' . $e->getMessage());
+        mysqli_close($con);
+        render_error('Payment verification failed. Please contact josh@ip2geo.org with your token: ' . htmlspecialchars($token, ENT_QUOTES, 'UTF-8'));
+        exit;
+    }
+
+    // Guard: session_id must belong to this token
+    if (($stripe_session->client_reference_id ?? '') !== $token) {
+        error_log('ip2geo report.php: session_id/token mismatch for token ' . $token);
+        mysqli_close($con);
+        render_error('Payment verification failed. Please contact josh@ip2geo.org with your token: ' . htmlspecialchars($token, ENT_QUOTES, 'UTF-8'));
+        exit;
+    }
+
+    if ($stripe_session->payment_status !== 'paid') {
+        mysqli_close($con);
+        render_error('Your payment is being processed. Please wait a moment and reload this page. If this message persists, contact josh@ip2geo.org.');
+        exit;
+    }
+
+    // Payment confirmed via Stripe — fall through to report generation.
+    // The UPDATE below uses status IN ("pending","paid") so this works without
+    // a separate mark-paid step. The webhook may still fire and no-op.
 }
 
 if ($status === 'redeemed') {
