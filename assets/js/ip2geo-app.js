@@ -1,0 +1,198 @@
+(function () {
+    'use strict';
+
+    // ── Stripe cancel restore ──────────────────────────────────────────────
+    // If the user cancelled from Stripe and was redirected back with ?cancelled=1,
+    // restore their IPs from sessionStorage and re-submit the form automatically.
+    (function handleCancel() {
+        var params = new URLSearchParams(window.location.search);
+        if (!params.get('cancelled')) return;
+
+        // Remove ?cancelled=1 from the URL without a page reload
+        history.replaceState(null, '', window.location.pathname);
+
+        var pending = sessionStorage.getItem('ip2geo_pending_ips');
+        if (pending) {
+            sessionStorage.removeItem('ip2geo_pending_ips');
+            var textarea = document.getElementById('message');
+            var form = document.getElementById('iplookup');
+            if (textarea && form) {
+                textarea.value = pending;
+                // Re-submit via the existing AJAX handler; it fires on the submit button click
+                // so we dispatch a click event which the existing listener handles.
+                var btn = form.querySelector('input[type="submit"]');
+                if (btn) {
+                    // Set a flag so the cancel notice shows after results render
+                    sessionStorage.setItem('ip2geo_show_cancel_notice', '1');
+                    btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+                }
+            }
+        } else {
+            // sessionStorage empty (different tab / cleared) — show static notice
+            showCancelNotice('Payment cancelled. Paste your IPs again to continue.');
+        }
+    })();
+
+    function showCancelNotice(msg) {
+        var existing = document.getElementById('cancel-notice');
+        if (existing) return;
+        var notice = document.createElement('div');
+        notice.id = 'cancel-notice';
+        notice.setAttribute('role', 'status');
+        notice.innerHTML = '<span>' + msg + '</span><button aria-label="Dismiss">&#215;</button>';
+        notice.querySelector('button').addEventListener('click', function () { notice.remove(); });
+        setTimeout(function () { if (notice.parentNode) notice.remove(); }, 8000);
+        var intro = document.getElementById('intro');
+        if (intro) intro.insertAdjacentElement('afterend', notice);
+    }
+
+    // ── CTA button: save IPs to sessionStorage before Stripe redirect ──────
+    // The CTA is a form submit (POST to /get-report.php with ip_classified_json).
+    // We save the raw textarea value here so we can restore it if the user cancels.
+    document.addEventListener('click', function (e) {
+        if (!e.target || e.target.id !== 'cta-button') return;
+        var textarea = document.getElementById('message');
+        if (textarea && textarea.value) {
+            sessionStorage.setItem('ip2geo_pending_ips', textarea.value);
+        }
+        // Let the form submit proceed normally
+    });
+
+    // ── Filter logic ───────────────────────────────────────────────────────
+    function applyFilters() {
+        var checkedCountries = new Set(
+            Array.from(document.querySelectorAll('.filter-country:checked')).map(function (el) { return el.value; })
+        );
+        var checkedCategories = new Set(
+            Array.from(document.querySelectorAll('.filter-category:checked')).map(function (el) { return el.value; })
+        );
+
+        var allRows = document.querySelectorAll('#results-table tbody:not(#unresolved-rows) tr');
+        var visible = 0;
+        allRows.forEach(function (row) {
+            var country  = row.dataset.country   || '';
+            var category = row.dataset.category  || '';
+            // A row is visible if its country AND category are both checked
+            // Empty country rows (no geo data) pass the country filter
+            var countryOk  = country === '' || checkedCountries.has(country);
+            var categoryOk = checkedCategories.has(category);
+            var show = countryOk && categoryOk;
+            row.style.display = show ? '' : 'none';
+            if (show) visible++;
+        });
+
+        // Update the showing count in the summary
+        var countEl = document.getElementById('filter-count');
+        if (countEl) countEl.textContent = visible;
+
+        // Empty state
+        var emptyMsg = document.getElementById('empty-filter-msg');
+        if (emptyMsg) emptyMsg.style.display = visible === 0 ? '' : 'none';
+
+        // Debounced rule update
+        scheduleRuleUpdate();
+    }
+
+    // ── Firewall rule generation ───────────────────────────────────────────
+    var ruleUpdateTimer = null;
+    function scheduleRuleUpdate() {
+        clearTimeout(ruleUpdateTimer);
+        ruleUpdateTimer = setTimeout(generateRules, 200);
+    }
+
+    function getVisibleIPs() {
+        var ips = [];
+        document.querySelectorAll('#results-table tbody:not(#unresolved-rows) tr').forEach(function (row) {
+            if (row.style.display === 'none') return;
+            var ip = row.querySelector('td');
+            if (ip) ips.push(ip.textContent.trim());
+        });
+        return ips;
+    }
+
+    function generateRules() {
+        var ips = getVisibleIPs();
+        if (!ips.length) return;
+
+        var iptablesPre = document.getElementById('rules-iptables-pre');
+        var ufwPre      = document.getElementById('rules-ufw-pre');
+        var nginxPre    = document.getElementById('rules-nginx-pre');
+
+        if (iptablesPre) {
+            iptablesPre.textContent = ips.map(function (ip) {
+                return 'iptables -A INPUT -s ' + ip + ' -j DROP';
+            }).join('\n');
+        }
+        if (ufwPre) {
+            ufwPre.textContent = ips.map(function (ip) {
+                return 'ufw deny from ' + ip + ' to any';
+            }).join('\n');
+        }
+        if (nginxPre) {
+            nginxPre.textContent = 'geo $block_ip {\n    default 0;\n' +
+                ips.map(function (ip) { return '    ' + ip + ' 1;'; }).join('\n') +
+                '\n}';
+        }
+    }
+
+    // ── Show/hide rule blocks ──────────────────────────────────────────────
+    function toggleRulesBlock(blockId) {
+        var block = document.getElementById(blockId);
+        if (!block) return;
+        var wasHidden = block.style.display === 'none';
+        // Close all open blocks first
+        ['rules-iptables', 'rules-ufw', 'rules-nginx'].forEach(function (id) {
+            var el = document.getElementById(id);
+            if (el) el.style.display = 'none';
+        });
+        if (wasHidden) {
+            block.style.display = '';
+            generateRules();
+            umami && umami.track('show_rules_' + blockId.replace('rules-', ''));
+        }
+    }
+
+    document.addEventListener('click', function (e) {
+        var id = e.target && e.target.id;
+        if (id === 'show-iptables') { toggleRulesBlock('rules-iptables'); return; }
+        if (id === 'show-ufw')      { toggleRulesBlock('rules-ufw');      return; }
+        if (id === 'show-nginx')    { toggleRulesBlock('rules-nginx');     return; }
+    });
+
+    // ── Copy button inside rule blocks ────────────────────────────────────
+    document.addEventListener('click', function (e) {
+        if (!e.target || !e.target.classList.contains('copy-rules')) return;
+        var targetId = e.target.dataset.target;
+        var pre = document.getElementById(targetId);
+        if (!pre) return;
+        navigator.clipboard.writeText(pre.textContent).then(function () {
+            var orig = e.target.textContent;
+            e.target.textContent = 'Copied!';
+            umami && umami.track('copy_rules_' + targetId.replace('rules-', '').replace('-pre', ''));
+            setTimeout(function () { e.target.textContent = orig; }, 2000);
+        });
+    });
+
+    // ── Wire up filter checkboxes (delegated — works after AJAX inject) ────
+    document.addEventListener('change', function (e) {
+        if (e.target && (e.target.classList.contains('filter-country') || e.target.classList.contains('filter-category'))) {
+            applyFilters();
+        }
+    });
+
+    // ── After AJAX results inject: init filters + show cancel notice ───────
+    // The existing AJAX handler in index.php replaces #results via outerHTML.
+    // We use a MutationObserver to detect when #results appears or changes.
+    var observer = new MutationObserver(function () {
+        var results = document.getElementById('results');
+        if (results) {
+            generateRules();
+            if (sessionStorage.getItem('ip2geo_show_cancel_notice')) {
+                sessionStorage.removeItem('ip2geo_show_cancel_notice');
+                showCancelNotice('Changed your mind? Your threat report is still ready.');
+            }
+        }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+
+})();

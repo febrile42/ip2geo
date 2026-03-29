@@ -1,0 +1,120 @@
+/* ip2geo Phase C+A — app-specific styles */
+
+/* --- Verdict badge --- */
+.asn-verdict {
+    font-family: monospace;
+    font-size: 1.4em;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    padding-left: 0.75em;
+    margin-bottom: 0.25em;
+}
+.asn-verdict--high     { color: #e06c9f; border-left: 3px solid #e06c9f; }
+.asn-verdict--moderate { color: #e0a85a; border-left: 3px solid #e0a85a; }
+.asn-verdict--low      { color: #6cb87a; border-left: 3px solid #6cb87a; }
+
+/* --- ASN category labels in table --- */
+.asn-category {
+    font-family: monospace;
+    font-size: 0.85em;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.asn-category--scanning    { color: #e06c9f; }
+.asn-category--cloud       { color: #8ab4d4; }
+.asn-category--vpn         { color: #e0a85a; }
+.asn-category--residential { color: #6cb87a; }
+.asn-category--unknown     { color: #888; }
+
+/* --- Filter panel --- */
+#filter-details > summary {
+    cursor: pointer;
+    padding: 0.5em 0;
+    font-weight: bold;
+    list-style: none;
+}
+#filter-details > summary::-webkit-details-marker { display: none; }
+#filter-details > summary::before {
+    content: '▸ ';
+    font-size: 0.8em;
+}
+#filter-details[open] > summary::before { content: '▾ '; }
+
+#filter-panel {
+    padding: 0.75em 0 0.5em;
+}
+#filter-countries label,
+#filter-categories label {
+    display: inline-block;
+    margin: 0.2em 0.5em 0.2em 0;
+    cursor: pointer;
+}
+#filter-countries input[type="checkbox"],
+#filter-categories input[type="checkbox"] {
+    accent-color: #e06c9f;
+    cursor: pointer;
+}
+
+/* --- Rules blocks --- */
+.rules-block {
+    position: relative;
+    margin-top: 0.75em;
+}
+.rules-block pre {
+    background: rgba(255,255,255,0.05);
+    border-radius: 4px;
+    padding: 1em;
+    font-family: monospace;
+    font-size: 0.9em;
+    overflow-x: auto;
+    white-space: pre;
+    max-height: 300px;
+    overflow-y: auto;
+    margin-top: 2em;
+}
+.rules-block .copy-rules {
+    position: absolute;
+    top: 0;
+    right: 0;
+}
+
+/* --- Touch targets (a11y) --- */
+.button.small { min-height: 44px; }
+
+/* --- Results table: pinned IP column --- */
+#results-table tbody td:first-child,
+#results-table thead th:first-child {
+    position: sticky;
+    left: 0;
+    background: #1d1d2e;
+    z-index: 1;
+}
+
+/* --- Mobile: filter accordion collapsed by default --- */
+@media (max-width: 767px) {
+    #filter-details:not([open]) #filter-panel { display: none; }
+    #filter-countries,
+    #filter-categories { display: block; margin-bottom: 0.75em; }
+}
+
+/* --- Cancel notice --- */
+#cancel-notice {
+    background: rgba(255,255,255,0.07);
+    border-left: 3px solid #e0a85a;
+    padding: 0.6em 1em;
+    margin-bottom: 1em;
+    font-size: 0.9em;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+#cancel-notice button {
+    background: none;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    font-size: 1.1em;
+    opacity: 0.6;
+    padding: 0 0.25em;
+}

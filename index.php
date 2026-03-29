@@ -1,6 +1,7 @@
 <?php
 
 require __DIR__ . '/config.php';
+require __DIR__ . '/asn_classification.php';
 @include_once __DIR__ . '/db_version.php'; // gitignored; written by the monthly DB update script
 
 function getRealIPAddr()
@@ -38,6 +39,7 @@ function ipToLong(string $ip): string {
 		<meta name="description" content="Free tool to filter up to 10,000 IP addresses from an arbitrary text blob and list their geographic location." />
 		<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
 		<link rel="stylesheet" href="assets/css/main.css" />
+	<link rel="stylesheet" href="assets/css/ip2geo-app.css" />
 		<link rel="icon" href="/favicon.ico" />
 		<noscript><link rel="stylesheet" href="assets/css/noscript.css" /></noscript>
 	</head>
@@ -157,39 +159,161 @@ if ($_POST)
 	$no_result_ips = [];
 	$totalduration = 0;
 	$rows_html = '';
+
+	// For CTA threshold and filter UI
+	$scanning_proxy_count = 0;
+	$category_counts = ['scanning' => 0, 'cloud' => 0, 'vpn' => 0, 'residential' => 0, 'unknown' => 0];
+	$country_counts = [];
+	// For ip_list_json stored at token creation (Phase A)
+	$ip_classified_data = [];
+
 	foreach ($ip_list as $key => $ip) {
-		$ip = mysqli_real_escape_string($con, $ip); // Just in case of crazy awesome hackers, escape our IP "input"
-		$query = 'SELECT country_iso_code, country_name, subdivision_1_name, city_name FROM( SELECT geoname_id, network_end_integer FROM geoip2_network_current_int WHERE "'.ipToLong($ip).'" >= network_start_integer ORDER BY network_start_integer DESC LIMIT 1) net LEFT JOIN geoip2_location_current location ON ( net.geoname_id = location.geoname_id AND location.locale_code = "en" ) WHERE "'.ipToLong($ip).'" <= network_end_integer';
-		// $query = 'SELECT country_iso_code,country_name,city_name FROM locations WHERE `geoname_id` = (SELECT geoname_id FROM `blocks` INNER JOIN (SELECT MAX(start_ip) AS start FROM `blocks` WHERE start_ip <= INET_ATON("'.$ip.'")) AS s ON (start_ip = s.start) WHERE end_ip >= INET_ATON("'.$ip.'"))';
+		$ip = mysqli_real_escape_string($con, $ip);
+		$ip_int = ipToLong($ip);
+		$query = 'SELECT loc.country_iso_code, loc.country_name, loc.subdivision_1_name, loc.city_name,
+			asn_net.autonomous_system_number, asn_net.autonomous_system_org
+		FROM (
+			SELECT geoname_id, network_end_integer
+			FROM geoip2_network_current_int
+			WHERE ' . $ip_int . ' >= network_start_integer
+			ORDER BY network_start_integer DESC LIMIT 1
+		) city_net
+		LEFT JOIN geoip2_location_current loc
+			ON (city_net.geoname_id = loc.geoname_id AND loc.locale_code = "en")
+		LEFT JOIN (
+			SELECT autonomous_system_number, autonomous_system_org
+			FROM geoip2_asn_current_int
+			WHERE ' . $ip_int . ' >= network_start_integer
+			ORDER BY network_start_integer DESC LIMIT 1
+		) asn_net ON 1=1
+		WHERE ' . $ip_int . ' <= city_net.network_end_integer';
 		$starttime = microtime(true);
 		$result = mysqli_query($con, $query);
-		$endtime = microtime(true);
-		$duration = $endtime - $starttime;
+		$totalduration += microtime(true) - $starttime;
 		$geo_found = false;
-		while ($row = mysqli_fetch_array($result))
+		while ($row = mysqli_fetch_assoc($result))
 		{
 			$geo_found = true;
-			if (!in_array($row['country_iso_code'], $good_countries))
+			$asn_num = $row['autonomous_system_number'] ?? '';
+			$asn_org = $row['autonomous_system_org'] ?? '';
+			$category = classify_asn((string)$asn_num, (string)$asn_org);
+			$country_code = $row['country_iso_code'] ?? '';
+			if (!in_array($country_code, $good_countries))
 			{
-				$rows_html .= '<tr>';
-				$rows_html .= '<td>'.htmlspecialchars($ip, ENT_QUOTES, 'UTF-8').'</td>';
-				$rows_html .= '<td>'.htmlspecialchars($row['country_iso_code'], ENT_QUOTES, 'UTF-8').'</td>';
-				$rows_html .= '<td>'.htmlspecialchars($row['country_name'], ENT_QUOTES, 'UTF-8').'</td>';
-				$rows_html .= '<td>'.htmlspecialchars($row['subdivision_1_name'], ENT_QUOTES, 'UTF-8').'</td>';
-				$rows_html .= '<td>'.htmlspecialchars($row['city_name'], ENT_QUOTES, 'UTF-8').'</td>';
-				$rows_html .= '</tr>';
 				$matches_total++;
+				$category_counts[$category]++;
+				if ($category === 'scanning' || $category === 'vpn') {
+					$scanning_proxy_count++;
+				}
+				if ($country_code !== '') {
+					$country_counts[$country_code] = ($country_counts[$country_code] ?? 0) + 1;
+				}
+				$ip_classified_data[] = [
+					'ip'             => $ip,
+					'asn'            => $asn_num !== '' ? 'AS' . $asn_num : '',
+					'classification' => $category,
+					'country'        => $country_code,
+					'freq'           => 1,
+				];
+				$rows_html .= '<tr data-category="'.htmlspecialchars($category, ENT_QUOTES, 'UTF-8').'" data-country="'.htmlspecialchars($country_code, ENT_QUOTES, 'UTF-8').'">';
+				$rows_html .= '<td style="font-family:monospace">'.htmlspecialchars($ip, ENT_QUOTES, 'UTF-8').'</td>';
+				$rows_html .= '<td>'.htmlspecialchars($country_code, ENT_QUOTES, 'UTF-8').'</td>';
+				$rows_html .= '<td>'.htmlspecialchars($row['country_name'] ?? '', ENT_QUOTES, 'UTF-8').'</td>';
+				$rows_html .= '<td>'.htmlspecialchars($row['subdivision_1_name'] ?? '', ENT_QUOTES, 'UTF-8').'</td>';
+				$rows_html .= '<td>'.htmlspecialchars($row['city_name'] ?? '', ENT_QUOTES, 'UTF-8').'</td>';
+				$rows_html .= '<td style="font-family:monospace">'.htmlspecialchars($asn_num !== '' ? 'AS'.$asn_num : '', ENT_QUOTES, 'UTF-8').'</td>';
+				$rows_html .= '<td>'.htmlspecialchars($asn_org, ENT_QUOTES, 'UTF-8').'</td>';
+				$rows_html .= '<td class="asn-category asn-category--'.htmlspecialchars($category, ENT_QUOTES, 'UTF-8').'">'.htmlspecialchars($category, ENT_QUOTES, 'UTF-8').'</td>';
+				$rows_html .= '</tr>';
 			} else {
 				$filtered_total++;
 			}
 		}
 		if (!$geo_found) $no_result_ips[] = $ip;
-		$totalduration = $totalduration + $duration;
 	}
 
-	// --- Output results section (counts are now known) ---
-	echo '<section id="results" class="wrapper style4 fade-up"><div class="inner"><div class="table-wrapper">';
+	// --- CTA threshold ---
+	$show_cta = $matches_total > 0 && ($scanning_proxy_count / $matches_total) > 0.20;
+	$scanning_pct = $matches_total > 0 ? round(($scanning_proxy_count / $matches_total) * 100) : 0;
+	if ($matches_total > 0 && ($scanning_proxy_count / $matches_total) >= 0.80) {
+		$verdict_level = 'HIGH';
+	} elseif ($matches_total > 0 && ($scanning_proxy_count / $matches_total) >= 0.60 && $scanning_proxy_count >= 100) {
+		$verdict_level = 'HIGH';
+	} elseif ($matches_total > 0 && (($scanning_proxy_count / $matches_total) < 0.30 || $scanning_proxy_count < 10)) {
+		$verdict_level = 'LOW';
+	} else {
+		$verdict_level = 'MODERATE';
+	}
+
+	arsort($country_counts);
+
+	// --- Output results section ---
+	echo '<section id="results" class="wrapper style4 fade-up"><div class="inner">';
 	echo '<h2 id="result">Lookup Results</h2>';
+
+	// --- Threat CTA (above filter + table) ---
+	if ($show_cta): ?>
+	<div id="threat-cta" role="region" aria-label="Threat Assessment">
+		<hr />
+		<p class="asn-verdict asn-verdict--<?php echo htmlspecialchars(strtolower($verdict_level), ENT_QUOTES, 'UTF-8'); ?>">
+			<?php echo htmlspecialchars($verdict_level, ENT_QUOTES, 'UTF-8'); ?> THREAT
+		</p>
+		<p><?php echo $scanning_pct; ?>% of IPs from scanning or proxy infrastructure
+			(<?php echo $scanning_proxy_count; ?> of <?php echo $matches_total; ?> IPs)</p>
+		<p>
+			<form method="POST" action="/get-report.php" id="cta-form" style="display:inline">
+			<input type="hidden" name="ip_classified_json" id="ip-classified-json"
+				value="<?php echo htmlspecialchars(json_encode($ip_classified_data), ENT_QUOTES, 'UTF-8'); ?>" />
+			<button type="submit" id="cta-button" class="button">Get Full Report + Block Script &mdash; $9</button>
+		</form>
+		</p>
+		<p style="font-size:0.8em;opacity:0.7;margin-top:-0.5em">
+			One-time payment. No account required. Report accessible for 30 days.
+		</p>
+		<hr />
+	</div>
+	<?php endif;
+
+	// --- Filter & Export (above table) ---
+	echo '<div id="filter-export" role="region" aria-label="Filter and Export">';
+	echo '<details id="filter-details">';
+	echo '<summary id="filter-summary">Filter &amp; Export &mdash; Showing <span id="filter-count">'.$matches_total.'</span> of '.$matches_total.' IPs</summary>';
+	echo '<div id="filter-panel">';
+
+	// Country checkboxes
+	echo '<div id="filter-countries">';
+	echo '<strong>Countries</strong><br>';
+	foreach ($country_counts as $cc => $count) {
+		$cc_safe = htmlspecialchars($cc, ENT_QUOTES, 'UTF-8');
+		echo '<label><input type="checkbox" class="filter-country" value="'.$cc_safe.'" checked> '.$cc_safe.' ('.$count.')</label> ';
+	}
+	echo '</div>';
+
+	// ASN category checkboxes
+	echo '<div id="filter-categories" style="margin-top:0.75em">';
+	echo '<strong>ASN Categories</strong><br>';
+	$cat_labels = ['scanning' => 'Scanning', 'cloud' => 'Cloud exit', 'vpn' => 'VPN/Proxy', 'residential' => 'Residential', 'unknown' => 'Unknown'];
+	foreach ($cat_labels as $cat => $label) {
+		if (($category_counts[$cat] ?? 0) === 0) continue;
+		$cat_safe = htmlspecialchars($cat, ENT_QUOTES, 'UTF-8');
+		echo '<label><input type="checkbox" class="filter-category" value="'.$cat_safe.'" checked> '.$label.' ('.$category_counts[$cat].')</label> ';
+	}
+	echo '</div>';
+
+	// Export buttons
+	echo '<div id="export-buttons" style="margin-top:1em">';
+	echo '<button class="button small" id="show-iptables">Show iptables rules</button> ';
+	echo '<button class="button small" id="show-ufw">Show ufw rules</button> ';
+	echo '<button class="button small" id="show-nginx">Show nginx block</button>';
+	echo '</div>';
+	echo '<div id="rules-iptables" class="rules-block" style="display:none" aria-label="iptables block rules"><button class="button small copy-rules" data-target="rules-iptables-pre">Copy</button><pre id="rules-iptables-pre"></pre></div>';
+	echo '<div id="rules-ufw"      class="rules-block" style="display:none" aria-label="ufw deny rules"><button class="button small copy-rules" data-target="rules-ufw-pre">Copy</button><pre id="rules-ufw-pre"></pre></div>';
+	echo '<div id="rules-nginx"    class="rules-block" style="display:none" aria-label="nginx geo block"><button class="button small copy-rules" data-target="rules-nginx-pre">Copy</button><pre id="rules-nginx-pre"></pre></div>';
+
+	echo '</div></details></div>';
+
+	// --- Results table ---
+	echo '<div class="table-wrapper" style="overflow-x:auto">';
 	echo '<p style="margin-bottom:1em">';
 	echo '<button id="download-csv" class="button small">&#8595; Download CSV</button>';
 	if (!empty($no_result_ips)) {
@@ -198,19 +322,27 @@ if ($_POST)
 	}
 	echo '</p>';
 
-	echo '<table id="results-table"><thead><th>IP</th><th>Country Code</th><th>Country</th><th>State/Province</th><th>City</th></thead><tbody>';
+	echo '<table id="results-table"><thead><tr>';
+	echo '<th scope="col" style="position:sticky;left:0;background:#1d1d2e;z-index:1">IP</th>';
+	echo '<th scope="col">CC</th><th scope="col">Country</th><th scope="col">State/Province</th><th scope="col">City</th>';
+	echo '<th scope="col">ASN</th><th scope="col">ASN Org</th><th scope="col">Category</th>';
+	echo '</tr></thead><tbody>';
 	echo $rows_html;
 	echo '</tbody>';
 
 	if (!empty($no_result_ips)) {
 		echo '<tbody id="unresolved-rows" style="display:none">';
 		foreach ($no_result_ips as $unresolved_ip) {
-			echo '<tr><td>'.htmlspecialchars($unresolved_ip, ENT_QUOTES, 'UTF-8').'</td><td></td><td></td><td></td><td></td></tr>';
+			echo '<tr><td style="font-family:monospace">'.htmlspecialchars($unresolved_ip, ENT_QUOTES, 'UTF-8').'</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>';
 		}
 		echo '</tbody>';
 	}
+	echo '</table>';
 
-	echo '</table></div>';
+	// Empty filter state (shown by JS when all rows filtered out)
+	echo '<p id="empty-filter-msg" style="display:none;text-align:center;padding:1em;opacity:0.7">No IPs match the current filter. Try selecting more categories.</p>';
+
+	echo '</div>';
 
 	// --- Summary stats ---
 	$submitted = count($ip_list);
@@ -227,7 +359,7 @@ if ($_POST)
 	}
 	echo '</table>';
 
-	echo '</section></section>';
+	echo '</div></section>';
 }
 else
 {
@@ -360,7 +492,15 @@ else
 					if (!newResults) throw new Error('no results section in response');
 
 					cleanup();
-					umami.track('lookup_submit', { ip_count: count });
+					var bucket = count === 1 ? '1'
+					             : count <= 10   ? '2-10'
+					             : count <= 50   ? '11-50'
+					             : count <= 100  ? '51-100'
+					             : count <= 500  ? '101-500'
+					             : count <= 1000 ? '501-1000'
+					             : count <= 5000 ? '1001-5000'
+					             :                 '5000+';
+					umami.track('lookup_submit', { ip_count_bucket: bucket });
 
 					var existing = document.getElementById('results');
 					if (existing) {
@@ -420,6 +560,7 @@ else
 			<script src="assets/js/breakpoints.min.js"></script>
 			<script src="assets/js/util.js"></script>
 			<script src="assets/js/main.js"></script>
+		<script src="assets/js/ip2geo-app.js"></script>
 
 	</body>
 </html>
