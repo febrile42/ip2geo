@@ -119,6 +119,10 @@ jobs:
           } > "$REVIEW_FILE"
 
           git add -f "$REVIEW_FILE"
+          if git diff --cached --quiet; then
+            echo "Spamhaus diff: candidate file unchanged since last PR — no new action needed."
+            exit 0
+          fi
           git commit -m "chore: ASN classification candidates from Spamhaus ASN-DROP ($MONTH)"
           git push origin "$BRANCH"
 

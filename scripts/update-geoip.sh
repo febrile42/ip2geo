@@ -96,12 +96,14 @@ DROP TABLE IF EXISTS geoip2_asn_incoming_int;
 CREATE TABLE geoip2_network_incoming_int LIKE geoip2_network_current_int;
 CREATE TABLE geoip2_location_incoming    LIKE geoip2_location_current;
 -- ASN table: create from scratch if this is the first run
+-- INT UNSIGNED (not BIGINT) matches the city table and halves the index key size.
+-- Covering index includes ASN number + org so lookups never touch the row heap.
 CREATE TABLE IF NOT EXISTS geoip2_asn_current_int (
-  network_start_integer BIGINT UNSIGNED NOT NULL,
-  network_end_integer   BIGINT UNSIGNED NOT NULL,
+  network_start_integer INT UNSIGNED NOT NULL,
+  network_end_integer   INT UNSIGNED NOT NULL,
   autonomous_system_number INT UNSIGNED,
   autonomous_system_org    VARCHAR(255),
-  KEY idx_start (network_start_integer)
+  KEY idx_asn_lookup (network_start_integer, autonomous_system_number, autonomous_system_org)
 ) ENGINE=InnoDB;
 CREATE TABLE geoip2_asn_incoming_int LIKE geoip2_asn_current_int;
 SQL
