@@ -528,16 +528,7 @@ function render_page_open(string $title, string $meta_desc = ''): void {
 
 function render_page_close(): void { ?>
     </div>
-    <footer id="footer" class="wrapper style1-alt">
-        <div class="inner">
-            <ul class="menu">
-                <li>This product includes GeoLite2 data created by MaxMind, available from <a href="http://www.maxmind.com">http://www.maxmind.com</a>.</li>
-            </ul>
-            <ul class="menu">
-                <li><a href="/privacy.php">Privacy Policy</a></li>
-            </ul>
-        </div>
-    </footer>
+    <?php require __DIR__ . '/includes/footer.php'; ?>
     <script src="/assets/js/jquery.min.js"></script>
     <script src="/assets/js/jquery.scrollex.min.js"></script>
     <script src="/assets/js/jquery.scrolly.min.js"></script>

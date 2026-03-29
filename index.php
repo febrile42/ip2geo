@@ -446,20 +446,7 @@ else
 
 			</div>
 
-		<!-- Footer -->
-			<footer id="footer" class="wrapper style1-alt">
-				<div class="inner">
-					<ul class="menu">
-						<li>This product includes GeoLite2 data created by MaxMind, available from <a href="http://www.maxmind.com" target="_new">http://www.maxmind.com</a>.</li>
-					</ul>
-					<ul class="menu">
-						<li><a href="/changelog.php">v2.6.3</a> &ndash; &copy;<?php echo date("Y"); ?></li>
-						<?php if (!empty($db_data_date)) { echo '<li>Data: ' . $db_data_date . '</li>'; } ?>
-						<li><a href="/privacy.php">Privacy Policy</a></li>
-						<li>Design: <a href="http://html5up.net">HTML5 UP</a></li>
-					</ul>
-				</div>
-			</footer>
+		<?php require __DIR__ . '/includes/footer.php'; ?>
 
 		<!-- Scripts -->
 		<script data-cfasync="false">
