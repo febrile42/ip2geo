@@ -110,20 +110,24 @@ jobs:
           git commit -m "chore: ASN classification candidates from Spamhaus ASN-DROP ($MONTH)"
           git push origin "$BRANCH"
 
+          PR_BODY_FILE=$(mktemp)
+          printf '%s\n' \
+            '## Spamhaus ASN-DROP diff' \
+            '' \
+            'These ASNs appear in the [Spamhaus ASN-DROP list](https://www.spamhaus.org/drop/asndrop.txt)' \
+            'but are not in `asn_classification.php`.' \
+            '' \
+            'Review `asn_classification_candidates.txt` and move confirmed entries into' \
+            '`$known_asns` in `asn_classification.php` with the appropriate category.' \
+            '' \
+            '**Never auto-merge this PR.** Human review required before classification changes ship.' \
+            > "$PR_BODY_FILE"
+
           gh pr create \
             --title "ASN classification updates — $MONTH" \
-            --body "$(cat <<'EOF'
-## Spamhaus ASN-DROP diff
-
-These ASNs appear in the [Spamhaus ASN-DROP list](https://www.spamhaus.org/drop/asndrop.txt)
-but are not in \`asn_classification.php\`.
-
-Review \`asn_classification_candidates.txt\` and move confirmed entries into
-\`\$known_asns\` in \`asn_classification.php\` with the appropriate category.
-
-**Never auto-merge this PR.** Human review required before classification changes ship.
-EOF
-)" \
+            --body-file "$PR_BODY_FILE" \
             --draft \
             --base main \
             --head "$BRANCH"
+
+          rm -f "$PR_BODY_FILE"
