@@ -580,6 +580,7 @@ else
 			var rows = [headers];
 			document.querySelectorAll('#results-table tbody tr').forEach(function(tr) {
 				if (tr.parentElement.style.display === 'none') return;
+				if (tr.classList.contains('row-hidden')) return;
 				var row = [];
 				tr.querySelectorAll('td').forEach(function(td) {
 					var val = td.textContent.replace(/"/g, '""');
