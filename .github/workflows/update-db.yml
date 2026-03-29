@@ -104,7 +104,7 @@ jobs:
             done <<< "$MISSING"
           } > "$REVIEW_FILE"
 
-          git add "$REVIEW_FILE"
+          git add -f "$REVIEW_FILE"
           git commit -m "chore: ASN classification candidates from Spamhaus ASN-DROP ($MONTH)"
           git push origin "$BRANCH"
 
