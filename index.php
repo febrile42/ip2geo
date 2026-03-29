@@ -217,7 +217,7 @@ if ($_POST)
 				];
 				$rows_html .= '<tr data-category="'.htmlspecialchars($category, ENT_QUOTES, 'UTF-8').'" data-country="'.htmlspecialchars($country_code, ENT_QUOTES, 'UTF-8').'">';
 				$rows_html .= '<td>'.htmlspecialchars($ip, ENT_QUOTES, 'UTF-8').'</td>';
-				$rows_html .= '<td title="'.htmlspecialchars($row['country_name'] ?? '', ENT_QUOTES, 'UTF-8').'">'.htmlspecialchars($country_code, ENT_QUOTES, 'UTF-8').'</td>';
+				$rows_html .= '<td><abbr title="'.htmlspecialchars($row['country_name'] ?? '', ENT_QUOTES, 'UTF-8').'">'.htmlspecialchars($country_code, ENT_QUOTES, 'UTF-8').'</abbr></td>';
 				$rows_html .= '<td>'.htmlspecialchars($row['subdivision_1_name'] ?? '', ENT_QUOTES, 'UTF-8').'</td>';
 				$rows_html .= '<td>'.htmlspecialchars($row['city_name'] ?? '', ENT_QUOTES, 'UTF-8').'</td>';
 				$rows_html .= '<td>'.htmlspecialchars($asn_num !== '' ? 'AS'.$asn_num : '', ENT_QUOTES, 'UTF-8').'</td>';
@@ -323,7 +323,7 @@ if ($_POST)
 
 	echo '<table id="results-table"><thead><tr>';
 	echo '<th scope="col">IP</th>';
-	echo '<th scope="col" title="Country Code">CC</th><th scope="col">State/Province</th><th scope="col">City</th>';
+	echo '<th scope="col"><abbr title="Country Code">CC</abbr></th><th scope="col">State/Province</th><th scope="col">City</th>';
 	echo '<th scope="col">ASN</th><th scope="col">ASN Org</th><th scope="col">Category</th>';
 	echo '</tr></thead><tbody>';
 	echo $rows_html;

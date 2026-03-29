@@ -79,6 +79,12 @@
     right: 0;
 }
 
+/* --- abbr tooltips in results table --- */
+#results-table abbr[title] {
+    text-decoration: underline dotted;
+    cursor: help;
+}
+
 /* --- Results table: smaller font for density --- */
 /* Body is 16.5pt (~22px); 0.85em ≈ 18.7px at desktop, scales with breakpoints */
 #results-table { font-size: 0.85em; }
