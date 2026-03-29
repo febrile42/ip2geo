@@ -111,6 +111,10 @@
         var countEl = document.getElementById('filter-count');
         if (countEl) countEl.textContent = visible;
 
+        // Update the denominator (total geo-resolved rows in current result set)
+        var totalEl = document.getElementById('filter-total');
+        if (totalEl) totalEl.textContent = allRows.length;
+
         // Empty state
         var emptyMsg = document.getElementById('empty-filter-msg');
         if (emptyMsg) emptyMsg.style.display = visible === 0 ? '' : 'none';
@@ -278,8 +282,7 @@
             });
         });
         if (!resultsAdded) return;
-        restripe();
-        generateRules();
+        applyFilters();
         if (sessionStorage.getItem('ip2geo_show_cancel_notice')) {
             sessionStorage.removeItem('ip2geo_show_cancel_notice');
             showCancelNotice('Changed your mind? Your threat report is still ready.');
@@ -287,7 +290,7 @@
     });
     observer.observe(document.body, { childList: true, subtree: true });
 
-    // Apply stripes on initial server-rendered load (observer only fires on AJAX re-renders)
-    restripe();
+    // Init filters + stripes + rules on initial server-rendered load
+    applyFilters();
 
 })();
