@@ -65,6 +65,17 @@ jobs:
         run: |
           set -euo pipefail
 
+          # Close any stale candidate PRs and delete their branches from prior runs
+          STALE_BRANCHES=$(gh api repos/febrile42/ip2geo/git/refs/heads \
+            --jq '.[].ref | select(startswith("refs/heads/asn-classification-update-"))' \
+            | sed 's|refs/heads/||')
+          for STALE in $STALE_BRANCHES; do
+            echo "Cleaning up stale branch: $STALE"
+            gh pr list --head "$STALE" --json number --jq '.[].number' \
+              | xargs -r -I{} gh pr close {} --comment "Superseded by next monthly run." --delete-branch || true
+            git push origin --delete "$STALE" 2>/dev/null || true
+          done
+
           # Fetch Spamhaus ASN-DROP list (NDJSON format — one JSON object per line)
           SPAMHAUS_ASNS=$(curl -sf https://www.spamhaus.org/drop/asndrop.json \
             | jq -r '"AS" + (.asn | tostring)' \
