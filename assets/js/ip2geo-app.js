@@ -107,19 +107,20 @@
 
         restripe();
 
-        // Add unresolved rows to the visible count if that tbody is currently shown
+        // Denominator = all submitted IPs (geo-resolved + unresolved)
         var unresolvedBody = document.getElementById('unresolved-rows');
+        var unresolvedCount = unresolvedBody ? unresolvedBody.rows.length : 0;
+        var totalEl = document.getElementById('filter-total');
+        if (totalEl) totalEl.textContent = allRows.length + unresolvedCount;
+
+        // Numerator: add unresolved to visible count only when that section is expanded
         if (unresolvedBody && unresolvedBody.style.display !== 'none') {
-            visible += unresolvedBody.rows.length;
+            visible += unresolvedCount;
         }
 
         // Update the showing count in the summary
         var countEl = document.getElementById('filter-count');
         if (countEl) countEl.textContent = visible;
-
-        // Update the denominator (total geo-resolved rows in current result set)
-        var totalEl = document.getElementById('filter-total');
-        if (totalEl) totalEl.textContent = allRows.length;
 
         // Empty state
         var emptyMsg = document.getElementById('empty-filter-msg');
@@ -143,17 +144,11 @@
             label.classList.toggle('chip--empty', count === 0);
         });
 
-        // Debounced rule update
-        scheduleRuleUpdate();
+        // Regenerate rules immediately so open blocks stay in sync with visible rows
+        generateRules();
     }
 
     // ── Firewall rule generation ───────────────────────────────────────────
-    var ruleUpdateTimer = null;
-    function scheduleRuleUpdate() {
-        clearTimeout(ruleUpdateTimer);
-        ruleUpdateTimer = setTimeout(generateRules, 200);
-    }
-
     function getVisibleIPs() {
         var ips = [];
         document.querySelectorAll('#results-table tbody:not(#unresolved-rows) tr').forEach(function (row) {
@@ -166,11 +161,18 @@
 
     function generateRules() {
         var ips = getVisibleIPs();
-        if (!ips.length) return;
 
         var iptablesPre = document.getElementById('rules-iptables-pre');
         var ufwPre      = document.getElementById('rules-ufw-pre');
         var nginxPre    = document.getElementById('rules-nginx-pre');
+
+        if (!ips.length) {
+            // All rows filtered out — clear stale rules
+            if (iptablesPre) iptablesPre.textContent = '';
+            if (ufwPre)      ufwPre.textContent = '';
+            if (nginxPre)    nginxPre.textContent = '';
+            return;
+        }
 
         if (iptablesPre) {
             iptablesPre.textContent = ips.map(function (ip) {
