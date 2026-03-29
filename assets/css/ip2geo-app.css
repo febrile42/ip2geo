@@ -214,6 +214,15 @@
     text-overflow: ellipsis;
 }
 
+/* --- Report table (report.php) — matches public results table density --- */
+.report-table { font-size: 0.85em; }
+.report-table .cell-asn-org {
+    max-width: 14em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 /* Alternating row stripes — JS-managed so filtering keeps correct alternation.
    Override the theme's nth-child rule (which counts hidden rows) with an explicit class. */
 #results-table tbody tr:nth-child(2n + 1) { background-color: transparent; }

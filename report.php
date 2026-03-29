@@ -141,6 +141,11 @@ $scanning_pct   = $total > 0 ? $scanning_proxy / $total : 0;
 $verdict = compute_verdict($scanning_proxy, $total);
 $top25   = rank_ips($ip_data, 25);
 
+// All scanning/VPN IPs for block scripts — freq-ordered (used by maybe_serve_script_download)
+$block_ips_entries = array_values(array_filter($ip_data, fn($e) => in_array($e['classification'] ?? '', ['scanning', 'vpn'], true)));
+usort($block_ips_entries, fn($a, $b) => ($b['freq'] ?? 1) <=> ($a['freq'] ?? 1));
+$block_ips = array_column($block_ips_entries, 'ip');
+
 // AbuseIPDB enrichment
 $top25   = enrich_abuseipdb($top25, $con, $abuseipdb_api_key ?? '');
 $verdict = maybe_upgrade_verdict($verdict, $top25);
@@ -156,6 +161,7 @@ $report = [
     'cat_counts'      => $cat_counts,
     'top_countries'   => $top_countries,
     'top25'           => $top25,
+    'block_ips'       => $block_ips,
     'generated_at'    => date('Y-m-d H:i:s'),
     'abuseipdb_note'  => null,
 ];
@@ -320,7 +326,7 @@ function maybe_serve_script_download(array $report, string $token): void {
     $fmt = $_GET['format'];
     if (!in_array($fmt, ['sh-iptables', 'sh-ufw'], true)) return;
 
-    $ips = array_column($report['top25'], 'ip');
+    $ips = !empty($report['block_ips']) ? $report['block_ips'] : array_column($report['top25'], 'ip');
 
     if ($fmt === 'sh-iptables') {
         $lines    = array_map(fn($ip) => 'iptables -A INPUT -s ' . $ip . ' -j DROP', $ips);
@@ -415,7 +421,7 @@ function render_report(array $report, string $token, ?string $expires_at): void 
                 <p>No IP data available.</p>
             <?php else: ?>
             <div class="table-wrapper" style="overflow-x:auto">
-            <table>
+            <table class="report-table">
                 <thead>
                     <tr>
                         <th scope="col" style="font-family:monospace">IP</th>
@@ -428,10 +434,11 @@ function render_report(array $report, string $token, ?string $expires_at): void 
                 <?php foreach ($top25 as $entry):
                     $cat = $entry['classification'] ?? 'unknown';
                     $score = $entry['abuse_score'] ?? null;
+                    $asn_org_full = ($entry['asn'] ?? '') . ($entry['asn'] && ($entry['asn_org'] ?? '') ? ' ' : '') . ($entry['asn_org'] ?? '');
                 ?>
                     <tr>
                         <td style="font-family:monospace"><?php echo htmlspecialchars($entry['ip'] ?? '', ENT_QUOTES, 'UTF-8'); ?></td>
-                        <td><?php echo htmlspecialchars(($entry['asn'] ?? '') . ($entry['asn'] && ($entry['asn_org'] ?? '') ? ' ' : '') . ($entry['asn_org'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                        <td class="cell-asn-org" title="<?php echo htmlspecialchars($asn_org_full, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($asn_org_full, ENT_QUOTES, 'UTF-8'); ?></td>
                         <td class="asn-category asn-category--<?php echo htmlspecialchars($cat, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($cat, ENT_QUOTES, 'UTF-8'); ?></td>
                         <td><?php echo $score !== null ? htmlspecialchars((string)$score, ENT_QUOTES, 'UTF-8') : '<span style="opacity:0.4">—</span>'; ?></td>
                     </tr>
@@ -471,7 +478,11 @@ function render_report(array $report, string $token, ?string $expires_at): void 
             <?php endif; ?>
 
             <p style="margin-top:1em">
-                <a href="/" class="button small alt">← New Lookup</a>
+                <a href="/?view_token=<?php echo urlencode($token); ?>" class="button small alt">
+                    View all <?php echo number_format($total); ?> IPs
+                </a>
+                &nbsp;
+                <a href="/" class="button small alt">New Lookup</a>
             </p>
         </div>
     </section>

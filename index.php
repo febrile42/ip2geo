@@ -23,6 +23,10 @@ function ipToLong(string $ip): string {
     return sprintf('%u', ip2long($ip)); // Handles unsigned 32-bit int
 }
 
+// view_token mode: show all IPs for a paid/redeemed report without a new submission
+$view_token_mode = !empty($_GET['view_token']) && empty($_POST);
+$view_token_val  = $view_token_mode ? preg_replace('/[^a-f0-9\-]/', '', trim($_GET['view_token'])) : '';
+
 
 ?><!DOCTYPE HTML>
 <!--
@@ -73,8 +77,9 @@ function ipToLong(string $ip): string {
 											<div class="field">
 												<label for="message">Text containing IPv4 Addresses</label>
 												<textarea name="ip_list" id="message" rows="5"><?php
-if (!isset($_POST['ip_list']))
-{
+if ($view_token_mode) {
+	// leave empty — user's IPs not re-populated in view mode
+} elseif (!isset($_POST['ip_list'])) {
 	echo "Here's some example text with the IPs 8.8.8.8 (Google's public DNS) and @#75.75.75.75@#% (Comcast's DNS with some extra characters tucked in the middle). Hit the button below to try it out. We'll see about your IP (".htmlspecialchars(getRealIPAddr(), ENT_QUOTES, 'UTF-8').") too, assuming it's IPv4.";
 } else {
 	echo htmlspecialchars($_POST['ip_list'], ENT_QUOTES, 'UTF-8');
@@ -100,7 +105,7 @@ if (!isset($_POST['ip_list']))
 <?php
 
 
-if ($_POST)
+if ($_POST || $view_token_mode)
 {
 	$con = mysqli_connect($db_host, $db_user, $db_pass, $db_name);
 	if (mysqli_connect_errno())
@@ -109,43 +114,75 @@ if ($_POST)
 		echo "Database connection failed. Please try again later.";
 	}
 
-	// Get Country List
-	$countries_query = 'SELECT DISTINCT(`country_iso_code`) FROM `geoip2_location_current` WHERE `country_iso_code` IS NOT NULL';
-	$countries = mysqli_query($con, $countries_query);
-	while ($row = mysqli_fetch_array($countries))
-	{
-		$countries_all[$row['country_iso_code']] = $row['country_iso_code'];
-	}
-	$countries_all = array_filter($countries_all); // remove spurious empty entries
+	if ($view_token_mode) {
+		// Load the original IP list from a paid/redeemed report token
+		$stmt = $con->prepare(
+			'SELECT ip_list_json FROM reports WHERE token = ? AND status IN ("paid","redeemed")'
+		);
+		$stmt->bind_param('s', $view_token_val);
+		$stmt->execute();
+		$vt_row = $stmt->get_result()->fetch_assoc();
+		$stmt->close();
 
-	// parse country filter: normalize, sanitize, and validate against known country codes
-	$good_countries = array_filter(explode(" ", mysqli_real_escape_string($con, strtoupper($_POST['countries_filter']))));
-	foreach ($good_countries as $key => $value) {
-		if (!in_array($value, $countries_all))
-		{
-			// echo 'unset('.$good_countries[$key].');<br/>';
-			unset($good_countries[$key]);
+		if (!$vt_row) {
+			echo '<section id="results" class="wrapper style4 fade-up"><div class="inner">';
+			echo '<p>Report not found or access has expired. <a href="/" class="button small">&#8592; New Lookup</a></p>';
+			echo '</div></section>';
+			mysqli_close($con);
+			$con = null;
+		} else {
+			$vt_ip_data = json_decode($vt_row['ip_list_json'], true) ?? [];
+			$ip_freq = [];
+			foreach ($vt_ip_data as $entry) {
+				$vt_ip = $entry['ip'] ?? '';
+				if ($vt_ip !== '') $ip_freq[$vt_ip] = $entry['freq'] ?? 1;
+			}
+			$ip_list = array_keys($ip_freq);
+			$good_countries = []; // show all IPs — no country filter in view mode
 		}
 	}
 
-	// Make an Array of valid IPs out of the input
-	if (strlen($_POST['ip_list']) > 2097152) { // 2MB hard limit
-		echo '<section id="results" class="wrapper style4 fade-up"><div class="inner"><p>Input exceeds 2MB limit. Please reduce the size of your input.</p></div></section>';
-		exit;
-	}
-	preg_match_all("/\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b/", $_POST['ip_list'], $ip_list);
+	if ($_POST) {
+		// Get Country List
+		$countries_query = 'SELECT DISTINCT(`country_iso_code`) FROM `geoip2_location_current` WHERE `country_iso_code` IS NOT NULL';
+		$countries = mysqli_query($con, $countries_query);
+		while ($row = mysqli_fetch_array($countries))
+		{
+			$countries_all[$row['country_iso_code']] = $row['country_iso_code'];
+		}
+		$countries_all = array_filter($countries_all); // remove spurious empty entries
 
-	// Count occurrences before dedup — repeat appearances are a meaningful threat signal
-	// (an IP hammering your SSH 400 times ranks higher than one that appeared once).
-	// array_count_values produces [ip => count]; slicing the map preserves the 10K cap
-	// on unique IPs; then private ranges are stripped from the keyset.
-	function test_local($ip) {
-		return !preg_match('/^(127\.|192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.|::1$)/', $ip);
+		// parse country filter: normalize, sanitize, and validate against known country codes
+		$good_countries = array_filter(explode(" ", mysqli_real_escape_string($con, strtoupper($_POST['countries_filter']))));
+		foreach ($good_countries as $key => $value) {
+			if (!in_array($value, $countries_all))
+			{
+				// echo 'unset('.$good_countries[$key].');<br/>';
+				unset($good_countries[$key]);
+			}
+		}
+
+		// Make an Array of valid IPs out of the input
+		if (strlen($_POST['ip_list']) > 2097152) { // 2MB hard limit
+			echo '<section id="results" class="wrapper style4 fade-up"><div class="inner"><p>Input exceeds 2MB limit. Please reduce the size of your input.</p></div></section>';
+			exit;
+		}
+		preg_match_all("/\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b/", $_POST['ip_list'], $ip_list);
+
+		// Count occurrences before dedup — repeat appearances are a meaningful threat signal
+		// (an IP hammering your SSH 400 times ranks higher than one that appeared once).
+		// array_count_values produces [ip => count]; slicing the map preserves the 10K cap
+		// on unique IPs; then private ranges are stripped from the keyset.
+		function test_local($ip) {
+			return !preg_match('/^(127\.|192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.|::1$)/', $ip);
+		}
+		$ip_freq = array_count_values($ip_list[0]);
+		$ip_freq = array_slice($ip_freq, 0, 10000, true);
+		$ip_freq = array_filter($ip_freq, 'test_local', ARRAY_FILTER_USE_KEY);
+		$ip_list = array_keys($ip_freq);
 	}
-	$ip_freq = array_count_values($ip_list[0]);
-	$ip_freq = array_slice($ip_freq, 0, 10000, true);
-	$ip_freq = array_filter($ip_freq, 'test_local', ARRAY_FILTER_USE_KEY);
-	$ip_list = array_keys($ip_freq);
+
+	if ($con !== null) {
 
 	// What're our acceptable countries?
 	// $good_countries = array('US','CA');
@@ -255,7 +292,7 @@ if ($_POST)
 	echo '<h2 id="result">Lookup Results</h2>';
 
 	// --- Threat CTA (above filter + table) ---
-	if ($show_cta): ?>
+	if ($show_cta && !$view_token_mode): ?>
 	<div id="threat-cta" role="region" aria-label="Threat Assessment">
 		<hr />
 		<p class="asn-verdict asn-verdict--<?php echo htmlspecialchars(strtolower($verdict_level), ENT_QUOTES, 'UTF-8'); ?>">
@@ -275,6 +312,10 @@ if ($_POST)
 		</p>
 		<hr />
 	</div>
+	<?php elseif ($view_token_mode): ?>
+	<p style="margin:0 0 1.5em">
+		<a href="/report.php?token=<?php echo htmlspecialchars($view_token_val, ENT_QUOTES, 'UTF-8'); ?>" class="button small alt">&#8592; Back to your report</a>
+	</p>
 	<?php endif;
 
 	// --- Filter & Export (above table) ---
@@ -379,6 +420,8 @@ if ($_POST)
 	echo '</table>';
 
 	echo '</div></section>';
+
+	} // end if ($con !== null)
 }
 else
 {
