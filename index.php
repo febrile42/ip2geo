@@ -290,6 +290,12 @@ if ($_POST || $view_token_mode)
 	// --- Output results section ---
 	echo '<section id="results" class="wrapper style4 fade-up"><div class="inner">';
 	echo '<h2 id="result">Lookup Results</h2>';
+	// In view_token mode the page is server-rendered (not injected by AJAX), so
+	// we need a script to scroll to results. The #results hash in the link from
+	// report.php handles the common case; this handles direct URL access without hash.
+	if ($view_token_mode): ?>
+	<script>if(!location.hash)document.getElementById('results').scrollIntoView({behavior:'smooth'});</script>
+	<?php endif;
 
 	// --- Threat CTA (above filter + table) ---
 	if ($show_cta && !$view_token_mode): ?>

@@ -478,7 +478,7 @@ function render_report(array $report, string $token, ?string $expires_at): void 
             <?php endif; ?>
 
             <p style="margin-top:1em">
-                <a href="/?view_token=<?php echo urlencode($token); ?>" class="button small alt">
+                <a href="/?view_token=<?php echo urlencode($token); ?>#results" class="button small alt">
                     View all <?php echo number_format($total); ?> IPs
                 </a>
                 &nbsp;
