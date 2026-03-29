@@ -194,6 +194,25 @@
 /* Body is 16.5pt (~22px); 0.85em ≈ 18.7px at desktop, scales with breakpoints */
 #results-table { font-size: 0.85em; }
 
+/* --- Column overflow absorption ---
+   ASN Org is the prime overflow culprit; State/Province and City are secondary.
+   Truncate with ellipsis at a fixed em cap; title attribute exposes full text on hover.
+   The outer overflow-x:auto wrapper stays as a last-resort fallback for very narrow
+   viewports. */
+#results-table .cell-asn-org {
+    max-width: 14em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+#results-table .cell-region,
+#results-table .cell-city {
+    max-width: 10em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 /* Alternating row stripes — JS-managed so filtering keeps correct alternation.
    Override the theme's nth-child rule (which counts hidden rows) with an explicit class. */
 #results-table tbody tr:nth-child(2n + 1) { background-color: transparent; }
