@@ -79,6 +79,10 @@
     right: 0;
 }
 
+/* --- Results table: smaller font for density --- */
+/* Body is 16.5pt (~22px); 0.85em ≈ 18.7px at desktop, scales with breakpoints */
+#results-table { font-size: 0.85em; }
+
 /* --- Touch targets (a11y) --- */
 .button.small { min-height: 44px; }
 
