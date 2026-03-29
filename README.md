@@ -62,7 +62,7 @@ The paid report flow requires a Stripe account and three values in `config.php`:
 2. Switch into the sandbox → Developers → API keys → copy the `sk_test_...` secret key
 3. Developers → Webhooks → Add endpoint:
    - URL: `https://yourdomain.com/webhook.php`
-   - Event: `checkout.session.completed`
+   - Events to subscribe: `checkout.session.completed` (the only one needed — async payment and expiry events are not used)
    - Copy the signing secret (`whsec_...`)
 4. Add both to `config.php` on the server
 
