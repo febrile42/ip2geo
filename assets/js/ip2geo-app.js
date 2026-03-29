@@ -82,6 +82,12 @@
         var allRows = document.querySelectorAll('#results-table tbody:not(#unresolved-rows) tr');
         var visible = 0;
 
+        // When the user has an exclusive country selection, empty-CC rows (anycast IPs with
+        // no geo data) should be hidden — they don't belong to any selected country.
+        // Only pass them through when ALL countries are selected (no filter active).
+        var totalCountryChips = document.querySelectorAll('.filter-country').length;
+        var allCountriesSelected = checkedCountries.size === totalCountryChips;
+
         // Per-chip cross-filter counts: how many rows pass the *other* filter dimension
         var catCounts = {};      // rows passing country filter, keyed by category
         var countryCounts = {};  // rows passing category filter, keyed by country
@@ -89,7 +95,7 @@
         allRows.forEach(function (row) {
             var country  = row.dataset.country   || '';
             var category = row.dataset.category  || '';
-            var countryOk  = country === '' || checkedCountries.has(country);
+            var countryOk  = (country === '' && allCountriesSelected) || checkedCountries.has(country);
             var categoryOk = checkedCategories.has(category);
             var show = countryOk && categoryOk;
             row.classList.toggle('row-hidden', !show);
