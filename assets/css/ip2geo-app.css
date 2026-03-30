@@ -79,12 +79,21 @@
 /* Section headers above chip columns */
 #filter-countries > strong,
 #filter-categories > strong {
-    display: block;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
     font-size: 0.65em;
     text-transform: uppercase;
     letter-spacing: 0.08em;
     opacity: 0.5;
     margin-bottom: 0.5em;
+}
+
+.chip-hint {
+    font-weight: normal;
+    text-transform: none;
+    letter-spacing: normal;
+    font-style: italic;
 }
 
 /* Scrollable chip container for countries.
@@ -399,7 +408,9 @@
 
 #report-filter-countries > strong,
 #report-filter-categories > strong {
-    display: block;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
     font-size: 0.65em;
     text-transform: uppercase;
     letter-spacing: 0.08em;

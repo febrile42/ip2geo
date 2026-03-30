@@ -623,7 +623,7 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                         </div>
                         <?php if (!empty($all_ctries)): ?>
                         <div id="report-filter-countries">
-                            <strong>Countries</strong>
+                            <strong>Countries <span class="chip-hint">⇧ multi-select</span></strong>
                             <div class="filter-chips">
                             <?php foreach ($all_ctries as $cc => $count):
                                 $cc_safe = htmlspecialchars($cc, ENT_QUOTES, 'UTF-8');
@@ -696,7 +696,56 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                     setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
                 }
 
+                // Which chip values exist (to know which categories/countries are filterable)
+                var allCatChips  = {};
+                document.querySelectorAll('.report-filter-category').forEach(function(cb) { allCatChips[cb.value]  = true; });
+                var allCtryChips = {};
+                document.querySelectorAll('.report-filter-country').forEach(function(cb)  { allCtryChips[cb.value] = true; });
+
                 function updateCount() {
+                    var checkedCats   = {};
+                    document.querySelectorAll('.report-filter-category:checked').forEach(function(cb) { checkedCats[cb.value]   = true; });
+                    var checkedCtries = {};
+                    document.querySelectorAll('.report-filter-country:checked').forEach(function(cb)  { checkedCtries[cb.value] = true; });
+
+                    // Filter top-25 table rows; track visible count
+                    var visibleRows = 0;
+                    document.querySelectorAll('.report-table tbody tr').forEach(function(row) {
+                        var cat = row.dataset.category || '';
+                        var cc  = row.dataset.country  || '';
+                        var catOk  = !allCatChips[cat]  || checkedCats[cat];
+                        var ctryOk = cc === '' || !allCtryChips[cc] || checkedCtries[cc];
+                        var show = catOk && ctryOk;
+                        row.style.display = show ? '' : 'none';
+                        if (show) visibleRows++;
+                    });
+
+                    // Update table "showing X of Y" counter
+                    var tableCount = document.getElementById('report-table-count');
+                    if (tableCount) tableCount.textContent = visibleRows;
+
+                    // Update chip count badges: cross-filter counts from allIps
+                    // Category badge = IPs passing the current country filter
+                    // Country badge  = IPs passing the current category filter
+                    var catCounts = {}, ctryCounts = {};
+                    allIps.forEach(function(e) {
+                        var cat = e.classification || 'unknown';
+                        var cc  = e.country || '';
+                        var catActive  = !allCatChips[cat]  || checkedCats[cat];
+                        var ctryActive = cc === '' || !allCtryChips[cc] || checkedCtries[cc];
+                        if (allCatChips[cat]  && ctryActive)  catCounts[cat]  = (catCounts[cat]  || 0) + 1;
+                        if (allCtryChips[cc]  && catActive)   ctryCounts[cc]  = (ctryCounts[cc]  || 0) + 1;
+                    });
+                    document.querySelectorAll('.report-filter-category').forEach(function(cb) {
+                        var countEl = cb.closest('label') && cb.closest('label').querySelector('.chip-count');
+                        if (countEl) countEl.textContent = '(' + (catCounts[cb.value] || 0) + ')';
+                    });
+                    document.querySelectorAll('.report-filter-country').forEach(function(cb) {
+                        var countEl = cb.closest('label') && cb.closest('label').querySelector('.chip-count');
+                        if (countEl) countEl.textContent = '(' + (ctryCounts[cb.value] || 0) + ')';
+                    });
+
+                    // Update block script IP count
                     var blockIps = getFilteredBlockIps();
                     var countEl  = document.getElementById('report-filter-count');
                     if (countEl) countEl.textContent = blockIps.length;
@@ -729,6 +778,33 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                     cb.addEventListener('change', updateCount);
                 });
 
+                // Country chip clicks: exclusive-select / shift+click multi-select
+                // Plain click  → show ONLY that country (click again to restore all).
+                // Shift+click  → toggle this country in/out; restore all if nothing left.
+                document.addEventListener('click', function(e) {
+                    var label = e.target && e.target.closest('#report-filter-countries label');
+                    if (!label) return;
+                    e.preventDefault();
+                    var clicked = label.querySelector('input[type="checkbox"]');
+                    if (!clicked) return;
+                    var all = Array.from(document.querySelectorAll('.report-filter-country'));
+                    if (e.shiftKey) {
+                        clicked.checked = !clicked.checked;
+                        if (!all.some(function(i) { return i.checked; })) {
+                            all.forEach(function(i) { i.checked = true; });
+                        }
+                    } else {
+                        var soloActive = all.filter(function(i) { return i.checked; }).length === 1 && clicked.checked;
+                        if (soloActive) {
+                            all.forEach(function(i) { i.checked = true; });
+                        } else {
+                            all.forEach(function(i) { i.checked = false; });
+                            clicked.checked = true;
+                        }
+                    }
+                    updateCount();
+                });
+
                 // Initial count
                 updateCount();
             })();
@@ -736,7 +812,7 @@ function render_report(array $report, string $token, ?string $expires_at, array 
             <?php endif; ?>
 
             <!-- Top 25 table -->
-            <h3>Top Threat Sources</h3>
+            <h3>Top Threat Sources <span id="report-table-summary" style="font-size:0.6em;font-weight:normal;opacity:0.6;margin-left:0.5em">— showing <span id="report-table-count"><?php echo count($top25); ?></span> of <span id="report-table-total"><?php echo count($top25); ?></span></span></h3>
             <?php if (empty($top25)): ?>
                 <p>No IP data available.</p>
             <?php else: ?>
@@ -758,7 +834,7 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                     $freq = $entry['freq'] ?? 1;
                     $asn_org_full = ($entry['asn'] ?? '') . ($entry['asn'] && ($entry['asn_org'] ?? '') ? ' ' : '') . ($entry['asn_org'] ?? '');
                 ?>
-                    <tr>
+                    <tr data-category="<?php echo htmlspecialchars($cat, ENT_QUOTES, 'UTF-8'); ?>" data-country="<?php echo htmlspecialchars($entry['country'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
                         <td style="font-family:monospace"><?php echo htmlspecialchars($entry['ip'] ?? '', ENT_QUOTES, 'UTF-8'); ?></td>
                         <td class="cell-asn-org" title="<?php echo htmlspecialchars($asn_org_full, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($asn_org_full, ENT_QUOTES, 'UTF-8'); ?></td>
                         <td class="asn-category asn-category--<?php echo htmlspecialchars($cat, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($cat, ENT_QUOTES, 'UTF-8'); ?></td>

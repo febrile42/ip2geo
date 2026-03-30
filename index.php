@@ -427,7 +427,7 @@ if ($_POST || $view_token_mode)
 
 	// Country chips
 	echo '<div id="filter-countries">';
-	echo '<strong>Countries</strong>';
+	echo '<strong>Countries <span class="chip-hint">⇧ multi-select</span></strong>';
 	echo '<div class="filter-chips">';
 	foreach ($country_counts as $cc => $count) {
 		$cc_safe = htmlspecialchars($cc, ENT_QUOTES, 'UTF-8');
