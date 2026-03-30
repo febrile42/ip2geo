@@ -244,6 +244,7 @@ if ($_POST || $view_token_mode)
 				$ip_classified_data[] = [
 					'ip'             => $ip,
 					'asn'            => $asn_num !== '' ? 'AS' . $asn_num : '',
+					'asn_org'        => $asn_org,
 					'classification' => $category,
 					'country'        => $country_code,
 					'freq'           => $ip_freq[$ip] ?? 1,
