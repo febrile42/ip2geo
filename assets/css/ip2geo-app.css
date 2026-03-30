@@ -230,7 +230,7 @@
 #results-table tbody tr.row-hidden        { display: none; }
 
 /* --- Touch targets (a11y) --- */
-.button.small { min-height: 44px; }
+.button.small { min-height: 44px; line-height: 44px; }
 
 
 /* --- Mobile --- */
