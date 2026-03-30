@@ -330,9 +330,18 @@ function enrich_abuseipdb(array $ips, $con, string $api_key): array {
 function maybe_serve_script_download(array $report, string $token): void {
     if (!isset($_GET['format'])) return;
     $fmt = $_GET['format'];
-    if (!in_array($fmt, ['sh-iptables', 'sh-ufw'], true)) return;
+    $valid = ['sh-iptables', 'sh-ufw', 'sh-iptables-ranges', 'sh-ufw-ranges', 'nginx-ips', 'nginx-ranges'];
+    if (!in_array($fmt, $valid, true)) return;
 
     $ips = !empty($report['block_ips']) ? $report['block_ips'] : array_column($report['top25'], 'ip');
+
+    // Flatten all CIDR ranges from asn_ranges groups
+    $cidrs = [];
+    foreach ($report['asn_ranges'] ?? [] as $group) {
+        foreach ($group['cidrs'] as $cidr) {
+            $cidrs[] = $cidr;
+        }
+    }
 
     if ($fmt === 'sh-iptables') {
         $lines    = array_map(fn($ip) => 'iptables -A INPUT -s ' . $ip . ' -j DROP', $ips);
@@ -344,8 +353,10 @@ function maybe_serve_script_download(array $report, string $token): void {
 
 set -euo pipefail
 ';
-        $filename = 'block-iptables.sh';
-    } else {
+        $filename    = 'block-iptables.sh';
+        $content_type = 'text/x-sh';
+        $body = $preamble . implode("\n", $lines) . "\n";
+    } elseif ($fmt === 'sh-ufw') {
         $lines    = array_map(fn($ip) => 'ufw deny from ' . $ip . ' to any', $ips);
         $preamble = '#!/bin/bash
 # ip2geo threat report — ufw block rules
@@ -355,14 +366,67 @@ set -euo pipefail
 
 set -euo pipefail
 ';
-        $filename = 'block-ufw.sh';
+        $filename    = 'block-ufw.sh';
+        $content_type = 'text/x-sh';
+        $body = $preamble . implode("\n", $lines) . "\n";
+    } elseif ($fmt === 'sh-iptables-ranges') {
+        $lines    = array_map(fn($cidr) => 'iptables -A INPUT -s ' . $cidr . ' -j DROP', $cidrs);
+        $preamble = '#!/bin/bash
+# ip2geo threat report — iptables block rules (ASN ranges)
+# Generated: ' . date('Y-m-d') . '
+# Token: ' . $token . '
+# Block ' . count($cidrs) . ' CIDR ranges covering scanning/VPN ASN prefixes
+
+set -euo pipefail
+';
+        $filename    = 'block-iptables-ranges.sh';
+        $content_type = 'text/x-sh';
+        $body = $preamble . implode("\n", $lines) . "\n";
+    } elseif ($fmt === 'sh-ufw-ranges') {
+        $lines    = array_map(fn($cidr) => 'ufw deny from ' . $cidr . ' to any', $cidrs);
+        $preamble = '#!/bin/bash
+# ip2geo threat report — ufw block rules (ASN ranges)
+# Generated: ' . date('Y-m-d') . '
+# Token: ' . $token . '
+# Block ' . count($cidrs) . ' CIDR ranges covering scanning/VPN ASN prefixes
+
+set -euo pipefail
+';
+        $filename    = 'block-ufw-ranges.sh';
+        $content_type = 'text/x-sh';
+        $body = $preamble . implode("\n", $lines) . "\n";
+    } elseif ($fmt === 'nginx-ips') {
+        $lines = array_map(fn($ip) => $ip . ' 1;', $ips);
+        $preamble = '# ip2geo threat report — nginx geo block (individual IPs)
+# Generated: ' . date('Y-m-d') . '
+# Token: ' . $token . '
+# Block ' . count($ips) . ' IPs flagged as scanning / proxy infrastructure
+# Usage: include this file inside a geo $blocked_ip { } block in nginx.conf
+
+default 0;
+';
+        $filename    = 'block-nginx-ips.conf';
+        $content_type = 'text/plain';
+        $body = $preamble . implode("\n", $lines) . "\n";
+    } else { // nginx-ranges
+        $lines = array_map(fn($cidr) => $cidr . ' 1;', $cidrs);
+        $preamble = '# ip2geo threat report — nginx geo block (ASN ranges)
+# Generated: ' . date('Y-m-d') . '
+# Token: ' . $token . '
+# Block ' . count($cidrs) . ' CIDR ranges covering scanning/VPN ASN prefixes
+# Usage: include this file inside a geo $blocked_ip { } block in nginx.conf
+
+default 0;
+';
+        $filename    = 'block-nginx-ranges.conf';
+        $content_type = 'text/plain';
+        $body = $preamble . implode("\n", $lines) . "\n";
     }
 
-    $script = $preamble . implode("\n", $lines) . "\n";
-    header('Content-Type: text/x-sh; charset=utf-8');
+    header('Content-Type: ' . $content_type . '; charset=utf-8');
     header('Content-Disposition: attachment; filename="' . $filename . '"');
-    header('Content-Length: ' . strlen($script));
-    echo $script;
+    header('Content-Length: ' . strlen($body));
+    echo $body;
     exit;
 }
 
@@ -430,6 +494,91 @@ function render_report(array $report, string $token, ?string $expires_at): void 
             <?php endif; ?>
             <p><?php echo htmlspecialchars($verdict_text, ENT_QUOTES, 'UTF-8'); ?></p>
 
+            <!-- ASN Ranges -->
+            <?php if (!empty($report['asn_ranges'])): ?>
+            <h3>ASN Ranges to Block</h3>
+            <p style="font-size:0.9em;opacity:0.7">
+                These CIDR ranges cover all current prefixes advertised by the scanning/VPN
+                ASNs above. Blocking by range is more resilient than individual IPs — the
+                ranges stay valid even as specific IPs rotate.
+            </p>
+            <?php foreach ($report['asn_ranges'] as $group):
+                $shown = count($group['cidrs']);
+                $total_ranges = $group['total'];
+            ?>
+            <div style="margin-bottom:1.2em">
+                <strong><?php echo htmlspecialchars($group['asn'], ENT_QUOTES, 'UTF-8'); ?></strong>
+                <?php if ($group['org']): ?>
+                <span style="opacity:0.7;font-size:0.9em"><?php echo htmlspecialchars($group['org'], ENT_QUOTES, 'UTF-8'); ?></span>
+                <?php endif; ?>
+                <span style="font-size:0.8em;opacity:0.5">
+                    &mdash; <?php if ($total_ranges > $shown): ?>
+                        <?php echo $shown; ?> of <?php echo number_format($total_ranges); ?> ranges
+                    <?php else: ?>
+                        <?php echo $total_ranges; ?> range<?php echo $total_ranges === 1 ? '' : 's'; ?>
+                    <?php endif; ?>
+                </span>
+                <pre style="font-size:0.82em;overflow-x:auto;background:rgba(0,0,0,0.2);padding:0.55em 0.8em;margin:0.35em 0 0;line-height:1.6"><?php
+                    foreach ($group['cidrs'] as $cidr) {
+                        echo htmlspecialchars($cidr, ENT_QUOTES, 'UTF-8') . "\n";
+                    }
+                ?></pre>
+            </div>
+            <?php endforeach; ?>
+            <?php endif; ?>
+
+            <!-- Block script downloads -->
+            <h3>Block Rules</h3>
+            <?php $has_ranges = !empty($report['asn_ranges']); ?>
+            <div class="block-rules-tabs">
+                <div class="block-rules-tablist" role="tablist">
+                    <button class="block-rules-tab active" id="tab-by-ip" role="tab" aria-selected="true" aria-controls="panel-by-ip" onclick="switchBlockTab('by-ip')">Block by IP</button>
+                    <button class="block-rules-tab" id="tab-by-range" role="tab" aria-selected="false" aria-controls="panel-by-range" onclick="switchBlockTab('by-range')"<?php echo $has_ranges ? '' : ' disabled title="No ASN ranges available"'; ?>>Block by Range</button>
+                </div>
+                <div id="panel-by-ip" class="block-rules-panel" role="tabpanel" aria-labelledby="tab-by-ip">
+                    <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=sh-iptables"
+                       class="button small">&#8595; iptables</a>
+                    &nbsp;
+                    <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=sh-ufw"
+                       class="button small">&#8595; ufw</a>
+                    &nbsp;
+                    <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=nginx-ips"
+                       class="button small">&#8595; nginx geo</a>
+                </div>
+                <div id="panel-by-range" class="block-rules-panel" role="tabpanel" aria-labelledby="tab-by-range" style="display:none">
+                    <?php if ($has_ranges): ?>
+                    <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=sh-iptables-ranges"
+                       class="button small">&#8595; iptables</a>
+                    &nbsp;
+                    <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=sh-ufw-ranges"
+                       class="button small">&#8595; ufw</a>
+                    &nbsp;
+                    <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=nginx-ranges"
+                       class="button small">&#8595; nginx geo</a>
+                    <?php else: ?>
+                    <p style="font-size:0.9em;opacity:0.6;margin:0.5em 0">No ASN ranges available for this report.</p>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <style>
+            .block-rules-tablist { display:flex; gap:0; margin-bottom:0.75em; border-bottom:1px solid rgba(255,255,255,0.15); }
+            .block-rules-tab { background:none; border:none; border-bottom:2px solid transparent; color:inherit; cursor:pointer; font-size:0.9em; padding:0.4em 1em; opacity:0.55; margin-bottom:-1px; }
+            .block-rules-tab.active { opacity:1; border-bottom-color:currentColor; }
+            .block-rules-tab:disabled { opacity:0.3; cursor:not-allowed; }
+            </style>
+            <script>
+            function switchBlockTab(name) {
+                document.querySelectorAll('.block-rules-tab').forEach(function(t) {
+                    var active = t.id === 'tab-' + name;
+                    t.classList.toggle('active', active);
+                    t.setAttribute('aria-selected', active ? 'true' : 'false');
+                });
+                document.querySelectorAll('.block-rules-panel').forEach(function(p) {
+                    p.style.display = p.id === 'panel-' + name ? '' : 'none';
+                });
+            }
+            </script>
+
             <!-- Top 25 table -->
             <h3>Top Threat Sources</h3>
             <?php if (empty($top25)): ?>
@@ -474,49 +623,6 @@ function render_report(array $report, string $token, ?string $expires_at): void 
                 <?php endif; ?>
             </p>
             <?php endif; ?>
-
-            <!-- ASN Ranges -->
-            <?php if (!empty($report['asn_ranges'])): ?>
-            <h3>ASN Ranges to Block</h3>
-            <p style="font-size:0.9em;opacity:0.7">
-                These CIDR ranges cover all current prefixes advertised by the scanning/VPN
-                ASNs above. Blocking by range is more resilient than individual IPs — the
-                ranges stay valid even as specific IPs rotate.
-            </p>
-            <?php foreach ($report['asn_ranges'] as $group):
-                $shown = count($group['cidrs']);
-                $total_ranges = $group['total'];
-            ?>
-            <div style="margin-bottom:1.2em">
-                <strong><?php echo htmlspecialchars($group['asn'], ENT_QUOTES, 'UTF-8'); ?></strong>
-                <?php if ($group['org']): ?>
-                <span style="opacity:0.7;font-size:0.9em"><?php echo htmlspecialchars($group['org'], ENT_QUOTES, 'UTF-8'); ?></span>
-                <?php endif; ?>
-                <span style="font-size:0.8em;opacity:0.5">
-                    &mdash; <?php if ($total_ranges > $shown): ?>
-                        <?php echo $shown; ?> of <?php echo number_format($total_ranges); ?> ranges
-                    <?php else: ?>
-                        <?php echo $total_ranges; ?> range<?php echo $total_ranges === 1 ? '' : 's'; ?>
-                    <?php endif; ?>
-                </span>
-                <pre style="font-size:0.82em;overflow-x:auto;background:rgba(0,0,0,0.2);padding:0.55em 0.8em;margin:0.35em 0 0;line-height:1.6"><?php
-                    foreach ($group['cidrs'] as $cidr) {
-                        echo htmlspecialchars($cidr, ENT_QUOTES, 'UTF-8') . "\n";
-                    }
-                ?></pre>
-            </div>
-            <?php endforeach; ?>
-            <?php endif; ?>
-
-            <!-- Block script downloads -->
-            <h3>Block Rules</h3>
-            <p>
-                <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=sh-iptables"
-                   class="button small">&#8595; Download block-iptables.sh</a>
-                &nbsp;
-                <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=sh-ufw"
-                   class="button small">&#8595; Download block-ufw.sh</a>
-            </p>
 
             <!-- Share link + expiry -->
             <hr />
@@ -571,6 +677,7 @@ function render_page_open(string $title, string $meta_desc = ''): void {
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
     <link rel="stylesheet" href="/assets/css/main.css" />
     <link rel="stylesheet" href="/assets/css/ip2geo-app.css" />
+    <link rel="stylesheet" href="/assets/css/ip2geo-print.css" media="print" />
     <link rel="icon" href="/favicon.ico" />
     <noscript><link rel="stylesheet" href="/assets/css/noscript.css" /></noscript>
 </head>
