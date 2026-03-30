@@ -595,11 +595,19 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                 document.querySelectorAll('.block-rules-panel').forEach(function(p) {
                     p.style.display = p.id === 'panel-' + name ? '' : 'none';
                 });
+                umami && umami.track('report_tab_switch', { tab: name });
             }
             document.querySelectorAll('.block-rules-tab:not(.brt-disabled)').forEach(function(t) {
                 t.addEventListener('click', function() { switchBlockTab(this.id.replace('tab-', '')); });
                 t.addEventListener('keydown', function(e) {
                     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); switchBlockTab(this.id.replace('tab-', '')); }
+                });
+            });
+            // Track range-panel downloads (plain <a> tags, no JS intercept)
+            document.querySelectorAll('#panel-by-range a.button[href]').forEach(function(a) {
+                a.addEventListener('click', function() {
+                    var fmt = (this.getAttribute('href') || '').replace(/.*format=/, '');
+                    umami && umami.track('report_download', { format: fmt, scope: 'by-range' });
                 });
             });
             </script>
@@ -769,7 +777,10 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                             content  = genNginx(ips);
                             filename = 'block-nginx-ips.conf';
                         }
-                        if (content) triggerDownload(content, filename);
+                        if (content) {
+                            triggerDownload(content, filename);
+                            umami && umami.track('report_download', { format: fmt, scope: 'by-ip' });
+                        }
                     });
                 });
 
@@ -885,6 +896,23 @@ function render_report(array $report, string $token, ?string $expires_at, array 
             var orig = btn.textContent;
             btn.textContent = 'Link copied!';
             setTimeout(function() { btn.textContent = orig; }, 2000);
+        });
+        umami && umami.track('report_copy_link');
+    });
+    document.querySelectorAll('a[href*="view_token="]').forEach(function(a) {
+        a.addEventListener('click', function() {
+            umami && umami.track('report_view_all_ips');
+        });
+    });
+    // Fire once on load — key conversion signal (paid vs demo, verdict distribution)
+    window.addEventListener('load', function() {
+        var total = <?php echo (int)$total; ?>;
+        var bucket = total <= 10 ? '1-10' : total <= 50 ? '11-50' : total <= 200 ? '51-200'
+                   : total <= 1000 ? '201-1000' : total <= 5000 ? '1001-5000' : '5000+';
+        umami && umami.track('report_view', {
+            is_demo:          <?php echo $is_demo ? 'true' : 'false'; ?>,
+            verdict:          <?php echo json_encode(strtolower($verdict)); ?>,
+            ip_count_bucket:  bucket
         });
     });
     </script>
