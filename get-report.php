@@ -39,6 +39,15 @@ if (strlen($raw_json) > 10 * 1024 * 1024) {
     exit;
 }
 
+$geo_results_raw = $_POST['geo_results_json'] ?? '';
+// Validate: if provided, must be valid JSON array
+if ($geo_results_raw !== '') {
+    $geo_check = json_decode($geo_results_raw, true);
+    if (!is_array($geo_check)) $geo_results_raw = '';
+}
+// Size guard: same 10MB ceiling as ip_list_json
+if (strlen($geo_results_raw) > 10 * 1024 * 1024) $geo_results_raw = '';
+
 // ── Generate token and submission hash ───────────────────────────────────────
 
 $token           = sprintf('%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
@@ -80,10 +89,10 @@ if ($cached) {
 
 $stmt = $con->prepare(
     'INSERT INTO reports
-       (token, submission_hash, ip_list_json, status, pending_expires_at, created_at)
-     VALUES (?, ?, ?, "pending", DATE_ADD(NOW(), INTERVAL 1 HOUR), NOW())'
+       (token, submission_hash, ip_list_json, geo_results_json, status, pending_expires_at, created_at)
+     VALUES (?, ?, ?, ?, "pending", DATE_ADD(NOW(), INTERVAL 1 HOUR), NOW())'
 );
-$stmt->bind_param('sss', $token, $submission_hash, $raw_json);
+$stmt->bind_param('ssss', $token, $submission_hash, $raw_json, $geo_results_raw);
 if (!$stmt->execute()) {
     error_log('ip2geo get-report.php INSERT failed: ' . $stmt->error);
     $stmt->close();

@@ -117,7 +117,7 @@ if ($_POST || $view_token_mode)
 	if ($view_token_mode) {
 		// Load the original IP list from a paid/redeemed report token
 		$stmt = $con->prepare(
-			'SELECT ip_list_json FROM reports WHERE token = ? AND status IN ("paid","redeemed")'
+			'SELECT ip_list_json, geo_results_json FROM reports WHERE token = ? AND status IN ("paid","redeemed")'
 		);
 		$stmt->bind_param('s', $view_token_val);
 		$stmt->execute();
@@ -139,6 +139,9 @@ if ($_POST || $view_token_mode)
 			}
 			$ip_list = array_keys($ip_freq);
 			$good_countries = []; // show all IPs — no country filter in view mode
+			$vt_geo_cached = !empty($vt_row['geo_results_json'])
+				? (json_decode($vt_row['geo_results_json'], true) ?? [])
+				: [];
 		}
 	}
 
@@ -182,6 +185,10 @@ if ($_POST || $view_token_mode)
 		$ip_list = array_keys($ip_freq);
 	}
 
+	// Declared outside `if ($con !== null)` so view_token fast-path can use it
+	// even after the DB connection is established above.
+	$vt_geo_cached = $vt_geo_cached ?? [];
+
 	if ($con !== null) {
 
 	// What're our acceptable countries?
@@ -199,7 +206,39 @@ if ($_POST || $view_token_mode)
 	$country_counts = [];
 	// For ip_list_json stored at token creation (Phase A)
 	$ip_classified_data = [];
+	// For geo_results_json cache (view_token fast path)
+	$geo_results_data = [];
 
+	// view_token fast path: serve from geo_results_json cache if available
+	$geo_loop_needed = true;
+	if ($view_token_mode && !empty($vt_geo_cached)) {
+		$geo_loop_needed = false;
+		foreach ($vt_geo_cached as $entry) {
+			$ip           = $entry['ip'] ?? '';
+			$country_code = $entry['country'] ?? '';
+			$category     = $entry['classification'] ?? 'unknown';
+			$asn_num      = ltrim($entry['asn'] ?? '', 'AS');
+			$asn_org      = $entry['asn_org'] ?? '';
+
+			$matches_total++;
+			$category_counts[$category] = ($category_counts[$category] ?? 0) + 1;
+			if ($category === 'scanning' || $category === 'vpn') $scanning_proxy_count++;
+			if ($country_code !== '') $country_counts[$country_code] = ($country_counts[$country_code] ?? 0) + 1;
+
+			$rows_html .= '<tr data-category="'.htmlspecialchars($category, ENT_QUOTES, 'UTF-8').'" data-country="'.htmlspecialchars($country_code, ENT_QUOTES, 'UTF-8').'">';
+			$rows_html .= '<td>'.htmlspecialchars($ip, ENT_QUOTES, 'UTF-8').'</td>';
+			$rows_html .= '<td><abbr title="'.htmlspecialchars($entry['country_name'] ?? '', ENT_QUOTES, 'UTF-8').'">'.htmlspecialchars($country_code, ENT_QUOTES, 'UTF-8').'</abbr></td>';
+			$rows_html .= '<td class="cell-region">'.htmlspecialchars($entry['region'] ?? '', ENT_QUOTES, 'UTF-8').'</td>';
+			$rows_html .= '<td class="cell-city">'.htmlspecialchars($entry['city'] ?? '', ENT_QUOTES, 'UTF-8').'</td>';
+			$rows_html .= '<td>'.htmlspecialchars($entry['asn'] ?? '', ENT_QUOTES, 'UTF-8').'</td>';
+			$rows_html .= '<td class="cell-asn-org" title="'.htmlspecialchars($asn_org, ENT_QUOTES, 'UTF-8').'">'.htmlspecialchars($asn_org, ENT_QUOTES, 'UTF-8').'</td>';
+			$rows_html .= '<td class="asn-category asn-category--'.htmlspecialchars($category, ENT_QUOTES, 'UTF-8').'">'.htmlspecialchars($category, ENT_QUOTES, 'UTF-8').'</td>';
+			$rows_html .= '</tr>';
+		}
+		arsort($country_counts);
+	}
+
+	if ($geo_loop_needed) {
 	foreach ($ip_list as $key => $ip) {
 		$ip = mysqli_real_escape_string($con, $ip);
 		$ip_int = ipToLong($ip);
@@ -249,6 +288,17 @@ if ($_POST || $view_token_mode)
 					'country'        => $country_code,
 					'freq'           => $ip_freq[$ip] ?? 1,
 				];
+				$geo_results_data[] = [
+					'ip'             => $ip,
+					'country'        => $country_code,
+					'country_name'   => $row['country_name'] ?? '',
+					'region'         => $row['subdivision_1_name'] ?? '',
+					'city'           => $row['city_name'] ?? '',
+					'asn'            => $asn_num !== '' ? 'AS' . $asn_num : '',
+					'asn_org'        => $asn_org,
+					'classification' => $category,
+					'freq'           => $ip_freq[$ip] ?? 1,
+				];
 				$rows_html .= '<tr data-category="'.htmlspecialchars($category, ENT_QUOTES, 'UTF-8').'" data-country="'.htmlspecialchars($country_code, ENT_QUOTES, 'UTF-8').'">';
 				$rows_html .= '<td>'.htmlspecialchars($ip, ENT_QUOTES, 'UTF-8').'</td>';
 				$rows_html .= '<td><abbr title="'.htmlspecialchars($row['country_name'] ?? '', ENT_QUOTES, 'UTF-8').'">'.htmlspecialchars($country_code, ENT_QUOTES, 'UTF-8').'</abbr></td>';
@@ -263,7 +313,8 @@ if ($_POST || $view_token_mode)
 			}
 		}
 		if (!$geo_found) $no_result_ips[] = $ip;
-	}
+	} // end foreach geo query loop
+	} // end if ($geo_loop_needed)
 
 	// --- CTA threshold ---
 	// "Non-residential" = confirmed scanners/VPNs + cloud/VPS egress.
@@ -311,6 +362,8 @@ if ($_POST || $view_token_mode)
 			<form method="POST" action="/get-report.php" id="cta-form" style="display:inline">
 			<input type="hidden" name="ip_classified_json" id="ip-classified-json"
 				value="<?php echo htmlspecialchars(json_encode($ip_classified_data), ENT_QUOTES, 'UTF-8'); ?>" />
+			<input type="hidden" name="geo_results_json" id="geo-results-json"
+				value="<?php echo htmlspecialchars(json_encode($geo_results_data), ENT_QUOTES, 'UTF-8'); ?>" />
 			<button type="submit" id="cta-button" class="button">Get Full Report + Block Script &mdash; $9</button>
 		</form>
 		</p>
