@@ -486,16 +486,20 @@ function render_report(array $report, string $token, ?string $expires_at, array 
     $expires_fmt = $expires_at ? date('F j, Y', strtotime($expires_at)) : null;
 
     // Build chip data from all_ips
-    $all_cats = ['scanning' => 0, 'cloud' => 0, 'vpn' => 0, 'residential' => 0, 'unknown' => 0];
+    // Only scanning + vpn appear in block scripts — count/show only those.
+    $blockable_cats = ['scanning', 'vpn'];
+    $all_cats   = ['scanning' => 0, 'cloud' => 0, 'vpn' => 0, 'residential' => 0, 'unknown' => 0];
     $all_ctries = [];
     foreach ($all_ips as $e) {
         $cat = $e['classification'] ?? 'unknown';
         $all_cats[$cat] = ($all_cats[$cat] ?? 0) + 1;
-        $cc = $e['country'] ?? '';
-        if ($cc !== '') $all_ctries[$cc] = ($all_ctries[$cc] ?? 0) + 1;
+        if (in_array($cat, $blockable_cats)) {
+            $cc = $e['country'] ?? '';
+            if ($cc !== '') $all_ctries[$cc] = ($all_ctries[$cc] ?? 0) + 1;
+        }
     }
     arsort($all_ctries);
-    $total_all_ips = count($all_ips);
+    $blockable_count = ($all_cats['scanning'] ?? 0) + ($all_cats['vpn'] ?? 0);
 
     $verdict_text = [
         'HIGH'     => 'This traffic shows a high concentration of known scanning infrastructure. The ASN ranges below cover all current prefixes for these networks — blocking them will stop the majority of it.',
@@ -604,12 +608,12 @@ function render_report(array $report, string $token, ?string $expires_at, array 
             <?php if (!empty($all_ips)): ?>
             <div id="report-filter" role="region" aria-label="Block script filter">
                 <details id="report-filter-details" open>
-                    <summary id="report-filter-summary">Block Script Filter &mdash; <span id="report-filter-count"><?php echo $total_all_ips; ?></span> of <span id="report-filter-total"><?php echo $total_all_ips; ?></span> IPs in block scripts</summary>
+                    <summary id="report-filter-summary">Block Script Filter &mdash; <span id="report-filter-count"><?php echo $blockable_count; ?></span> of <span id="report-filter-total"><?php echo $blockable_count; ?></span> IPs in block scripts</summary>
                     <div id="report-filter-layout">
                         <div id="report-filter-categories">
                             <strong>ASN Categories</strong>
                             <?php
-                            $cat_labels = ['scanning' => 'Scanning', 'cloud' => 'Cloud', 'vpn' => 'VPN/Proxy', 'residential' => 'Residential', 'unknown' => 'Unknown'];
+                            $cat_labels = ['scanning' => 'Scanning', 'vpn' => 'VPN/Proxy'];
                             foreach ($cat_labels as $cat => $label):
                                 if (($all_cats[$cat] ?? 0) === 0) continue;
                                 $cat_safe = htmlspecialchars($cat, ENT_QUOTES, 'UTF-8');
