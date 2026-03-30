@@ -34,9 +34,9 @@ Phase A is built and deployed to staging. Revenue-gating is live behind Stripe C
 
 **Not yet built (pre-launch):**
 - [ ] Spamhaus ASN-DROP diff step in update-db.yml GitHub Actions workflow
-- [ ] Cancel URL flow (/?cancelled=1 → repopulate textarea)
+- [x] Cancel URL flow (/?cancelled=1 → repopulate textarea)
 - [ ] Umami custom events (form submit with IP count bucket; export button clicks)
-- [ ] PHPUnit tests (VerdictAlgorithmTest, TokenLifecycleTest, WebhookHandlerTest, AbuseIPDBRankingTest)
+- [x] PHPUnit tests (VerdictAlgorithmTest, TokenLifecycleTest, WebhookHandlerTest, AbuseIPDBRankingTest, AsnClassificationTest, CacheTest) — 95 tests, 119 assertions
 - [ ] WCAG AA contrast check on verdict badge colors (#e06c9f, #e0a85a, #6cb87a)
 - [ ] QA agent doc (see item 6 below)
 - [x] Report layout: move ranges and block rules above top threat sources (2026-03-30)
