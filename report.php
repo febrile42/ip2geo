@@ -529,42 +529,83 @@ function render_report(array $report, string $token, ?string $expires_at): void 
 
             <!-- Block script downloads -->
             <h3>Block Rules</h3>
+            <p style="font-size:0.9em;opacity:0.7;margin-top:-0.5em">Download firewall rules for your server.</p>
             <?php $has_ranges = !empty($report['asn_ranges']); ?>
             <div class="block-rules-tabs">
-                <div class="block-rules-tablist" role="tablist">
-                    <button class="block-rules-tab active" id="tab-by-ip" role="tab" aria-selected="true" aria-controls="panel-by-ip" onclick="switchBlockTab('by-ip')">Block by IP</button>
-                    <button class="block-rules-tab" id="tab-by-range" role="tab" aria-selected="false" aria-controls="panel-by-range" onclick="switchBlockTab('by-range')"<?php echo $has_ranges ? '' : ' disabled title="No ASN ranges available"'; ?>>Block by Range</button>
+                <div class="block-rules-tablist" role="tablist" aria-label="Block by IP or by range">
+                    <div class="block-rules-tab active" id="tab-by-ip" role="tab" tabindex="0" aria-selected="true" aria-controls="panel-by-ip">Block by IP</div>
+                    <div class="block-rules-tab<?php echo $has_ranges ? '' : ' brt-disabled'; ?>" id="tab-by-range" role="tab" tabindex="<?php echo $has_ranges ? '0' : '-1'; ?>" aria-selected="false" aria-controls="panel-by-range"<?php echo $has_ranges ? '' : ' aria-disabled="true" title="No ASN ranges available for this report"'; ?>>Block by Range</div>
                 </div>
                 <div id="panel-by-ip" class="block-rules-panel" role="tabpanel" aria-labelledby="tab-by-ip">
                     <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=sh-iptables"
-                       class="button small">&#8595; iptables</a>
+                       class="button small">&#8595; block-iptables.sh</a>
                     &nbsp;
                     <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=sh-ufw"
-                       class="button small">&#8595; ufw</a>
+                       class="button small">&#8595; block-ufw.sh</a>
                     &nbsp;
                     <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=nginx-ips"
-                       class="button small">&#8595; nginx geo</a>
+                       class="button small">&#8595; block-nginx-ips.conf</a>
                 </div>
                 <div id="panel-by-range" class="block-rules-panel" role="tabpanel" aria-labelledby="tab-by-range" style="display:none">
                     <?php if ($has_ranges): ?>
                     <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=sh-iptables-ranges"
-                       class="button small">&#8595; iptables</a>
+                       class="button small">&#8595; block-iptables-ranges.sh</a>
                     &nbsp;
                     <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=sh-ufw-ranges"
-                       class="button small">&#8595; ufw</a>
+                       class="button small">&#8595; block-ufw-ranges.sh</a>
                     &nbsp;
                     <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=nginx-ranges"
-                       class="button small">&#8595; nginx geo</a>
+                       class="button small">&#8595; block-nginx-ranges.conf</a>
                     <?php else: ?>
-                    <p style="font-size:0.9em;opacity:0.6;margin:0.5em 0">No ASN ranges available for this report.</p>
+                    <p style="font-size:0.9em;opacity:0.5;margin:0.6em 0">No ASN ranges available for this report.</p>
                     <?php endif; ?>
                 </div>
             </div>
             <style>
-            .block-rules-tablist { display:flex; gap:0; margin-bottom:0.75em; border-bottom:1px solid rgba(255,255,255,0.15); }
-            .block-rules-tab { background:none; border:none; border-bottom:2px solid transparent; color:inherit; cursor:pointer; font-size:0.9em; padding:0.4em 1em; opacity:0.55; margin-bottom:-1px; }
-            .block-rules-tab.active { opacity:1; border-bottom-color:currentColor; }
-            .block-rules-tab:disabled { opacity:0.3; cursor:not-allowed; }
+            .block-rules-tablist {
+                display: flex;
+                gap: 0;
+                border-bottom: 1px solid rgba(255,255,255,0.12);
+                margin-bottom: 1em;
+            }
+            .block-rules-tab {
+                cursor: pointer;
+                padding: 0.3em 1.2em 0.4em;
+                font-size: 0.72em;
+                font-weight: bold;
+                letter-spacing: 0.12em;
+                text-transform: uppercase;
+                opacity: 0.45;
+                border-bottom: 2px solid transparent;
+                margin-bottom: -1px;
+                user-select: none;
+                transition: opacity 0.15s ease, border-color 0.15s ease;
+                outline: none;
+            }
+            .block-rules-tab.active {
+                opacity: 1;
+                border-bottom-color: rgba(255,255,255,0.75);
+            }
+            .block-rules-tab:not(.active):not(.brt-disabled):hover {
+                opacity: 0.7;
+            }
+            .block-rules-tab:focus-visible {
+                outline: 2px solid rgba(255,255,255,0.5);
+                outline-offset: 2px;
+            }
+            .block-rules-tab.brt-disabled {
+                opacity: 0.2;
+                cursor: not-allowed;
+            }
+            .block-rules-panel {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.5em;
+                padding: 0.25em 0;
+            }
+            .block-rules-panel .button {
+                margin: 0;
+            }
             </style>
             <script>
             function switchBlockTab(name) {
@@ -577,6 +618,12 @@ function render_report(array $report, string $token, ?string $expires_at): void 
                     p.style.display = p.id === 'panel-' + name ? '' : 'none';
                 });
             }
+            document.querySelectorAll('.block-rules-tab:not(.brt-disabled)').forEach(function(t) {
+                t.addEventListener('click', function() { switchBlockTab(this.id.replace('tab-', '')); });
+                t.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); switchBlockTab(this.id.replace('tab-', '')); }
+                });
+            });
             </script>
 
             <!-- Top 25 table -->
