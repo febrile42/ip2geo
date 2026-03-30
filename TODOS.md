@@ -209,12 +209,8 @@ Check server access logs for POST requests with non-browser user agents.
 5 minutes, reopens the API monetization question if present. (CEO plan item.)
 
 ### Q8 — asn_org not stored in ip_list_json for real paid reports
-The seed script stores `asn_org` in ip_list_json entries. The live index.php flow
-does NOT store `asn_org` — only `asn` (number), `classification`, `country`, `freq`.
-This means the ASN org column in the report table shows only the ASN number for
-real paid reports (no org name). The org is fetched from the DB in `fetch_asn_ranges()`
-for the ranges section, but not back-filled into the top-25 table cells.
-Decision: add `asn_org` to ip_list_json at token creation time (one line change in index.php)?
+**RESOLVED 2026-03-30 (commit e1b18f6).** Added `'asn_org' => $asn_org` to `$ip_classified_data`
+in `index.php:244`. Forward fix only — existing DB rows not back-filled.
 
 ---
 

@@ -101,9 +101,10 @@ if ($status === 'redeemed') {
     }
     // Serve cached report
     $report = json_decode($row['report_json'], true);
+    $ip_data_for_render = json_decode($row['ip_list_json'], true) ?? [];
     mysqli_close($con);
     maybe_serve_script_download($report, $token);
-    render_report($report, $token, $row['report_expires_at']);
+    render_report($report, $token, $row['report_expires_at'], $ip_data_for_render);
     exit;
 }
 
@@ -186,7 +187,7 @@ $stmt->close();
 mysqli_close($con);
 
 maybe_serve_script_download($report, $token);
-render_report($report, $token, $report_expires);
+render_report($report, $token, $report_expires, $ip_data);
 exit;
 
 // ── AbuseIPDB enrichment ──────────────────────────────────────────────────────
@@ -440,11 +441,11 @@ function include_block_rules_tabs(string $token, bool $has_ranges): void { ?>
                 </div>
                 <div id="panel-by-ip" class="block-rules-panel" role="tabpanel" aria-labelledby="tab-by-ip">
                     <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=sh-iptables"
-                       class="button small">&#8595; block-iptables.sh</a>
+                       class="button small" data-format="sh-iptables">&#8595; block-iptables.sh</a>
                     <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=sh-ufw"
-                       class="button small">&#8595; block-ufw.sh</a>
+                       class="button small" data-format="sh-ufw">&#8595; block-ufw.sh</a>
                     <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=nginx-ips"
-                       class="button small">&#8595; block-nginx-ips.conf</a>
+                       class="button small" data-format="nginx-ips">&#8595; block-nginx-ips.conf</a>
                 </div>
                 <div id="panel-by-range" class="block-rules-panel" role="tabpanel" aria-labelledby="tab-by-range" style="display:none">
                     <?php if ($has_ranges): ?>
@@ -474,7 +475,7 @@ function render_error(string $msg): void {
     <?php render_page_close();
 }
 
-function render_report(array $report, string $token, ?string $expires_at): void {
+function render_report(array $report, string $token, ?string $expires_at, array $all_ips = []): void {
     $verdict     = $report['verdict'];
     $verdict_lc  = strtolower($verdict);
     $total       = $report['total_ips'];
@@ -483,6 +484,18 @@ function render_report(array $report, string $token, ?string $expires_at): void 
     $top25       = $report['top25'];
     $gen_date    = $report['generated_at'];
     $expires_fmt = $expires_at ? date('F j, Y', strtotime($expires_at)) : null;
+
+    // Build chip data from all_ips
+    $all_cats = ['scanning' => 0, 'cloud' => 0, 'vpn' => 0, 'residential' => 0, 'unknown' => 0];
+    $all_ctries = [];
+    foreach ($all_ips as $e) {
+        $cat = $e['classification'] ?? 'unknown';
+        $all_cats[$cat] = ($all_cats[$cat] ?? 0) + 1;
+        $cc = $e['country'] ?? '';
+        if ($cc !== '') $all_ctries[$cc] = ($all_ctries[$cc] ?? 0) + 1;
+    }
+    arsort($all_ctries);
+    $total_all_ips = count($all_ips);
 
     $verdict_text = [
         'HIGH'     => 'This traffic shows a high concentration of known scanning infrastructure. The ASN ranges below cover all current prefixes for these networks — blocking them will stop the majority of it.',
@@ -498,7 +511,9 @@ function render_report(array $report, string $token, ?string $expires_at): void 
 
     $is_demo = ($token === DEMO_TOKEN);
 
-    render_page_open('Threat Report — ip2geo.org', $meta_desc); ?>
+    render_page_open('Threat Report — ip2geo.org', $meta_desc);
+    // Embed full IP list for client-side filtering
+    echo '<script>window.reportAllIps = ' . json_encode($all_ips) . ';</script>'; ?>
     <section id="report" class="wrapper style4 fade-up">
         <div class="inner">
             <?php if ($is_demo): ?>
@@ -584,6 +599,137 @@ function render_report(array $report, string $token, ?string $expires_at): void 
                 });
             });
             </script>
+
+            <!-- Block script filter -->
+            <?php if (!empty($all_ips)): ?>
+            <div id="report-filter" role="region" aria-label="Block script filter">
+                <details id="report-filter-details" open>
+                    <summary id="report-filter-summary">Block Script Filter &mdash; <span id="report-filter-count"><?php echo $total_all_ips; ?></span> of <span id="report-filter-total"><?php echo $total_all_ips; ?></span> IPs in block scripts</summary>
+                    <div id="report-filter-layout">
+                        <div id="report-filter-categories">
+                            <strong>ASN Categories</strong>
+                            <?php
+                            $cat_labels = ['scanning' => 'Scanning', 'cloud' => 'Cloud', 'vpn' => 'VPN/Proxy', 'residential' => 'Residential', 'unknown' => 'Unknown'];
+                            foreach ($cat_labels as $cat => $label):
+                                if (($all_cats[$cat] ?? 0) === 0) continue;
+                                $cat_safe = htmlspecialchars($cat, ENT_QUOTES, 'UTF-8');
+                            ?>
+                            <label class="cat-<?php echo $cat_safe; ?>"><input type="checkbox" class="report-filter-category" value="<?php echo $cat_safe; ?>" checked><span class="chip-label"><?php echo htmlspecialchars($label, ENT_QUOTES, 'UTF-8'); ?></span> <span class="chip-count">(<?php echo $all_cats[$cat]; ?>)</span></label>
+                            <?php endforeach; ?>
+                        </div>
+                        <?php if (!empty($all_ctries)): ?>
+                        <div id="report-filter-countries">
+                            <strong>Countries</strong>
+                            <div class="filter-chips">
+                            <?php foreach ($all_ctries as $cc => $count):
+                                $cc_safe = htmlspecialchars($cc, ENT_QUOTES, 'UTF-8');
+                            ?>
+                                <label><input type="checkbox" class="report-filter-country" value="<?php echo $cc_safe; ?>" checked><span class="chip-label"><?php echo $cc_safe; ?></span> <span class="chip-count">(<?php echo $count; ?>)</span></label>
+                            <?php endforeach; ?>
+                            </div>
+                        </div>
+                        <?php endif; ?>
+                    </div>
+                </details>
+            </div>
+            <script>
+            (function() {
+                var allIps = window.reportAllIps || [];
+                if (!allIps.length) return;
+
+                var blockCats = ['scanning', 'vpn'];
+                var today = new Date().toISOString().slice(0, 10);
+
+                function getFilteredIps() {
+                    var checkedCats = {};
+                    document.querySelectorAll('.report-filter-category:checked').forEach(function(cb) {
+                        checkedCats[cb.value] = true;
+                    });
+                    var checkedCtries = {};
+                    document.querySelectorAll('.report-filter-country:checked').forEach(function(cb) {
+                        checkedCtries[cb.value] = true;
+                    });
+                    return allIps.filter(function(e) {
+                        var cat = e.classification || 'unknown';
+                        var cc  = e.country || '';
+                        var catOk = checkedCats[cat];
+                        // If no country chips exist (all_ctries empty), skip country filter
+                        var noCtryChips = document.querySelectorAll('.report-filter-country').length === 0;
+                        var ctryOk = noCtryChips || (cc === '' ? true : checkedCtries[cc]);
+                        return catOk && ctryOk;
+                    });
+                }
+
+                function getFilteredBlockIps() {
+                    return getFilteredIps()
+                        .filter(function(e) { return blockCats.indexOf(e.classification || '') !== -1; })
+                        .sort(function(a, b) { return (b.freq || 1) - (a.freq || 1); })
+                        .map(function(e) { return e.ip; });
+                }
+
+                function genIptables(ips) {
+                    return '#!/bin/bash\n# ip2geo threat report \u2014 iptables block rules\n# Generated: ' + today + '\n# Block ' + ips.length + ' IPs flagged as scanning / proxy infrastructure\n\nset -euo pipefail\n' +
+                        ips.map(function(ip) { return 'iptables -A INPUT -s ' + ip + ' -j DROP'; }).join('\n') + '\n';
+                }
+
+                function genUfw(ips) {
+                    return '#!/bin/bash\n# ip2geo threat report \u2014 ufw block rules\n# Generated: ' + today + '\n# Block ' + ips.length + ' IPs flagged as scanning / proxy infrastructure\n\nset -euo pipefail\n' +
+                        ips.map(function(ip) { return 'ufw deny from ' + ip + ' to any'; }).join('\n') + '\n';
+                }
+
+                function genNginx(ips) {
+                    return '# ip2geo threat report \u2014 nginx geo block (individual IPs)\n# Generated: ' + today + '\n# Block ' + ips.length + ' IPs flagged as scanning / proxy infrastructure\n# Usage: include this file inside a geo $blocked_ip { } block in nginx.conf\n\ndefault 0;\n' +
+                        ips.map(function(ip) { return ip + ' 1;'; }).join('\n') + '\n';
+                }
+
+                function triggerDownload(content, filename) {
+                    var blob = new Blob([content], {type: 'text/plain'});
+                    var url  = URL.createObjectURL(blob);
+                    var a    = document.createElement('a');
+                    a.href     = url;
+                    a.download = filename;
+                    a.click();
+                    setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+                }
+
+                function updateCount() {
+                    var blockIps = getFilteredBlockIps();
+                    var countEl  = document.getElementById('report-filter-count');
+                    if (countEl) countEl.textContent = blockIps.length;
+                }
+
+                // Intercept "Block by IP" download buttons
+                document.querySelectorAll('#panel-by-ip .button[data-format]').forEach(function(btn) {
+                    btn.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        var fmt  = this.dataset.format;
+                        var ips  = getFilteredBlockIps();
+                        var content = '';
+                        var filename = '';
+                        if (fmt === 'sh-iptables') {
+                            content  = genIptables(ips);
+                            filename = 'block-iptables.sh';
+                        } else if (fmt === 'sh-ufw') {
+                            content  = genUfw(ips);
+                            filename = 'block-ufw.sh';
+                        } else if (fmt === 'nginx-ips') {
+                            content  = genNginx(ips);
+                            filename = 'block-nginx-ips.conf';
+                        }
+                        if (content) triggerDownload(content, filename);
+                    });
+                });
+
+                // Wire up filter chips
+                document.querySelectorAll('.report-filter-category, .report-filter-country').forEach(function(cb) {
+                    cb.addEventListener('change', updateCount);
+                });
+
+                // Initial count
+                updateCount();
+            })();
+            </script>
+            <?php endif; ?>
 
             <!-- Top 25 table -->
             <h3>Top Threat Sources</h3>
