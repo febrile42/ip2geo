@@ -325,6 +325,7 @@
     font-weight: bold;
     letter-spacing: 0.12em;
     text-transform: uppercase;
+    white-space: nowrap;
     opacity: 0.45;
     border-bottom: 2px solid transparent;
     margin-bottom: -1px;
