@@ -214,6 +214,28 @@ in `index.php:244`. Forward fix only — existing DB rows not back-filled.
 
 ---
 
+---
+
+## Stripe Account Activation — Required Before Production Launch
+
+Stripe reviews the live site for compliance before activating the account for payments.
+Contact email: **support@ip2geo.org**
+
+- [ ] **Add contact email to index.php and footer** — add `support@ip2geo.org` to the "Contact / Contribute" section and footer. Stripe requires a direct contact method (phone, email, address, form, or chat). Current social links alone are insufficient.
+
+- [ ] **Update privacy.php** — current policy says "no data collected except Umami." Now false: we process payments via Stripe, store report tokens/results in DB for 30 days, optionally store notification email, and send IPs to AbuseIPDB for enrichment. Add sections covering: what's collected, retention period, Stripe as payment processor (link their privacy policy), AbuseIPDB as third-party lookup service.
+
+- [ ] **Create legal.php** — new page covering three policies required before first transaction:
+  - *Refund policy:* "Digital reports are generated immediately upon payment. All sales are final. If a technical failure prevents your report from generating, contact support@ip2geo.org within 7 days for a full refund."
+  - *Cancellation policy:* "Reports are one-time purchases. There is no subscription to cancel."
+  - *Dispute policy:* "Contact support@ip2geo.org before filing a dispute. Legitimate issues resolved promptly."
+
+- [ ] **Describe the paid product publicly** — Stripe requires that goods/services on the site match what was told to Stripe during signup. Add a brief description of the $9 threat report (what it includes: verdict, top-25 threat sources, ASN ranges, block scripts, AbuseIPDB scores) somewhere visible before the CTA — either a section in index.php or a linked `/report-info` page.
+
+- [ ] **Add Legal / Refund Policy link to footer** — alongside the existing Privacy Policy link, add a link to legal.php.
+
+---
+
 ## Deferred — Phase B
 
 - AI-powered threat report (Claude API) — replaces rule-based verdict
