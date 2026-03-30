@@ -432,6 +432,35 @@ default 0;
 
 // ── Rendering ─────────────────────────────────────────────────────────────────
 
+function include_block_rules_tabs(string $token, bool $has_ranges): void { ?>
+            <div class="block-rules-tabs">
+                <div class="block-rules-tablist" role="tablist" aria-label="Block by IP or by range">
+                    <div class="block-rules-tab active" id="tab-by-ip" role="tab" tabindex="0" aria-selected="true" aria-controls="panel-by-ip">Block by IP</div>
+                    <div class="block-rules-tab<?php echo $has_ranges ? '' : ' brt-disabled'; ?>" id="tab-by-range" role="tab" tabindex="<?php echo $has_ranges ? '0' : '-1'; ?>" aria-selected="false" aria-controls="panel-by-range"<?php echo $has_ranges ? '' : ' aria-disabled="true" title="No ASN ranges available for this report"'; ?>>Block by Range</div>
+                </div>
+                <div id="panel-by-ip" class="block-rules-panel" role="tabpanel" aria-labelledby="tab-by-ip">
+                    <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=sh-iptables"
+                       class="button small">&#8595; block-iptables.sh</a>
+                    <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=sh-ufw"
+                       class="button small">&#8595; block-ufw.sh</a>
+                    <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=nginx-ips"
+                       class="button small">&#8595; block-nginx-ips.conf</a>
+                </div>
+                <div id="panel-by-range" class="block-rules-panel" role="tabpanel" aria-labelledby="tab-by-range" style="display:none">
+                    <?php if ($has_ranges): ?>
+                    <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=sh-iptables-ranges"
+                       class="button small">&#8595; block-iptables-ranges.sh</a>
+                    <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=sh-ufw-ranges"
+                       class="button small">&#8595; block-ufw-ranges.sh</a>
+                    <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=nginx-ranges"
+                       class="button small">&#8595; block-nginx-ranges.conf</a>
+                    <?php else: ?>
+                    <p style="font-size:0.9em;opacity:0.5;margin:0.6em 0">No ASN ranges available for this report.</p>
+                    <?php endif; ?>
+                </div>
+            </div>
+<?php }
+
 function render_error(string $msg): void {
     $title = 'Report Unavailable — ip2geo.org';
     render_page_open($title); ?>
@@ -494,119 +523,49 @@ function render_report(array $report, string $token, ?string $expires_at): void 
             <?php endif; ?>
             <p><?php echo htmlspecialchars($verdict_text, ENT_QUOTES, 'UTF-8'); ?></p>
 
-            <!-- ASN Ranges -->
-            <?php if (!empty($report['asn_ranges'])): ?>
-            <h3>ASN Ranges to Block</h3>
-            <p style="font-size:0.9em;opacity:0.7">
-                These CIDR ranges cover all current prefixes advertised by the scanning/VPN
-                ASNs above. Blocking by range is more resilient than individual IPs — the
-                ranges stay valid even as specific IPs rotate.
-            </p>
-            <?php foreach ($report['asn_ranges'] as $group):
-                $shown = count($group['cidrs']);
-                $total_ranges = $group['total'];
-            ?>
-            <div style="margin-bottom:1.2em">
-                <strong><?php echo htmlspecialchars($group['asn'], ENT_QUOTES, 'UTF-8'); ?></strong>
-                <?php if ($group['org']): ?>
-                <span style="opacity:0.7;font-size:0.9em"><?php echo htmlspecialchars($group['org'], ENT_QUOTES, 'UTF-8'); ?></span>
-                <?php endif; ?>
-                <span style="font-size:0.8em;opacity:0.5">
-                    &mdash; <?php if ($total_ranges > $shown): ?>
-                        <?php echo $shown; ?> of <?php echo number_format($total_ranges); ?> ranges
-                    <?php else: ?>
-                        <?php echo $total_ranges; ?> range<?php echo $total_ranges === 1 ? '' : 's'; ?>
-                    <?php endif; ?>
-                </span>
-                <pre style="font-size:0.82em;overflow-x:auto;background:rgba(0,0,0,0.2);padding:0.55em 0.8em;margin:0.35em 0 0;line-height:1.6"><?php
-                    foreach ($group['cidrs'] as $cidr) {
-                        echo htmlspecialchars($cidr, ENT_QUOTES, 'UTF-8') . "\n";
-                    }
-                ?></pre>
-            </div>
-            <?php endforeach; ?>
-            <?php endif; ?>
-
-            <!-- Block script downloads -->
-            <h3>Block Rules</h3>
-            <p style="font-size:0.9em;opacity:0.7;margin-top:-0.5em">Download firewall rules for your server.</p>
+            <!-- ASN Ranges + Block Rules: side-by-side when ranges exist, Block Rules full-width otherwise -->
             <?php $has_ranges = !empty($report['asn_ranges']); ?>
-            <div class="block-rules-tabs">
-                <div class="block-rules-tablist" role="tablist" aria-label="Block by IP or by range">
-                    <div class="block-rules-tab active" id="tab-by-ip" role="tab" tabindex="0" aria-selected="true" aria-controls="panel-by-ip">Block by IP</div>
-                    <div class="block-rules-tab<?php echo $has_ranges ? '' : ' brt-disabled'; ?>" id="tab-by-range" role="tab" tabindex="<?php echo $has_ranges ? '0' : '-1'; ?>" aria-selected="false" aria-controls="panel-by-range"<?php echo $has_ranges ? '' : ' aria-disabled="true" title="No ASN ranges available for this report"'; ?>>Block by Range</div>
+            <?php if ($has_ranges): ?>
+            <div class="ranges-rules-grid">
+                <div class="ranges-col">
+                    <h3>ASN Ranges to Block</h3>
+                    <p style="font-size:0.9em;opacity:0.7">
+                        CIDR prefixes for all scanning/VPN ASNs in this report.
+                        Blocking by range is more resilient — ranges stay valid as IPs rotate.
+                    </p>
+                    <?php foreach ($report['asn_ranges'] as $group):
+                        $shown = count($group['cidrs']);
+                        $total_ranges = $group['total'];
+                    ?>
+                    <div style="margin-bottom:1.2em">
+                        <strong><?php echo htmlspecialchars($group['asn'], ENT_QUOTES, 'UTF-8'); ?></strong>
+                        <?php if ($group['org']): ?>
+                        <span style="opacity:0.7;font-size:0.9em"><?php echo htmlspecialchars($group['org'], ENT_QUOTES, 'UTF-8'); ?></span>
+                        <?php endif; ?>
+                        <span style="font-size:0.8em;opacity:0.5">
+                            &mdash; <?php if ($total_ranges > $shown): ?>
+                                <?php echo $shown; ?> of <?php echo number_format($total_ranges); ?> ranges
+                            <?php else: ?>
+                                <?php echo $total_ranges; ?> range<?php echo $total_ranges === 1 ? '' : 's'; ?>
+                            <?php endif; ?>
+                        </span>
+                        <pre style="font-size:0.82em;overflow-x:auto;background:rgba(0,0,0,0.2);padding:0.55em 0.8em;margin:0.35em 0 0;line-height:1.6"><?php
+                            foreach ($group['cidrs'] as $cidr) {
+                                echo htmlspecialchars($cidr, ENT_QUOTES, 'UTF-8') . "\n";
+                            }
+                        ?></pre>
+                    </div>
+                    <?php endforeach; ?>
                 </div>
-                <div id="panel-by-ip" class="block-rules-panel" role="tabpanel" aria-labelledby="tab-by-ip">
-                    <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=sh-iptables"
-                       class="button small">&#8595; block-iptables.sh</a>
-                    &nbsp;
-                    <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=sh-ufw"
-                       class="button small">&#8595; block-ufw.sh</a>
-                    &nbsp;
-                    <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=nginx-ips"
-                       class="button small">&#8595; block-nginx-ips.conf</a>
-                </div>
-                <div id="panel-by-range" class="block-rules-panel" role="tabpanel" aria-labelledby="tab-by-range" style="display:none">
-                    <?php if ($has_ranges): ?>
-                    <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=sh-iptables-ranges"
-                       class="button small">&#8595; block-iptables-ranges.sh</a>
-                    &nbsp;
-                    <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=sh-ufw-ranges"
-                       class="button small">&#8595; block-ufw-ranges.sh</a>
-                    &nbsp;
-                    <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=nginx-ranges"
-                       class="button small">&#8595; block-nginx-ranges.conf</a>
-                    <?php else: ?>
-                    <p style="font-size:0.9em;opacity:0.5;margin:0.6em 0">No ASN ranges available for this report.</p>
-                    <?php endif; ?>
+                <div class="rules-col">
+                    <h3>Block Rules</h3>
+                    <?php include_block_rules_tabs($token, $has_ranges); ?>
                 </div>
             </div>
-            <style>
-            .block-rules-tablist {
-                display: flex;
-                gap: 0;
-                border-bottom: 1px solid rgba(255,255,255,0.12);
-                margin-bottom: 1em;
-            }
-            .block-rules-tab {
-                cursor: pointer;
-                padding: 0.3em 1.2em 0.4em;
-                font-size: 0.72em;
-                font-weight: bold;
-                letter-spacing: 0.12em;
-                text-transform: uppercase;
-                opacity: 0.45;
-                border-bottom: 2px solid transparent;
-                margin-bottom: -1px;
-                user-select: none;
-                transition: opacity 0.15s ease, border-color 0.15s ease;
-                outline: none;
-            }
-            .block-rules-tab.active {
-                opacity: 1;
-                border-bottom-color: rgba(255,255,255,0.75);
-            }
-            .block-rules-tab:not(.active):not(.brt-disabled):hover {
-                opacity: 0.7;
-            }
-            .block-rules-tab:focus-visible {
-                outline: 2px solid rgba(255,255,255,0.5);
-                outline-offset: 2px;
-            }
-            .block-rules-tab.brt-disabled {
-                opacity: 0.2;
-                cursor: not-allowed;
-            }
-            .block-rules-panel {
-                display: flex;
-                flex-wrap: wrap;
-                gap: 0.5em;
-                padding: 0.25em 0;
-            }
-            .block-rules-panel .button {
-                margin: 0;
-            }
-            </style>
+            <?php else: ?>
+            <h3>Block Rules</h3>
+            <?php include_block_rules_tabs($token, $has_ranges); ?>
+            <?php endif; ?>
             <script>
             function switchBlockTab(name) {
                 document.querySelectorAll('.block-rules-tab').forEach(function(t) {

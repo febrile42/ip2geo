@@ -266,3 +266,93 @@
     opacity: 0.6;
     padding: 0 0.25em;
 }
+
+/* --- Ranges + Block Rules side-by-side grid (report.php) --- */
+.ranges-rules-grid {
+    display: flex !important;
+    gap: 2.5em;
+    align-items: flex-start;
+    margin-bottom: 2em;
+}
+.ranges-col {
+    flex: 2;
+    min-width: 0;
+}
+.rules-col {
+    flex: 1;
+    min-width: 0;
+}
+
+/* In right column, stack download buttons vertically, full width */
+.rules-col .block-rules-panel {
+    flex-direction: column;
+    gap: 0.45em;
+}
+.rules-col .block-rules-panel .button {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    text-align: center;
+}
+
+/* Stack columns on tablet and below */
+@media (max-width: 900px) {
+    .ranges-rules-grid {
+        flex-direction: column;
+        gap: 0;
+    }
+    .rules-col .block-rules-panel {
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+    .rules-col .block-rules-panel .button {
+        display: inline-block;
+        width: auto;
+    }
+}
+
+/* Block rules tab + panel styles (shared for both grid and full-width layouts) */
+.block-rules-tablist {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid rgba(255,255,255,0.12);
+    margin-bottom: 1em;
+}
+.block-rules-tab {
+    cursor: pointer;
+    padding: 0.3em 1.2em 0.4em;
+    font-size: 0.72em;
+    font-weight: bold;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    opacity: 0.45;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    user-select: none;
+    transition: opacity 0.15s ease, border-color 0.15s ease;
+    outline: none;
+}
+.block-rules-tab.active {
+    opacity: 1;
+    border-bottom-color: rgba(255,255,255,0.75);
+}
+.block-rules-tab:not(.active):not(.brt-disabled):hover {
+    opacity: 0.7;
+}
+.block-rules-tab:focus-visible {
+    outline: 2px solid rgba(255,255,255,0.5);
+    outline-offset: 2px;
+}
+.block-rules-tab.brt-disabled {
+    opacity: 0.2;
+    cursor: not-allowed;
+}
+.block-rules-panel {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5em;
+    padding: 0.25em 0;
+}
+.block-rules-panel .button {
+    margin: 0;
+}
