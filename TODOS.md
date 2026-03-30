@@ -33,7 +33,7 @@ Phase A is built and deployed to staging. Revenue-gating is live behind Stripe C
 - [x] QUESTIONS.md for async design review
 
 **Not yet built (pre-launch):**
-- [ ] Spamhaus ASN-DROP diff step in update-db.yml GitHub Actions workflow
+- [x] Spamhaus ASN-DROP diff step in update-db.yml GitHub Actions workflow
 - [x] Cancel URL flow (/?cancelled=1 → repopulate textarea)
 - [ ] Umami custom events (form submit with IP count bucket; export button clicks)
 - [x] PHPUnit tests (VerdictAlgorithmTest, TokenLifecycleTest, WebhookHandlerTest, AbuseIPDBRankingTest, AsnClassificationTest, CacheTest) — 95 tests, 119 assertions
