@@ -35,6 +35,7 @@ jobs:
             cd ${{ secrets.STAGING_PATH }}
             git fetch origin && git reset --hard origin/develop
             ~/bin/composer install --no-dev --no-interaction --quiet
+            printf "User-agent: *\nDisallow: /\n" > robots.txt
 
   test-staging:
     name: Test Staging
