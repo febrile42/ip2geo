@@ -281,8 +281,17 @@ Monthly update-db.yml step: curl Spamhaus ASN-DROP, diff against asn_classificat
 open draft PR with proposed additions. Never auto-merged. See CEO plan for bash sketch.
 
 ### Expired report cleanup job
-Monthly pruning of `status=redeemed AND report_expires_at < DATE_SUB(NOW(), INTERVAL 30 DAY)`.
-Never delete pending rows. Phase A scale is fine without this; Phase B scale needs it.
+Two queries needed, run via cron on lime (preferred over GHA — avoids 60-day inactivity kill):
+
+```sql
+-- Dead pending rows (never paid, window elapsed)
+DELETE FROM reports WHERE status = 'pending' AND pending_expires_at < NOW() - INTERVAL 2 HOUR;
+
+-- Expired paid reports (30-day access window elapsed)
+DELETE FROM reports WHERE status = 'redeemed' AND report_expires_at IS NOT NULL AND report_expires_at < NOW();
+```
+
+Phase A scale is fine without this; Phase B scale needs it. At ~2.6 MB/paid report (ip_list_json + report_json, geo_results_json now nulled on redemption), disk limit is ~3,200 paid rows on current 8.5 GB free. Add cleanup before that ceiling is near.
 
 ---
 

@@ -184,7 +184,7 @@ $report_json_str  = json_encode($report);
 $report_expires   = date('Y-m-d H:i:s', strtotime('+30 days'));
 $stmt = $con->prepare(
     'UPDATE reports
-     SET status = "redeemed", report_json = ?, report_expires_at = ?
+     SET status = "redeemed", report_json = ?, report_expires_at = ?, geo_results_json = NULL
      WHERE token = ? AND status IN ("pending","paid")'
 );
 $stmt->bind_param('sss', $report_json_str, $report_expires, $token);
