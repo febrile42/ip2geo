@@ -527,18 +527,41 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                 <a href="/" style="margin-left:1em">Run your own lookup &rarr;</a>
             </div>
             <?php endif; ?>
-            <h2>Threat Report</h2>
-            <p style="opacity:0.6;font-size:0.85em;margin-top:-1em">
-                <?php echo number_format($total); ?> IPs &middot;
-                <?php echo htmlspecialchars(date('F j, Y', strtotime($gen_date)), ENT_QUOTES, 'UTF-8'); ?>
-            </p>
-            <button onclick="window.print()" class="button small alt print-report-btn">Print / Save as PDF</button>
-            <style>@media (max-width: 736px) { .print-report-btn { display: none; } }</style>
+            <style>
+                .report-header-row {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    gap: 1em;
+                    margin-bottom: 0.5em;
+                }
+                .report-header-row h2 { margin: 0; }
+                .report-header-stats { opacity: 0.6; font-size: 0.85em; margin: 0; white-space: nowrap; }
+                .report-verdict-row { margin-top: 0.6em; }
+                .report-verdict-row .asn-verdict { margin: 0; }
+                @media (max-width: 736px) {
+                    .report-header-row { flex-direction: column; align-items: flex-start; gap: 0.25em; }
+                    .print-report-btn { display: none; }
+                }
+            </style>
 
-            <!-- Verdict -->
-            <p class="asn-verdict asn-verdict--<?php echo $verdict_lc; ?>">
-                <?php echo $verdict; ?> THREAT
-            </p>
+            <!-- Row 1: Title + stats -->
+            <div class="report-header-row">
+                <h2>Threat Report</h2>
+                <p class="report-header-stats">
+                    <?php echo number_format($total); ?> IPs &middot;
+                    <?php echo htmlspecialchars(date('F j, Y', strtotime($gen_date)), ENT_QUOTES, 'UTF-8'); ?>
+                </p>
+            </div>
+
+            <!-- Row 2: Verdict badge + Print button -->
+            <div class="report-header-row report-verdict-row">
+                <p class="asn-verdict asn-verdict--<?php echo $verdict_lc; ?>">
+                    <?php echo $verdict; ?> THREAT
+                </p>
+                <button onclick="window.print()" class="button small alt print-report-btn">Print / Save as PDF</button>
+            </div>
+
             <?php if ($verdict === 'LOW'): ?>
             <p style="opacity:0.7;font-size:0.9em">No high-confidence threats detected. Scores below confirm low risk.</p>
             <?php endif; ?>
@@ -555,7 +578,7 @@ function render_report(array $report, string $token, ?string $expires_at, array 
             <?php
             $abuse_data = compute_abuseipdb_callout($top25);
             if ($abuse_data !== null): ?>
-            <p style="font-size:0.9em;opacity:0.85">
+            <p class="abuseipdb-callout">
                 AbuseIPDB independently verified <strong><?php echo $abuse_data['count']; ?></strong> of <?php echo $abuse_data['total']; ?> top IPs as known attackers (average confidence: <strong><?php echo $abuse_data['avg']; ?>%</strong>).
             </p>
             <?php endif; ?>

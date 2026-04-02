@@ -477,3 +477,35 @@
         gap: 1em;
     }
 }
+
+/* --- What to do next checklist --- */
+.next-steps {
+    border-left: 3px solid rgba(255,255,255,0.15);
+    padding-left: 1.2em;
+    margin: 1.5em 0;
+}
+.next-steps h3 {
+    margin-top: 0;
+    margin-bottom: 0.5em;
+    font-size: 1em;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    opacity: 0.8;
+}
+.next-steps ol {
+    margin: 0;
+    padding-left: 1.4em;
+}
+.next-steps li {
+    margin-bottom: 0.4em;
+    font-size: 0.9em;
+    opacity: 0.85;
+}
+
+/* --- AbuseIPDB verification callout --- */
+.abuseipdb-callout {
+    border-left: 3px solid rgba(138,180,212,0.6);
+    padding-left: 0.75em;
+    font-size: 0.9em;
+    margin: 0.75em 0;
+}

@@ -148,6 +148,25 @@
         margin: 1.2em 0;
     }
 
+    /* Report header rows — reset flex to block for clean print layout */
+    .report-header-row {
+        display: block !important;
+        margin-bottom: 0.2em !important;
+    }
+    .report-header-stats {
+        font-size: 10pt;
+        opacity: 0.7;
+    }
+    .abuseipdb-callout {
+        border-left: 2px solid #888 !important;
+        padding-left: 8px;
+        font-size: 10pt;
+    }
+    .next-steps {
+        border-left: 2px solid #888 !important;
+        padding-left: 10px;
+    }
+
     /* Demo banner */
     div[style*="border-left:3px solid #e0a85a"] {
         border-left: 3px solid #888 !important;
