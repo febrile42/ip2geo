@@ -290,6 +290,9 @@
 .rules-col {
     flex: 1;
     min-width: 0;
+    position: sticky;
+    top: 2em;
+    align-self: flex-start;
 }
 
 /* In right column, stack download buttons vertically, full width */

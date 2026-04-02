@@ -331,7 +331,7 @@ function enrich_abuseipdb(array $ips, $con, string $api_key): array {
 function maybe_serve_script_download(array $report, string $token): void {
     if (!isset($_GET['format'])) return;
     $fmt = $_GET['format'];
-    $valid = ['sh-iptables', 'sh-ufw', 'sh-iptables-ranges', 'sh-ufw-ranges', 'nginx-ips', 'nginx-ranges'];
+    $valid = ['sh-iptables', 'sh-ufw', 'sh-iptables-ranges', 'sh-ufw-ranges', 'nginx-ips', 'nginx-ranges', 'txt-ranges'];
     if (!in_array($fmt, $valid, true)) return;
 
     $ips = !empty($report['block_ips']) ? $report['block_ips'] : array_column($report['top25'], 'ip');
@@ -409,7 +409,7 @@ default 0;
         $filename    = 'block-nginx-ips.conf';
         $content_type = 'text/plain';
         $body = $preamble . implode("\n", $lines) . "\n";
-    } else { // nginx-ranges
+    } elseif ($fmt === 'nginx-ranges') {
         $lines = array_map(fn($cidr) => $cidr . ' 1;', $cidrs);
         $preamble = '# ip2geo threat report — nginx geo block (ASN ranges)
 # Generated: ' . date('Y-m-d') . '
@@ -422,6 +422,16 @@ default 0;
         $filename    = 'block-nginx-ranges.conf';
         $content_type = 'text/plain';
         $body = $preamble . implode("\n", $lines) . "\n";
+    } else { // txt-ranges
+        $preamble = '# ip2geo threat report — CIDR ranges (plain list)
+# Generated: ' . date('Y-m-d') . '
+# Token: ' . $token . '
+# ' . count($cidrs) . ' CIDR ranges covering scanning/VPN ASN prefixes
+# One range per line — paste into ipset, web firewall, or any blocklist tool
+';
+        $filename    = 'cidr-ranges.txt';
+        $content_type = 'text/plain';
+        $body = $preamble . implode("\n", $cidrs) . "\n";
     }
 
     header('Content-Type: ' . $content_type . '; charset=utf-8');
@@ -447,6 +457,8 @@ function include_block_rules_tabs(string $token, bool $has_ranges): void { ?>
                        class="button small">&#8595; block-ufw-ranges.sh</a>
                     <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=nginx-ranges"
                        class="button small">&#8595; block-nginx-ranges.conf</a>
+                    <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=txt-ranges"
+                       class="button small alt">&#8595; cidr-ranges.txt</a>
                     <?php else: ?>
                     <p style="font-size:0.9em;opacity:0.5;margin:0.6em 0">No ASN ranges available for this report.</p>
                     <?php endif; ?>
@@ -637,7 +649,7 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                 <div class="rules-col">
                     <h3>Block Rules</h3>
                     <p style="font-size:0.9em;opacity:0.7;margin-bottom:1em">
-                        Range-based rules stay valid as IPs rotate. Download a script for your firewall, or copy the ranges directly.
+                        Range-based rules stay valid as IPs rotate. Download a ready-to-run script, or <code>cidr-ranges.txt</code> for paste-in to a web firewall or ipset.
                     </p>
                     <?php include_block_rules_tabs($token, $has_ranges); ?>
                 </div>
