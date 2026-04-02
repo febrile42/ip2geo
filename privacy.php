@@ -40,10 +40,15 @@
 							<li>The security procedures in place to protect the misuse of your information.</li>
 							</ol>
 							<h3>Information Collection, Use, and Sharing</h3>
-							<p>We are the sole owners of the information collected on this site. We only have access to/collect information that you voluntarily give us via email or other direct contact from you. We will not sell or rent this information to anyone.</p>
-							<p>At this time, <b>no data is collected on this site</b> except via Umami analytics. No searches are logged and any data used is transient.</p>
+							<p>We are the sole owners of the information collected on this site. We only have access to/collect information that you voluntarily give us via email, direct contact, or use of site features. We will not sell or rent this information to anyone.</p>
+							<p>IP lookups on the main tool are not logged and any data used is transient. Visitor analytics are collected via <a href="https://umami.is/" target="_blank">Umami</a>, an open-source, privacy-friendly analytics platform that does not use cookies or share data with third parties.</p>
+							<h3>Threat Reports</h3>
+							<p>When you purchase a Threat Report, the IP addresses you submit and the resulting report are stored securely for 30 days, after which they are deleted. This data is accessible only via your unique report token and is not shared with any third party.</p>
+							<p>Payment is processed by <a href="https://stripe.com" target="_blank">Stripe</a>. We do not collect or store your payment card details. Stripe may collect your name, email address, card details, and billing information in accordance with their <a href="https://stripe.com/privacy" target="_blank">Privacy Policy</a>.</p>
+							<h3>Contact</h3>
+							<p>Questions about this policy or your data can be directed to <a href="mailto:support@ip2geo.org">support@ip2geo.org</a>. If you would like your report data deleted before the 30-day expiry, contact us with your report token and we will remove it promptly.</p>
 							<h3>Security</h3>
-							<p>Wherever we collect information, that information is encrypted and transmitted to us in a secure way. You can verify this by looking for a lock icon in the address bar and looking for "https" at the beginning of the address of the Web page.</p>
+							<p>All data is transmitted over HTTPS. You can verify this by looking for a lock icon in the address bar and "https" at the beginning of the page address.</p>
 						</div>
 					</section>
 
