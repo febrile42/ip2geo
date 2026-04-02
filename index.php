@@ -566,7 +566,7 @@ else
 							<div class="col-6 col-12-medium">
 								<h3>See it in action</h3>
 								<p>The sample report below is built from real Tor exit node data with live AbuseIPDB enrichment — the same format you'd get after a paid lookup.</p>
-								<a href="/report.php?token=00000000-0000-0000-0000-000000000000" target="_blank" class="button">See a sample report &rarr;</a>
+								<p style="text-align:right"><a href="/report.php?token=00000000-0000-0000-0000-000000000000" target="_blank" class="button">See a sample report &rarr;</a></p>
 							</div>
 						</div>
 						<p style="text-align:right;margin-top:1.5em"><strong>$9 one-time. No account required.</strong></p>
