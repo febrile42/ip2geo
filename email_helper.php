@@ -66,19 +66,19 @@ function send_report_email(
   <p>Your ip2geo Threat Report has been generated. Click below to view your results, block scripts, and ASN ranges.</p>
   <p style="margin:1.5em 0">
     <a href="{$report_url}"
-       style="background:#4a90d9;color:#fff;padding:0.65em 1.4em;border-radius:4px;text-decoration:none;font-weight:bold;display:inline-block">
+       style="background:#5e42a6;color:#fff;padding:0.65em 1.4em;border-radius:4px;text-decoration:none;font-weight:bold;display:inline-block">
       View your report &rarr;
     </a>
   </p>
   <p style="font-size:0.9em;color:#555">
     Or copy this link:<br>
-    <a href="{$report_url}" style="color:#4a90d9;word-break:break-all">{$report_url}</a>
+    <a href="{$report_url}" style="color:#5e42a6;word-break:break-all">{$report_url}</a>
   </p>
   <hr style="border:none;border-top:1px solid #eee;margin:1.5em 0">
   <p style="font-size:0.85em;color:#777">
     This report expires on <strong>{$expires_fmt}</strong>. After that date your data is deleted and the link will stop working.<br>
-    Need to resend this email? <a href="{$resend_url}" style="color:#4a90d9">Request it here</a>.<br>
-    Questions? <a href="mailto:support@ip2geo.org" style="color:#4a90d9">support@ip2geo.org</a>
+    Need to resend this email? <a href="{$resend_url}" style="color:#5e42a6">Request it here</a>.<br>
+    Questions? <a href="mailto:support@ip2geo.org" style="color:#5e42a6">support@ip2geo.org</a>
   </p>
 </body>
 </html>
