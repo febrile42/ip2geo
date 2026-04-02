@@ -688,7 +688,7 @@ function render_report(array $report, string $token, ?string $expires_at, array 
             <!-- Block script filter -->
             <?php if (!empty($all_ips)): ?>
             <div id="report-filter" role="region" aria-label="Block script filter">
-                <details id="report-filter-details" open>
+                <details id="report-filter-details">
                     <summary id="report-filter-summary">Block Script Filter &mdash; <span id="report-filter-count"><?php echo $blockable_count; ?></span> of <span id="report-filter-total"><?php echo $blockable_count; ?></span> IPs in block scripts</summary>
                     <div id="report-filter-layout">
                         <div id="report-filter-categories">
