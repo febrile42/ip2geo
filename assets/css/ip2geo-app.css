@@ -286,6 +286,7 @@
 .ranges-col {
     flex: 2;
     min-width: 0;
+    overflow: hidden;
 }
 .rules-col {
     flex: 1;
@@ -355,6 +356,9 @@
     .ranges-rules-grid {
         flex-direction: column;
         gap: 0;
+    }
+    .rules-col {
+        position: static;
     }
     .rules-col .block-rules-panel {
         flex-direction: row;
