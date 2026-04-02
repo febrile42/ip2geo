@@ -141,7 +141,7 @@ foreach ($ip_data as $entry) {
 $scanning_proxy = $cat_counts['scanning'] + $cat_counts['vpn'];
 $scanning_pct   = $total > 0 ? $scanning_proxy / $total : 0;
 
-$verdict = compute_verdict($scanning_proxy, $total);
+$verdict = compute_verdict($scanning_proxy, $total, $cat_counts['cloud']);
 $top25   = rank_ips($ip_data, 25);
 
 // All scanning/VPN IPs for block scripts — freq-ordered (used by maybe_serve_script_download)

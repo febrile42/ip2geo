@@ -12,9 +12,9 @@ require_once __DIR__ . '/../report_functions.php';
  * Tests for compute_verdict() and maybe_upgrade_verdict().
  *
  * All boundary conditions from the spec:
- *  HIGH:     ≥80% scanning  OR  ≥60% scanning AND ≥100 IPs absolute
- *  LOW:      <30% scanning  OR  <10 scanning IPs
- *  MODERATE: everything else
+ *  HIGH:     ≥250 scanning abs  OR  (≥60% AND ≥20 abs)  OR  ≥80%
+ *  LOW:      <10 scanning abs  OR  (<5% AND <25 abs)  — unless cloud floor applies
+ *  MODERATE: everything else; LOW→MODERATE when cloud ≥50 abs or ≥15%
  *
  * AbuseIPDB upgrade:
  *  Any top-5 IP with confidence >80 bumps verdict one level.
@@ -41,20 +41,32 @@ class VerdictAlgorithmTest extends TestCase
 
     public function testSixtyPercentWithOver100AbsoluteIsHigh(): void
     {
-        // 80 of 120 → ~66.7%, 80 abs ≥ 100 → HIGH (both ≥60% and ≥100 abs conditions met)
+        // 100 of 150 → ~66.7%, 100 abs ≥ 20 → HIGH
         $this->assertSame('HIGH', compute_verdict(100, 150));
     }
 
-    public function testSixtyPercentWithUnder100AbsoluteIsModerate(): void
+    public function testSixtyPercentWithOver20AbsoluteIsHigh(): void
     {
-        // 60 of 100 → 60%, only 60 abs (< 100) → MODERATE (percentage threshold met but not absolute)
-        $this->assertSame('MODERATE', compute_verdict(60, 100));
+        // 60 of 100 → 60%, 60 abs ≥ 20 → HIGH (absolute threshold is 20, not 100)
+        $this->assertSame('HIGH', compute_verdict(60, 100));
     }
 
-    public function testExactly100AbsoluteAt60PctIsHigh(): void
+    public function testSixtyPercentWithUnder20AbsoluteIsModerate(): void
     {
-        // Exactly at the absolute boundary: 100 scanning, 60%+ → HIGH
-        $this->assertSame('HIGH', compute_verdict(100, 166));  // 60.2%
+        // 12 of 20 → 60%, but only 12 abs (< 20) → MODERATE
+        $this->assertSame('MODERATE', compute_verdict(12, 20));
+    }
+
+    public function testExactly20AbsoluteAt60PctIsHigh(): void
+    {
+        // Exactly at the absolute boundary: 20 scanning at 60%+ → HIGH
+        $this->assertSame('HIGH', compute_verdict(20, 33));  // 60.6%
+    }
+
+    public function testAbsolute250IsHighRegardlessOfPct(): void
+    {
+        // 250 scanners out of 10000 (2.5%) → HIGH via absolute count trigger
+        $this->assertSame('HIGH', compute_verdict(250, 10000));
     }
 
     public function testJustUnderSixtyPercentWithLargeVolumeIsModerate(): void
@@ -63,15 +75,15 @@ class VerdictAlgorithmTest extends TestCase
         $this->assertSame('MODERATE', compute_verdict(59, 100));
     }
 
-    public function testThirtyPercentBoundaryIsLow(): void
+    public function testTwentyNinePercentAtHighVolumeIsModerate(): void
     {
-        // 29 of 100 → 29% → LOW
-        $this->assertSame('LOW', compute_verdict(29, 100));
+        // 29 of 100 → 29%, 29 abs — not < 10, not < 5% → MODERATE (no 30% single-axis LOW)
+        $this->assertSame('MODERATE', compute_verdict(29, 100));
     }
 
-    public function testExactlyThirtyPercentIsModerate(): void
+    public function testThirtyPercentIsModerate(): void
     {
-        // 30 of 100 → 30% → MODERATE (not <30%)
+        // 30 of 100 → 30% → MODERATE
         $this->assertSame('MODERATE', compute_verdict(30, 100));
     }
 
@@ -101,6 +113,24 @@ class VerdictAlgorithmTest extends TestCase
     public function testAllResidential(): void
     {
         $this->assertSame('LOW', compute_verdict(0, 200));
+    }
+
+    public function testCloudFloorUpgradesLowToModerate(): void
+    {
+        // 5 scanners (LOW base) + 50 cloud IPs → MODERATE via cloud floor
+        $this->assertSame('MODERATE', compute_verdict(5, 100, 50));
+    }
+
+    public function testCloudFloorAtFifteenPercentUpgradesLowToModerate(): void
+    {
+        // 5 scanners (LOW base) + 15% cloud → MODERATE via cloud floor
+        $this->assertSame('MODERATE', compute_verdict(5, 200, 30));  // 30/200 = 15%
+    }
+
+    public function testLowCloudDoesNotAffectLowVerdict(): void
+    {
+        // 5 scanners (LOW base) + only 10 cloud (10%) → stays LOW
+        $this->assertSame('LOW', compute_verdict(5, 100, 10));
     }
 
     // ── maybe_upgrade_verdict ──────────────────────────────────────────────────

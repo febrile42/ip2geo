@@ -9,20 +9,35 @@
 /**
  * Compute the threat verdict from scanning/proxy counts.
  *
+ * HIGH:     ≥250 scanning abs  OR  (≥60% AND ≥20 abs)  OR  ≥80%
+ * LOW:      <10 scanning abs  OR  (<5% AND <25 abs)  — unless cloud floor applies
+ * MODERATE: everything else; also LOW→MODERATE when cloud heavy (≥50 abs or ≥15%)
+ *
  * @param int $scanning_proxy  Number of IPs classified scanning or vpn
  * @param int $total           Total IP count (denominator)
+ * @param int $cloud_count     Number of IPs classified cloud (for LOW→MODERATE floor)
  * @return string  'HIGH' | 'MODERATE' | 'LOW'
  */
-function compute_verdict(int $scanning_proxy, int $total): string {
+function compute_verdict(int $scanning_proxy, int $total, int $cloud_count = 0): string {
     if ($total === 0) return 'LOW';
 
     $pct = $scanning_proxy / $total;
 
-    if ($pct >= 0.80 || ($pct >= 0.60 && $scanning_proxy >= 100)) {
+    if ($scanning_proxy >= 250
+        || ($pct >= 0.60 && $scanning_proxy >= 20)
+        || $pct >= 0.80
+    ) {
         return 'HIGH';
     }
 
-    if ($pct < 0.30 || $scanning_proxy < 10) {
+    if ($scanning_proxy < 10
+        || ($pct < 0.05 && $scanning_proxy < 25)
+    ) {
+        // Cloud floor: heavy cloud traffic warrants MODERATE even with few scanners
+        $cloud_pct = $cloud_count / $total;
+        if ($cloud_count >= 50 || $cloud_pct >= 0.15) {
+            return 'MODERATE';
+        }
         return 'LOW';
     }
 
