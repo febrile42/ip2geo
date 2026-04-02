@@ -304,6 +304,49 @@
     text-align: center;
 }
 
+/* --- ASN range groups (report.php) --- */
+.asn-range-group {
+    margin-bottom: 1em;
+    padding-bottom: 1em;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+.asn-range-group:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+    margin-bottom: 0;
+}
+.asn-range-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.35em;
+    margin-bottom: 0.5em;
+}
+.asn-range-org {
+    font-size: 0.88em;
+    opacity: 0.65;
+}
+.asn-range-count {
+    font-size: 0.72em;
+    opacity: 0.4;
+}
+.cidr-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35em;
+}
+.cidr-chip {
+    font-family: monospace;
+    font-size: 0.78em;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 3px;
+    padding: 0.2em 0.5em;
+    white-space: nowrap;
+    line-height: 1.4;
+    user-select: all;
+}
+
 /* Stack columns on tablet and below */
 @media (max-width: 900px) {
     .ranges-rules-grid {

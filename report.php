@@ -618,23 +618,23 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                         $shown = count($group['cidrs']);
                         $total_ranges = $group['total'];
                     ?>
-                    <div style="margin-bottom:1.2em">
-                        <strong><?php echo htmlspecialchars($group['asn'], ENT_QUOTES, 'UTF-8'); ?></strong>
-                        <?php if ($group['org']): ?>
-                        <span style="opacity:0.7;font-size:0.9em"><?php echo htmlspecialchars($group['org'], ENT_QUOTES, 'UTF-8'); ?></span>
-                        <?php endif; ?>
-                        <span style="font-size:0.8em;opacity:0.5">
-                            &mdash; <?php if ($total_ranges > $shown): ?>
-                                <?php echo $shown; ?> of <?php echo number_format($total_ranges); ?> ranges
-                            <?php else: ?>
-                                <?php echo $total_ranges; ?> range<?php echo $total_ranges === 1 ? '' : 's'; ?>
+                    <div class="asn-range-group">
+                        <div class="asn-range-header">
+                            <strong><?php echo htmlspecialchars($group['asn'], ENT_QUOTES, 'UTF-8'); ?></strong>
+                            <?php if ($group['org']): ?>
+                            <span class="asn-range-org"><?php echo htmlspecialchars($group['org'], ENT_QUOTES, 'UTF-8'); ?></span>
                             <?php endif; ?>
-                        </span>
-                        <pre style="font-size:0.82em;overflow-x:auto;background:rgba(0,0,0,0.2);padding:0.55em 0.8em;margin:0.35em 0 0;line-height:1.6"><?php
-                            foreach ($group['cidrs'] as $cidr) {
-                                echo htmlspecialchars($cidr, ENT_QUOTES, 'UTF-8') . "\n";
-                            }
-                        ?></pre>
+                            <?php if ($total_ranges > $shown): ?>
+                            <span class="asn-range-count"><?php echo $shown; ?> of <?php echo number_format($total_ranges); ?> &mdash; all in download</span>
+                            <?php else: ?>
+                            <span class="asn-range-count"><?php echo $total_ranges; ?> range<?php echo $total_ranges === 1 ? '' : 's'; ?></span>
+                            <?php endif; ?>
+                        </div>
+                        <div class="cidr-chips">
+                            <?php foreach ($group['cidrs'] as $cidr): ?>
+                            <span class="cidr-chip"><?php echo htmlspecialchars($cidr, ENT_QUOTES, 'UTF-8'); ?></span>
+                            <?php endforeach; ?>
+                        </div>
                     </div>
                     <?php endforeach; ?>
                 </div>
