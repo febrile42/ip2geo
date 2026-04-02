@@ -23,8 +23,12 @@
     /* ── Hide chrome ────────────────────────────────────────────────── */
     #sidebar,
     .block-rules-tabs,
+    .block-rules-heading,      /* orphaned h3 when no ASN ranges (no content below) */
+    .rules-col,                /* download-only column: useless in print */
+    #report-filter,            /* interactive filter UI: irrelevant in print */
     .button,
     #share-link-btn,
+    hr,                        /* footer separator: hides solo since following content is hidden */
     hr + p,                    /* share link paragraph */
     hr ~ p                     /* expiry + view-all paragraphs */
     {
@@ -128,24 +132,25 @@
         page-break-inside: avoid;
     }
 
-    /* ── Links — print the URL for meaningful links ─────────────────── */
-    a[href^="http"]::after,
-    a[href^="/"]::after {
+    /* ── Links — print the URL for external links only ─────────────── */
+    /* Relative paths (like "/") are useless in print — skip them */
+    a[href^="http"]::after {
         content: " (" attr(href) ")";
         font-size: 8pt;
         opacity: 0.6;
     }
 
-    /* But suppress URL printing for hidden/button elements */
+    /* Suppress URL printing for button-styled links */
     .button::after {
         content: none !important;
     }
 
-    /* ── Misc ───────────────────────────────────────────────────────── */
-    hr {
-        border: none !important;
-        border-top: 1px solid #bbb !important;
-        margin: 1.2em 0;
+    /* ── Ranges grid: full-width when rules col is hidden ───────────── */
+    .ranges-rules-grid {
+        display: block !important;
+    }
+    .ranges-col {
+        width: 100% !important;
     }
 
     /* Report header rows — reset flex to block for clean print layout */

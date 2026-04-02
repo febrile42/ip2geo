@@ -630,7 +630,7 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                 </div>
             </div>
             <?php else: ?>
-            <h3>Block Rules</h3>
+            <h3 class="block-rules-heading">Block Rules</h3>
             <?php include_block_rules_tabs($token, $has_ranges); ?>
             <?php endif; ?>
             <script>
