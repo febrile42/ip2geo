@@ -169,7 +169,9 @@
     }
     .next-steps {
         border-left: 2px solid #888 !important;
-        padding-left: 10px;
+        background: transparent !important;
+        padding: 4px 10px !important;
+        margin: 0.8em 0 !important;
     }
 
     /* Demo banner */

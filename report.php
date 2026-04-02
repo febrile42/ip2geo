@@ -436,18 +436,10 @@ default 0;
 function include_block_rules_tabs(string $token, bool $has_ranges): void { ?>
             <div class="block-rules-tabs">
                 <div class="block-rules-tablist" role="tablist" aria-label="Block by IP or by range">
-                    <div class="block-rules-tab active" id="tab-by-ip" role="tab" tabindex="0" aria-selected="true" aria-controls="panel-by-ip">Block by IP</div>
-                    <div class="block-rules-tab<?php echo $has_ranges ? '' : ' brt-disabled'; ?>" id="tab-by-range" role="tab" tabindex="<?php echo $has_ranges ? '0' : '-1'; ?>" aria-selected="false" aria-controls="panel-by-range"<?php echo $has_ranges ? '' : ' aria-disabled="true" title="No ASN ranges available for this report"'; ?>>Block by Range</div>
+                    <div class="block-rules-tab<?php echo $has_ranges ? ' active' : ''; ?>" id="tab-by-range" role="tab" tabindex="<?php echo $has_ranges ? '0' : '-1'; ?>" aria-selected="<?php echo $has_ranges ? 'true' : 'false'; ?>" aria-controls="panel-by-range"<?php echo $has_ranges ? '' : ' aria-disabled="true" title="No ASN ranges available for this report"'; ?>>Block by Range</div>
+                    <div class="block-rules-tab<?php echo $has_ranges ? '' : ' active'; ?>" id="tab-by-ip" role="tab" tabindex="0" aria-selected="<?php echo $has_ranges ? 'false' : 'true'; ?>" aria-controls="panel-by-ip">Block by IP</div>
                 </div>
-                <div id="panel-by-ip" class="block-rules-panel" role="tabpanel" aria-labelledby="tab-by-ip">
-                    <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=sh-iptables"
-                       class="button small" data-format="sh-iptables">&#8595; block-iptables.sh</a>
-                    <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=sh-ufw"
-                       class="button small" data-format="sh-ufw">&#8595; block-ufw.sh</a>
-                    <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=nginx-ips"
-                       class="button small" data-format="nginx-ips">&#8595; block-nginx-ips.conf</a>
-                </div>
-                <div id="panel-by-range" class="block-rules-panel" role="tabpanel" aria-labelledby="tab-by-range" style="display:none">
+                <div id="panel-by-range" class="block-rules-panel" role="tabpanel" aria-labelledby="tab-by-range"<?php echo $has_ranges ? '' : ' style="display:none"'; ?>>
                     <?php if ($has_ranges): ?>
                     <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=sh-iptables-ranges"
                        class="button small">&#8595; block-iptables-ranges.sh</a>
@@ -458,6 +450,14 @@ function include_block_rules_tabs(string $token, bool $has_ranges): void { ?>
                     <?php else: ?>
                     <p style="font-size:0.9em;opacity:0.5;margin:0.6em 0">No ASN ranges available for this report.</p>
                     <?php endif; ?>
+                </div>
+                <div id="panel-by-ip" class="block-rules-panel" role="tabpanel" aria-labelledby="tab-by-ip"<?php echo $has_ranges ? ' style="display:none"' : ''; ?>>
+                    <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=sh-iptables"
+                       class="button small" data-format="sh-iptables">&#8595; block-iptables.sh</a>
+                    <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=sh-ufw"
+                       class="button small" data-format="sh-ufw">&#8595; block-ufw.sh</a>
+                    <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=nginx-ips"
+                       class="button small" data-format="nginx-ips">&#8595; block-nginx-ips.conf</a>
                 </div>
             </div>
 <?php }
@@ -590,8 +590,22 @@ function render_report(array $report, string $token, ?string $expires_at, array 
             </p>
             <?php endif; ?>
 
-            <!-- ASN Ranges + Block Rules: side-by-side when ranges exist, Block Rules full-width otherwise -->
+            <!-- What to do next -->
             <?php $has_ranges = !empty($report['asn_ranges']); ?>
+            <div class="next-steps">
+                <h3>What to do next</h3>
+                <ol>
+                    <?php if ($has_ranges): ?>
+                    <li>Download a block script below, or copy the CIDR ranges and add them to your firewall directly — blocking by range is more resilient as IPs rotate.</li>
+                    <?php else: ?>
+                    <li>Download a block script below and run it on your server.</li>
+                    <?php endif; ?>
+                    <li>Verify in your firewall logs that traffic from these sources drops within a few minutes.</li>
+                    <li>Check back in 48 hours: <a href="/">submit new logs</a> to confirm the blocking worked.</li>
+                </ol>
+            </div>
+
+            <!-- ASN Ranges + Block Rules: side-by-side when ranges exist, Block Rules full-width otherwise -->
             <?php if ($has_ranges): ?>
             <div class="ranges-rules-grid">
                 <div class="ranges-col">
@@ -869,16 +883,6 @@ function render_report(array $report, string $token, ?string $expires_at, array 
             })();
             </script>
             <?php endif; ?>
-
-            <!-- What to do next -->
-            <div class="next-steps">
-                <h3>What to do next</h3>
-                <ol>
-                    <li>Run the block script on your server, or add the CIDR ranges to your firewall directly.</li>
-                    <li>Verify in your firewall logs that traffic from these ranges drops within a few minutes.</li>
-                    <li>Check back in 48 hours: <a href="/">submit new logs</a> to confirm the blocking worked.</li>
-                </ol>
-            </div>
 
             <!-- Top 25 table -->
             <h3>Top Threat Sources <span id="report-table-summary" style="font-size:0.6em;font-weight:normal;opacity:0.6;margin-left:0.5em">— showing <span id="report-table-count"><?php echo count($top25); ?></span> of <span id="report-table-total"><?php echo count($top25); ?></span></span></h3>

@@ -480,8 +480,10 @@
 
 /* --- What to do next checklist --- */
 .next-steps {
-    border-left: 3px solid rgba(255,255,255,0.15);
-    padding-left: 1.2em;
+    border-left: 3px solid rgba(255,255,255,0.25);
+    background: rgba(255,255,255,0.04);
+    border-radius: 4px;
+    padding: 0.9em 1.2em;
     margin: 1.5em 0;
 }
 .next-steps h3 {
