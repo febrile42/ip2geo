@@ -610,10 +610,6 @@ function render_report(array $report, string $token, ?string $expires_at, array 
             <div class="ranges-rules-grid">
                 <div class="ranges-col">
                     <h3>ASN Ranges to Block</h3>
-                    <p style="font-size:0.9em;opacity:0.7">
-                        CIDR prefixes for all scanning/VPN ASNs in this report.
-                        Blocking by range is more resilient — ranges stay valid as IPs rotate.
-                    </p>
                     <?php foreach ($report['asn_ranges'] as $group):
                         $shown = count($group['cidrs']);
                         $total_ranges = $group['total'];
@@ -640,6 +636,9 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                 </div>
                 <div class="rules-col">
                     <h3>Block Rules</h3>
+                    <p style="font-size:0.9em;opacity:0.7;margin-bottom:1em">
+                        Range-based rules stay valid as IPs rotate. Download a script for your firewall, or copy the ranges directly.
+                    </p>
                     <?php include_block_rules_tabs($token, $has_ranges); ?>
                 </div>
             </div>
