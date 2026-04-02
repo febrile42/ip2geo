@@ -562,7 +562,6 @@ else
 									<li><strong>Ready-to-paste firewall rules</strong> for iptables, ufw, and nginx</li>
 									<li><strong>Shareable link</strong> saved for 30 days — send it to your team or come back later</li>
 								</ul>
-								<p style="text-align:right"><strong>$9 one-time. No account required.</strong></p>
 							</div>
 							<div class="col-6 col-12-medium">
 								<h3>See it in action</h3>
@@ -570,6 +569,7 @@ else
 								<a href="/report.php?token=00000000-0000-0000-0000-000000000000" target="_blank" class="button">See a sample report &rarr;</a>
 							</div>
 						</div>
+						<p style="text-align:right;margin-top:1.5em"><strong>$9 one-time. No account required.</strong></p>
 					</div>
 				</section>
 
