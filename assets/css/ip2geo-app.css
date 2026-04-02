@@ -359,6 +359,7 @@
     }
     .rules-col {
         position: static;
+        margin-top: 1.5em;
     }
     .rules-col .block-rules-panel {
         flex-direction: row;
