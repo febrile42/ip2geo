@@ -557,10 +557,10 @@ else
 							<div class="col-6 col-12-medium">
 								<h3>What's included</h3>
 								<ul>
-									<li><strong>AbuseIPDB reputation scores</strong> for your top 25 IPs — see which ones are confirmed attackers</li>
-									<li><strong>ASN CIDR ranges</strong> for resilient blocking — block entire scanning networks, not just individual IPs that rotate</li>
+									<li><strong>AbuseIPDB reputation scores</strong> for your top 25 IPs: see which ones are confirmed attackers</li>
+									<li><strong>ASN CIDR ranges</strong> for resilient blocking: block entire scanning networks, not just individual IPs that rotate</li>
 									<li><strong>Ready-to-paste firewall rules</strong> for iptables, ufw, and nginx</li>
-									<li><strong>Shareable link</strong> saved for 30 days — send it to your team or come back later</li>
+									<li><strong>Shareable link</strong> saved for 30 days: send it to your team or come back later</li>
 								</ul>
 							</div>
 							<div class="col-6 col-12-medium">
