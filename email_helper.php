@@ -54,7 +54,6 @@ function send_report_email(
     }
 
     $report_url  = 'https://ip2geo.org/report.php?token=' . urlencode($token);
-    $resend_url  = 'https://ip2geo.org/send-report-link.php?token=' . urlencode($token);
     $expires_fmt = date('F j, Y', strtotime($expires_at));
 
     $html = <<<HTML
@@ -77,8 +76,7 @@ function send_report_email(
   <hr style="border:none;border-top:1px solid #eee;margin:1.5em 0">
   <p style="font-size:0.85em;color:#777">
     This report expires on <strong>{$expires_fmt}</strong>. After that date your data is deleted and the link will stop working.<br>
-    Need to resend this email? <a href="{$resend_url}" style="color:#5e42a6">Request it here</a>.<br>
-    Questions? <a href="mailto:support@ip2geo.org" style="color:#5e42a6">support@ip2geo.org</a>
+Questions? <a href="mailto:support@ip2geo.org" style="color:#5e42a6">support@ip2geo.org</a>
   </p>
 </body>
 </html>
