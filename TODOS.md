@@ -1,9 +1,10 @@
 # ip2geo — TODOs, Deferred Items & Open Questions
 
-Last updated: 2026-03-30 (design polish session).
+Last updated: 2026-04-02 (CEO review: report perceived value).
 Source of truth for what's done, what's next, and what's deferred.
 
 Plans live in: `~/.gstack/projects/febrile42-ip2geo/`
+- `ceo-plans/2026-04-02-report-perceived-value.md` — report UX improvements (narrative, AbuseIPDB callout, CTA copy, effort-saved, checklist, print/share)
 - `ceo-plans/2026-03-28-incident-triage-tool.md` — Phase C+A+B architecture, Stripe flow, verdict logic, test strategy
 - `shadows-develop-design-20260328-220913.md` — full design spec (layout, interaction states, copy, a11y, responsive)
 - `designs/design-audit-20260329/` — screenshots from design audit
@@ -233,6 +234,26 @@ Contact email: **support@ip2geo.org**
 - [ ] **Describe the paid product publicly** — Stripe requires that goods/services on the site match what was told to Stripe during signup. Add a brief description of the $9 threat report (what it includes: verdict, top-25 threat sources, ASN ranges, block scripts, AbuseIPDB scores) somewhere visible before the CTA — either a section in index.php or a linked `/report-info` page.
 
 - [ ] **Add Legal / Refund Policy link to footer** — alongside the existing Privacy Policy link, add a link to legal.php.
+
+---
+
+## Post-Phase A: Report Engagement (defer until 10+ real purchases)
+
+### Repeat-purchase CTA at report bottom
+**What:** Add one line at the bottom of the paid report: "Responding to a new incident? Analyze another batch →" linking to ip2geo.org.
+**Why:** The buyer who just got value is the most likely next buyer. The report currently ends with nothing — buyer closes the tab.
+**Pros:** Lowest-effort repeat-purchase signal. Landing point for Phase D "$3 re-analyze" upsell.
+**Cons:** Needs purchase data to validate whether buyers actually return. May feel premature before Phase A launches.
+**Context:** From 2026-04-02 CEO review. ~3min CC effort. Wait until Phase A has 10+ real purchases.
+**Effort:** S | **Priority:** P2 | **Depends on:** Phase A revenue validation
+
+### Email delivery for paid report
+**What:** "Send to my inbox" input on the report page. Sends verdict summary + shareable link + CIDR ranges inline. Uses existing `notification_email` DB column — zero schema changes.
+**Why:** A physical email makes the $9 feel permanent. Buyer can forward to boss. The report becomes a shareable artifact.
+**Pros:** High perceived-value lift. Schema is already ready. Natural Phase B hook.
+**Cons:** Requires transactional email provider decision (SendGrid free tier is easiest).
+**Context:** From 2026-04-02 CEO review. Decision needed: SendGrid / Postmark / PHP mail(). ~30min CC after provider is set up.
+**Effort:** M (human: ~4h / CC: ~30min after provider setup) | **Priority:** P2 | **Depends on:** email provider decision
 
 ---
 

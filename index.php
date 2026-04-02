@@ -364,12 +364,16 @@ if ($_POST || $view_token_mode)
 				value="<?php echo htmlspecialchars(json_encode($ip_classified_data), ENT_QUOTES, 'UTF-8'); ?>" />
 			<input type="hidden" name="geo_results_json" id="geo-results-json"
 				value="<?php echo htmlspecialchars(json_encode($geo_results_data), ENT_QUOTES, 'UTF-8'); ?>" />
+			<p style="font-size:0.85em;opacity:0.75;margin-bottom:0.4em">The paid report adds AbuseIPDB reputation scores, ASN CIDR ranges for resilient blocking, and a saved 30-day link &mdash; things not shown above.</p>
 			<button type="submit" id="cta-button" class="button">Get Full Report + Block Script &mdash; $9</button>
 		</form>
 		</p>
 		<p style="font-size:0.8em;opacity:0.7;margin-top:-0.5em">
-			One-time payment. No account required. Report accessible for 30 days.
-			<a href="/report.php?token=00000000-0000-0000-0000-000000000000" target="_blank" style="opacity:0.8;margin-left:0.5em">See a sample report &rarr;</a>
+			One-time payment. No account required.<br>
+			&middot; AbuseIPDB scores for your top 25 IPs<br>
+			&middot; ASN CIDR ranges for resilient blocking<br>
+			&middot; Report saved 30 days, shareable link<br>
+			<a href="/report.php?token=00000000-0000-0000-0000-000000000000" target="_blank" style="opacity:0.8;margin-top:0.3em;display:inline-block">See a sample report &rarr;</a>
 		</p>
 		<hr />
 	</div>

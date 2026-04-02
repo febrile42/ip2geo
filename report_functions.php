@@ -143,3 +143,94 @@ function rank_ips(array $ip_data, int $limit = 25): array {
 
     return array_slice($ip_data, 0, $limit);
 }
+
+/**
+ * Generate a rule-based threat narrative paragraph for the paid report.
+ *
+ * Returns an HTML-safe string suitable for direct echo inside a <p> tag.
+ * ASN org names are htmlspecialchars-escaped internally.
+ *
+ * @param string      $verdict     'HIGH' | 'MODERATE' | 'LOW'
+ * @param array       $asn_ranges  From fetch_asn_ranges(). Each entry: ['asn'=>'AS16276','org'=>'OVH SAS','cidrs'=>[...],'total'=>N]
+ * @param int         $scan_pct    Percentage of IPs classified scanning/VPN (0-100). 0 used as fallback for null legacy rows.
+ * @param string|null $ai_narrative Pre-escaped HTML string from Phase B Claude API, or null to use rule-based templates.
+ * @return string HTML-safe string, or '' if total IPs is 0.
+ */
+function generate_threat_narrative(string $verdict, array $asn_ranges, int $scan_pct, ?string $ai_narrative = null): string
+{
+    // Phase B override: if AI narrative provided, use it directly (caller must ensure it's HTML-safe)
+    if ($ai_narrative !== null) {
+        return $ai_narrative;
+    }
+
+    $asn_count = count($asn_ranges);
+
+    // Escape ASN names for HTML output
+    $org0 = $asn_count >= 1 ? htmlspecialchars($asn_ranges[0]['org'] ?? '', ENT_QUOTES, 'UTF-8') : '';
+    $asn0 = $asn_count >= 1 ? htmlspecialchars($asn_ranges[0]['asn'] ?? '', ENT_QUOTES, 'UTF-8') : '';
+    $org1 = $asn_count >= 2 ? htmlspecialchars($asn_ranges[1]['org'] ?? '', ENT_QUOTES, 'UTF-8') : '';
+    $asn1 = $asn_count >= 2 ? htmlspecialchars($asn_ranges[1]['asn'] ?? '', ENT_QUOTES, 'UTF-8') : '';
+
+    // scan_pct fallback for legacy rows where scanning_pct was not stored
+    $pct_str = $scan_pct > 0 ? "{$scan_pct}% of IPs" : "a significant portion";
+
+    if ($verdict === 'HIGH') {
+        if ($asn_count === 0) {
+            return "This traffic shows a high concentration of known scanning infrastructure ({$pct_str} from known scanning infrastructure). No ASN ranges were found — use the IP-based block scripts below.";
+        } elseif ($asn_count === 1) {
+            return "This traffic is a coordinated scan originating from {$org0} ({$asn0}), which accounts for the majority of your scanning hits. The CIDR ranges below cover this network permanently — blocking them stops the rotation.";
+        } else {
+            return "This traffic matches a coordinated port scan originating from {$org0} ({$asn0}) and {$org1} ({$asn1}) infrastructure. {$pct_str} are from known scanning infrastructure. The CIDR ranges below cover these networks permanently — blocking them stops the rotation.";
+        }
+    }
+
+    if ($verdict === 'MODERATE') {
+        if ($asn_count === 0) {
+            return "This traffic is mixed — {$pct_str} is from known scanning or proxy infrastructure, with legitimate traffic in the remainder. Review the top sources below before blocking.";
+        } elseif ($asn_count === 1) {
+            return "This traffic is mixed — {$pct_str} originates from {$org0} ({$asn0}) scanning infrastructure. The remainder appears to be legitimate traffic. Use the CIDR ranges below selectively, or filter by country before downloading block scripts.";
+        } else {
+            return "This traffic is mixed — {$pct_str} is from scanning infrastructure across {$asn_count} ASNs including {$org0} and {$org1}. The remainder appears legitimate. Review the top sources before blocking broadly.";
+        }
+    }
+
+    // LOW verdict
+    if ($asn_count === 0) {
+        return "No significant threat patterns detected. Most traffic appears to be from residential or commercial ISPs.";
+    } elseif ($asn_count === 1) {
+        return "No significant threat patterns detected. One scanning ASN ({$org0}) is present but at low volume. Most traffic appears to be from residential or commercial ISPs.";
+    } else {
+        return "No significant threat patterns detected. A small number of scanning ASNs are present but at low volume. Most traffic appears to be from residential or commercial ISPs.";
+    }
+}
+
+/**
+ * Compute data for the AbuseIPDB verification callout.
+ *
+ * Returns null if the callout should not be shown (all scores null, or none > 80).
+ * Returns ['count' => N, 'total' => N, 'avg' => N] if the callout should be shown.
+ *
+ * @param array $top25  Ranked IP entries, each may have 'abuse_score' (int|null, 0-100).
+ * @return array|null
+ */
+function compute_abuseipdb_callout(array $top25): ?array
+{
+    $total_shown = count($top25);
+    if ($total_shown === 0) return null;
+
+    // Only score entries above threshold
+    $high_scores = array_filter(
+        array_column($top25, 'abuse_score'),
+        fn($s) => $s !== null && $s > 80
+    );
+
+    if (count($high_scores) === 0) return null;
+
+    $avg = (int) round(array_sum($high_scores) / count($high_scores));
+
+    return [
+        'count' => count($high_scores),
+        'total' => $total_shown,
+        'avg'   => $avg,
+    ];
+}

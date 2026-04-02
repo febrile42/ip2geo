@@ -532,6 +532,8 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                 <?php echo number_format($total); ?> IPs &middot;
                 <?php echo htmlspecialchars(date('F j, Y', strtotime($gen_date)), ENT_QUOTES, 'UTF-8'); ?>
             </p>
+            <button onclick="window.print()" class="button small alt print-report-btn">Print / Save as PDF</button>
+            <style>@media (max-width: 736px) { .print-report-btn { display: none; } }</style>
 
             <!-- Verdict -->
             <p class="asn-verdict asn-verdict--<?php echo $verdict_lc; ?>">
@@ -541,6 +543,29 @@ function render_report(array $report, string $token, ?string $expires_at, array 
             <p style="opacity:0.7;font-size:0.9em">No high-confidence threats detected. Scores below confirm low risk.</p>
             <?php endif; ?>
             <p><?php echo htmlspecialchars($verdict_text, ENT_QUOTES, 'UTF-8'); ?></p>
+
+            <!-- Threat narrative -->
+            <?php
+            $narrative = generate_threat_narrative($verdict, $report['asn_ranges'] ?? [], (int)($report['scanning_pct'] ?? 0));
+            if ($narrative !== ''): ?>
+            <p><?php echo $narrative; ?></p>
+            <?php endif; ?>
+
+            <!-- AbuseIPDB callout -->
+            <?php
+            $abuse_data = compute_abuseipdb_callout($top25);
+            if ($abuse_data !== null): ?>
+            <p style="font-size:0.9em;opacity:0.85">
+                AbuseIPDB independently verified <strong><?php echo $abuse_data['count']; ?></strong> of <?php echo $abuse_data['total']; ?> top IPs as known attackers (average confidence: <strong><?php echo $abuse_data['avg']; ?>%</strong>).
+            </p>
+            <?php endif; ?>
+
+            <!-- Analysis scope callout -->
+            <?php if (!empty($report['asn_ranges'])): ?>
+            <p style="font-size:0.85em;opacity:0.65">
+                Analyzed <?php echo number_format($total); ?> IPs, verified top threats against AbuseIPDB, extracted CIDR prefixes from <?php echo count($report['asn_ranges']); ?> ASN<?php echo count($report['asn_ranges']) === 1 ? '' : 's'; ?>.
+            </p>
+            <?php endif; ?>
 
             <!-- ASN Ranges + Block Rules: side-by-side when ranges exist, Block Rules full-width otherwise -->
             <?php $has_ranges = !empty($report['asn_ranges']); ?>
@@ -822,6 +847,16 @@ function render_report(array $report, string $token, ?string $expires_at, array 
             </script>
             <?php endif; ?>
 
+            <!-- What to do next -->
+            <div class="next-steps">
+                <h3>What to do next</h3>
+                <ol>
+                    <li>Run the block script on your server, or add the CIDR ranges to your firewall directly.</li>
+                    <li>Verify in your firewall logs that traffic from these ranges drops within a few minutes.</li>
+                    <li>Check back in 48 hours: <a href="/">submit new logs</a> to confirm the blocking worked.</li>
+                </ol>
+            </div>
+
             <!-- Top 25 table -->
             <h3>Top Threat Sources <span id="report-table-summary" style="font-size:0.6em;font-weight:normal;opacity:0.6;margin-left:0.5em">— showing <span id="report-table-count"><?php echo count($top25); ?></span> of <span id="report-table-total"><?php echo count($top25); ?></span></span></h3>
             <?php if (empty($top25)): ?>
@@ -870,7 +905,7 @@ function render_report(array $report, string $token, ?string $expires_at, array 
             <!-- Share link + expiry -->
             <hr />
             <p>
-                <button id="share-link-btn" class="button small">&#128203; Copy report link</button>
+                <button id="share-link-btn" class="button small">&#128279; Share this report</button>
             </p>
             <?php if ($expires_fmt && !$is_demo): ?>
             <p style="font-size:0.85em;opacity:0.6">
@@ -893,9 +928,9 @@ function render_report(array $report, string $token, ?string $expires_at, array 
         var cleanUrl = window.location.origin + window.location.pathname + '?token=' + <?php echo json_encode($token); ?>;
         navigator.clipboard.writeText(cleanUrl).then(function() {
             var btn = document.getElementById('share-link-btn');
-            var orig = btn.textContent;
-            btn.textContent = 'Link copied!';
-            setTimeout(function() { btn.textContent = orig; }, 2000);
+            var orig = btn.innerHTML;
+            btn.innerHTML = 'Link copied!';
+            setTimeout(function() { btn.innerHTML = orig; }, 2000);
         });
         umami && umami.track('report_copy_link');
     });
