@@ -55,6 +55,7 @@ $view_token_val  = $view_token_mode ? preg_replace('/[^a-f0-9\-]/', '', trim($_G
 				<nav>
 					<ul>
 						<li><a href="#intro">Bulk IP Location Lookup</a></li>
+						<li><a href="#reports">Full Threat Reports</a></li>
 						<li><a href="#contribute">Contact / Contribute</a></li>
 						<li><a href="#about">About</a></li>
 					</ul>
@@ -498,8 +499,34 @@ else
 ?>
 
 
+				<!-- Full Threat Reports -->
+				<section id="reports" class="wrapper style1 fade-up">
+					<div class="inner">
+						<h2>Full Threat Reports</h2>
+						<p>When a lookup reveals a high proportion of scanning, cloud, or proxy infrastructure, ip2geo offers a one-time paid report that goes deeper — giving you the data and ready-to-paste rules you need to actually block the traffic.</p>
+						<div class="row">
+							<div class="col-6 col-12-medium">
+								<h3>What's included</h3>
+								<ul>
+									<li><strong>AbuseIPDB reputation scores</strong> for your top 25 IPs — see which ones are confirmed attackers</li>
+									<li><strong>ASN CIDR ranges</strong> for resilient blocking — block entire scanning networks, not just individual IPs that rotate</li>
+									<li><strong>Ready-to-paste firewall rules</strong> for iptables, ufw, and nginx</li>
+									<li><strong>Shareable link</strong> saved for 30 days — send it to your team or come back later</li>
+								</ul>
+								<p><strong>$9 one-time. No account required.</strong></p>
+							</div>
+							<div class="col-6 col-12-medium">
+								<h3>See it in action</h3>
+								<p>The sample report below is built from real Tor exit node data with live AbuseIPDB enrichment — the same format you'd get after a paid lookup.</p>
+								<a href="/report.php?token=00000000-0000-0000-0000-000000000000" target="_blank" class="button">See a sample report &rarr;</a>
+							</div>
+						</div>
+					</div>
+				</section>
+
+
 				<!-- Contact / Contribute -->
-				<section id="contribute" class="wrapper style1 fade-up">
+				<section id="contribute" class="wrapper style4 fade-up">
 					<div class="inner">
 						<h2>Contact / Contribute</h2>
 						<p>ip2geo.org is maintained and run by me, Josh. Hi. If this tool was helpful, feel free to say hello &mdash; or help contribute to hosting if this really saved the day.</p>
