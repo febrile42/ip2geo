@@ -608,7 +608,7 @@ else
 
 
 				<!-- About -->
-				<section id="about" class="wrapper style4 fade-up">
+				<section id="about" class="wrapper style1 fade-up">
 					<div class="inner">
 						<section>
 							<h2>About ip2geo.org</h2>
