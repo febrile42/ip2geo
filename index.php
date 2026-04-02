@@ -399,34 +399,33 @@ if ($_POST || $view_token_mode)
 
 	// --- Threat CTA (above filter + table) ---
 	if ($show_cta && !$view_token_mode): ?>
-	<div id="threat-cta" role="region" aria-label="Threat Assessment">
-		<hr />
-		<p class="asn-verdict asn-verdict--<?php echo htmlspecialchars(strtolower($verdict_level), ENT_QUOTES, 'UTF-8'); ?>">
-			<?php echo htmlspecialchars($verdict_level, ENT_QUOTES, 'UTF-8'); ?> THREAT
-		</p>
-		<?php if ($verdict_reason !== ''): ?>
-		<p style="font-size:0.9em;margin:-0.4em 0 0.6em"><?php echo htmlspecialchars($verdict_reason, ENT_QUOTES, 'UTF-8'); ?></p>
-		<?php endif; ?>
-		<p><?php echo round($non_residential_pct * 100); ?>% of IPs from cloud, scanning, or proxy infrastructure
-			(<?php echo $non_residential_count; ?> of <?php echo $matches_total; ?> IPs)</p>
-		<p>
-			<form method="POST" action="/get-report.php" id="cta-form" style="display:inline">
-			<input type="hidden" name="ip_classified_json" id="ip-classified-json"
-				value="<?php echo htmlspecialchars(json_encode($ip_classified_data), ENT_QUOTES, 'UTF-8'); ?>" />
-			<input type="hidden" name="geo_results_json" id="geo-results-json"
-				value="<?php echo htmlspecialchars(json_encode($geo_results_data), ENT_QUOTES, 'UTF-8'); ?>" />
-			<p style="font-size:0.85em;opacity:0.75;margin-bottom:0.4em">The paid report adds AbuseIPDB reputation scores, ASN CIDR ranges for resilient blocking, and a saved 30-day link &mdash; things not shown above.</p>
-			<button type="submit" id="cta-button" class="button">Get Threat Report + Block Scripts &mdash; $9</button>
-		</form>
-		</p>
-		<p style="font-size:0.8em;opacity:0.7;margin-top:-0.5em">
-			One-time payment. No account required.<br>
-			&middot; AbuseIPDB scores for your top 25 IPs<br>
-			&middot; ASN CIDR ranges for resilient blocking<br>
-			&middot; Report saved 30 days, shareable link<br>
-			<a href="/report.php?token=00000000-0000-0000-0000-000000000000" target="_blank" style="opacity:0.8;margin-top:0.3em;display:inline-block">See a sample report &rarr;</a>
-		</p>
-		<hr />
+	<div id="threat-cta" class="threat-cta-box threat-cta-box--<?php echo htmlspecialchars(strtolower($verdict_level), ENT_QUOTES, 'UTF-8'); ?>" role="region" aria-label="Threat Assessment">
+		<div class="threat-cta-left">
+			<p class="asn-verdict asn-verdict--<?php echo htmlspecialchars(strtolower($verdict_level), ENT_QUOTES, 'UTF-8'); ?>">
+				<?php echo htmlspecialchars($verdict_level, ENT_QUOTES, 'UTF-8'); ?> THREAT
+			</p>
+			<?php if ($verdict_reason !== ''): ?>
+			<p class="threat-cta-reason"><?php echo htmlspecialchars($verdict_reason, ENT_QUOTES, 'UTF-8'); ?></p>
+			<?php endif; ?>
+			<p class="threat-cta-stats"><?php echo round($non_residential_pct * 100); ?>% of IPs from cloud, scanning, or proxy infrastructure
+				(<?php echo $non_residential_count; ?> of <?php echo $matches_total; ?> IPs)</p>
+		</div>
+		<div class="threat-cta-right">
+			<form method="POST" action="/get-report.php" id="cta-form">
+				<input type="hidden" name="ip_classified_json" id="ip-classified-json"
+					value="<?php echo htmlspecialchars(json_encode($ip_classified_data), ENT_QUOTES, 'UTF-8'); ?>" />
+				<input type="hidden" name="geo_results_json" id="geo-results-json"
+					value="<?php echo htmlspecialchars(json_encode($geo_results_data), ENT_QUOTES, 'UTF-8'); ?>" />
+				<ul class="threat-cta-features">
+					<li>AbuseIPDB reputation scores for your top 25 IPs</li>
+					<li>ASN CIDR ranges for resilient blocking</li>
+					<li>Report saved 30 days &mdash; shareable link</li>
+				</ul>
+				<button type="submit" id="cta-button" class="button">Get Threat Report + Block Scripts &mdash; $9</button>
+				<p class="threat-cta-fine">One-time payment. No account required.
+					&nbsp;&middot;&nbsp;<a href="/report.php?token=00000000-0000-0000-0000-000000000000" target="_blank">See sample report &rarr;</a></p>
+			</form>
+		</div>
 	</div>
 	<?php elseif ($view_token_mode): ?>
 	<p style="margin:0 0 1.5em">
