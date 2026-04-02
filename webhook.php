@@ -13,6 +13,7 @@
  */
 
 require __DIR__ . '/config.php';
+require __DIR__ . '/email_helper.php';
 require __DIR__ . '/vendor/autoload.php';
 
 $raw_body = file_get_contents('php://input');
@@ -41,9 +42,10 @@ if ($event->type !== 'checkout.session.completed') {
     exit;
 }
 
-$session = $event->data->object;
-$token   = $session->client_reference_id ?? '';
-$intent  = $session->payment_intent      ?? '';
+$session            = $event->data->object;
+$token              = $session->client_reference_id ?? '';
+$intent             = $session->payment_intent      ?? '';
+$notification_email = trim($session->customer_details->email ?? '');
 
 if ($token === '') {
     error_log('ip2geo webhook: checkout.session.completed with no client_reference_id');
@@ -59,14 +61,23 @@ if (mysqli_connect_errno()) {
 // Idempotent: if already paid or redeemed, no-op
 $stmt = $con->prepare(
     'UPDATE reports
-     SET status = "paid", stripe_payment_intent = ?
+     SET status = "paid", stripe_payment_intent = ?,
+         notification_email = COALESCE(notification_email, NULLIF(?, ""))
      WHERE token = ? AND status = "pending" AND pending_expires_at > NOW()'
 );
-$stmt->bind_param('ss', $intent, $token);
+$stmt->bind_param('sss', $intent, $notification_email, $token);
 $stmt->execute();
 if ($stmt->affected_rows > 0) {
     error_log('ip2geo webhook: token ' . $token . ' marked paid via webhook');
 }
 $stmt->close();
+
+// Fallback email: send if report.php hasn't already done so.
+// report_expires_at is not set yet (report not generated); use 30 days from now as estimate.
+if ($notification_email !== '' && !empty($resend_api_key) && !empty($resend_from)) {
+    $approx_expires = date('Y-m-d H:i:s', strtotime('+30 days'));
+    send_report_email($con, $token, $notification_email, $approx_expires, $resend_api_key, $resend_from);
+}
+
 mysqli_close($con);
 exit;

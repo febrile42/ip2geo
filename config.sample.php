@@ -20,3 +20,10 @@ $stripe_webhook_secret = 'whsec_your_stripe_webhook_secret';
 // AbuseIPDB — get from https://www.abuseipdb.com/account/api
 // Free tier: 1,000 checks/day. Leave empty to disable enrichment.
 $abuseipdb_api_key = 'your_abuseipdb_api_key';
+
+// Resend — https://resend.com/api-keys
+// Used to email report links to users who provide their email at Stripe checkout.
+// Leave empty to disable email delivery (reports still work; users must save their link).
+// Sending domain (ip2geo.org) must be verified in the Resend dashboard before deploying.
+$resend_api_key = 're_your_resend_api_key';
+$resend_from    = 'ip2geo <reports@ip2geo.org>';

@@ -13,6 +13,7 @@
 require __DIR__ . '/config.php';
 require __DIR__ . '/asn_classification.php';
 require __DIR__ . '/report_functions.php';
+require __DIR__ . '/email_helper.php';
 require __DIR__ . '/vendor/autoload.php';
 
 define('DEMO_TOKEN', '00000000-0000-0000-0000-000000000000');
@@ -30,7 +31,8 @@ if (mysqli_connect_errno()) {
 
 $stmt = $con->prepare(
     'SELECT token, submission_hash, ip_list_json, status,
-            pending_expires_at, report_expires_at, report_json
+            pending_expires_at, report_expires_at, report_json,
+            notification_email, email_sent_at
      FROM reports WHERE token = ?'
 );
 $stmt->bind_param('s', $token);
@@ -40,16 +42,17 @@ $stmt->close();
 
 if (!$row) {
     mysqli_close($con);
-    render_error('This report link is invalid or has expired. If you paid and cannot access your report, contact us at josh@ip2geo.org.');
+    render_error('This report link is invalid or has expired. If you paid and cannot access your report, contact us at support@ip2geo.org.');
     exit;
 }
 
-$status = $row['status'];
+$status             = $row['status'];
+$notification_email = $row['notification_email'] ?? '';  // may be overwritten below from Stripe session
 
 if ($status === 'pending') {
     if (strtotime($row['pending_expires_at']) < time()) {
         mysqli_close($con);
-        render_error('This report link has expired (payment window was 1 hour). If you completed payment, contact us at josh@ip2geo.org with your payment confirmation and we will restore your report.');
+        render_error('This report link has expired (payment window was 1 hour). If you completed payment, contact us at support@ip2geo.org with your payment confirmation and we will restore your report.');
         exit;
     }
 
@@ -59,7 +62,7 @@ if ($status === 'pending') {
     if ($stripe_session_id === '') {
         // No session_id — user navigated directly before webhook fired
         mysqli_close($con);
-        render_error('Your payment is being processed. Please wait a moment and reload this page. If this message persists, contact josh@ip2geo.org.');
+        render_error('Your payment is being processed. Please wait a moment and reload this page. If this message persists, contact support@ip2geo.org.');
         exit;
     }
 
@@ -69,7 +72,7 @@ if ($status === 'pending') {
     } catch (\Stripe\Exception\ApiErrorException $e) {
         error_log('ip2geo report.php Stripe retrieve failed: ' . $e->getMessage());
         mysqli_close($con);
-        render_error('Payment verification failed. Please contact josh@ip2geo.org with your token: ' . htmlspecialchars($token, ENT_QUOTES, 'UTF-8'));
+        render_error('Payment verification failed. Please contact support@ip2geo.org with your token: ' . htmlspecialchars($token, ENT_QUOTES, 'UTF-8'));
         exit;
     }
 
@@ -77,19 +80,20 @@ if ($status === 'pending') {
     if (($stripe_session->client_reference_id ?? '') !== $token) {
         error_log('ip2geo report.php: session_id/token mismatch for token ' . $token);
         mysqli_close($con);
-        render_error('Payment verification failed. Please contact josh@ip2geo.org with your token: ' . htmlspecialchars($token, ENT_QUOTES, 'UTF-8'));
+        render_error('Payment verification failed. Please contact support@ip2geo.org with your token: ' . htmlspecialchars($token, ENT_QUOTES, 'UTF-8'));
         exit;
     }
 
     if ($stripe_session->payment_status !== 'paid') {
         mysqli_close($con);
-        render_error('Your payment is being processed. Please wait a moment and reload this page. If this message persists, contact josh@ip2geo.org.');
+        render_error('Your payment is being processed. Please wait a moment and reload this page. If this message persists, contact support@ip2geo.org.');
         exit;
     }
 
     // Payment confirmed via Stripe — fall through to report generation.
     // The UPDATE below uses status IN ("pending","paid") so this works without
     // a separate mark-paid step. The webhook may still fire and no-op.
+    $notification_email = trim($stripe_session->customer_details->email ?? '');
 }
 
 if ($status === 'redeemed') {
@@ -102,9 +106,11 @@ if ($status === 'redeemed') {
     // Serve cached report
     $report = json_decode($row['report_json'], true);
     $ip_data_for_render = json_decode($row['ip_list_json'], true) ?? [];
+    $cached_email      = $row['notification_email'] ?? '';
+    $cached_email_sent = $row['email_sent_at'] !== null;
     mysqli_close($con);
     maybe_serve_script_download($report, $token);
-    render_report($report, $token, $row['report_expires_at'], $ip_data_for_render);
+    render_report($report, $token, $row['report_expires_at'], $ip_data_for_render, $cached_email, $cached_email_sent);
     exit;
 }
 
@@ -123,7 +129,7 @@ if ($status === 'paid') {
 $ip_data = json_decode($row['ip_list_json'], true);
 if (!is_array($ip_data)) {
     error_log('ip2geo report.php: ip_list_json decode failed for token ' . $token);
-    render_error('Report generation failed. Please contact josh@ip2geo.org with your token: ' . htmlspecialchars($token, ENT_QUOTES, 'UTF-8'));
+    render_error('Report generation failed. Please contact support@ip2geo.org with your token: ' . htmlspecialchars($token, ENT_QUOTES, 'UTF-8'));
     exit;
 }
 
@@ -184,10 +190,15 @@ $stmt = $con->prepare(
 $stmt->bind_param('sss', $report_json_str, $report_expires, $token);
 $stmt->execute();
 $stmt->close();
+
+$email_was_sent = false;
+if ($notification_email !== '' && !empty($resend_api_key) && !empty($resend_from)) {
+    $email_was_sent = send_report_email($con, $token, $notification_email, $report_expires, $resend_api_key, $resend_from);
+}
 mysqli_close($con);
 
 maybe_serve_script_download($report, $token);
-render_report($report, $token, $report_expires, $ip_data);
+render_report($report, $token, $report_expires, $ip_data, $notification_email, $email_was_sent);
 exit;
 
 // ── AbuseIPDB enrichment ──────────────────────────────────────────────────────
@@ -487,7 +498,7 @@ function render_error(string $msg): void {
     <?php render_page_close();
 }
 
-function render_report(array $report, string $token, ?string $expires_at, array $all_ips = []): void {
+function render_report(array $report, string $token, ?string $expires_at, array $all_ips = [], string $notification_email = '', bool $email_sent = false): void {
     $verdict     = $report['verdict'];
     $verdict_lc  = strtolower($verdict);
     $total       = $report['total_ips'];
@@ -538,6 +549,27 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                 This is what a HIGH-threat report looks like.
                 <a href="/" style="margin-left:1em">Run your own lookup &rarr;</a>
             </div>
+            <?php elseif ($email_sent && $notification_email !== ''): ?>
+            <div class="report-email-notice sent">
+                <span>&#10003; Report link sent to <strong><?php echo htmlspecialchars(mask_email($notification_email), ENT_QUOTES, 'UTF-8'); ?></strong>. Check your inbox.</span>
+            </div>
+            <?php elseif ($token !== DEMO_TOKEN): ?>
+            <?php
+                $report_url   = 'https://ip2geo.org/report.php?token=' . urlencode($token);
+                $resend_link  = '/send-report-link.php?token=' . urlencode($token);
+            ?>
+            <div class="report-email-notice save">
+                <div style="width:100%">
+                    <strong>Save your report link</strong> &mdash; it expires on <?php echo htmlspecialchars($expires_fmt ?? 'in 30 days', ENT_QUOTES, 'UTF-8'); ?>.
+                    Bookmark it or <a href="<?php echo htmlspecialchars($resend_link, ENT_QUOTES, 'UTF-8'); ?>">email it to yourself</a>.
+                    <div class="report-link-row">
+                        <input class="report-link-input" id="rpt-link" type="text" readonly
+                               value="<?php echo htmlspecialchars($report_url, ENT_QUOTES, 'UTF-8'); ?>">
+                        <button class="button small alt" style="white-space:nowrap;padding:0.3em 0.8em"
+                                onclick="var i=document.getElementById('rpt-link');i.select();document.execCommand('copy');this.textContent='Copied!'">Copy link</button>
+                    </div>
+                </div>
+            </div>
             <?php endif; ?>
             <style>
                 .report-header-row {
@@ -554,6 +586,43 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                 @media (max-width: 736px) {
                     .report-header-row { flex-direction: column; align-items: flex-start; gap: 0.25em; }
                     .print-report-btn { display: none; }
+                }
+                .report-email-notice {
+                    border-radius: 4px;
+                    padding: 0.7em 1em;
+                    margin-bottom: 1.5em;
+                    font-size: 0.9em;
+                    display: flex;
+                    align-items: flex-start;
+                    gap: 0.75em;
+                    flex-wrap: wrap;
+                }
+                .report-email-notice.sent {
+                    background: rgba(80,180,120,0.12);
+                    border-left: 3px solid #50b478;
+                }
+                .report-email-notice.save {
+                    background: rgba(224,168,90,0.12);
+                    border-left: 3px solid #e0a85a;
+                }
+                .report-link-row {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5em;
+                    margin-top: 0.5em;
+                    flex-wrap: wrap;
+                    width: 100%;
+                }
+                .report-link-input {
+                    font-family: monospace;
+                    font-size: 0.85em;
+                    background: rgba(255,255,255,0.06);
+                    border: 1px solid rgba(255,255,255,0.15);
+                    color: inherit;
+                    padding: 0.3em 0.6em;
+                    border-radius: 3px;
+                    flex: 1;
+                    min-width: 0;
                 }
             </style>
 
