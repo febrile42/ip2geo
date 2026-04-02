@@ -618,6 +618,7 @@ function render_report(array $report, string $token, ?string $expires_at, array 
             </div>
 
             <!-- ASN Ranges + Block Rules: side-by-side when ranges exist, Block Rules full-width otherwise -->
+            <div id="block-rules"></div>
             <?php if ($has_ranges): ?>
             <div class="ranges-rules-grid">
                 <div class="ranges-col">
@@ -896,7 +897,7 @@ function render_report(array $report, string $token, ?string $expires_at, array 
             <?php endif; ?>
 
             <!-- Top 25 table -->
-            <h3>Top Threat Sources <span id="report-table-summary" style="font-size:0.6em;font-weight:normal;opacity:0.6;margin-left:0.5em">— showing <span id="report-table-count"><?php echo count($top25); ?></span> of <span id="report-table-total"><?php echo count($top25); ?></span></span></h3>
+            <h3 id="top-sources">Top Threat Sources <span id="report-table-summary" style="font-size:0.6em;font-weight:normal;opacity:0.6;margin-left:0.5em">— showing <span id="report-table-count"><?php echo count($top25); ?></span> of <span id="report-table-total"><?php echo count($top25); ?></span></span></h3>
             <?php if (empty($top25)): ?>
                 <p>No IP data available.</p>
             <?php else: ?>
@@ -1019,9 +1020,10 @@ function render_page_open(string $title, string $meta_desc = ''): void {
         <div class="inner">
             <nav>
                 <ul>
-                    <li><a href="/">← Back to Lookup</a></li>
-                    <li><a href="#report">Your Report</a></li>
-                    <li><a href="/#about">About</a></li>
+                    <li><a href="#report">Summary</a></li>
+                    <li><a href="#block-rules">Block Rules</a></li>
+                    <li><a href="#top-sources">Top Sources</a></li>
+                    <li><a href="/">← New Lookup</a></li>
                 </ul>
             </nav>
         </div>
