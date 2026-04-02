@@ -317,25 +317,72 @@ if ($_POST || $view_token_mode)
 	} // end foreach geo query loop
 	} // end if ($geo_loop_needed)
 
-	// --- CTA threshold ---
+	// --- CTA threshold & verdict ---
 	// "Non-residential" = confirmed scanners/VPNs + cloud/VPS egress.
 	// Cloud IPs hitting your infrastructure at volume is itself suspicious,
-	// so both categories count toward the trigger.
+	// so both categories count toward the CTA trigger.
 	$non_residential_count = $scanning_proxy_count + $category_counts['cloud'];
 	$non_residential_pct   = $matches_total > 0 ? $non_residential_count / $matches_total : 0;
+	$scanning_proxy_pct    = $matches_total > 0 ? $scanning_proxy_count / $matches_total : 0;
+	$scanning_pct          = $matches_total > 0 ? round($scanning_proxy_pct * 100) : 0;
+
 	$show_cta = $matches_total >= 5 && (
 		$scanning_proxy_count >= 3 ||
 		$non_residential_pct >= 0.15
 	);
-	$scanning_pct = $matches_total > 0 ? round(($scanning_proxy_count / $matches_total) * 100) : 0;
-	if ($matches_total > 0 && ($scanning_proxy_count / $matches_total) >= 0.80) {
+
+	// Verdict: two independent axes — absolute count and concentration.
+	//
+	// HIGH:     >=250 confirmed scanners (volume)
+	//           OR >=60% scanning AND >=20 scanners (concentration)
+	//           OR >=80% scanning (overwhelming)
+	// LOW:      <10 confirmed scanners
+	//           OR <5% scanning AND <25 scanners (dilute noise)
+	//           ...unless cloud volume is substantial (cloud floor: upgrade to MODERATE)
+	// MODERATE: everything else
+	$cloud_count = $category_counts['cloud'];
+	$cloud_pct   = $matches_total > 0 ? $cloud_count / $matches_total : 0;
+
+	if ($matches_total > 0 && (
+		$scanning_proxy_count >= 250
+		|| ($scanning_proxy_pct >= 0.60 && $scanning_proxy_count >= 20)
+		|| $scanning_proxy_pct >= 0.80
+	)) {
 		$verdict_level = 'HIGH';
-	} elseif ($matches_total > 0 && ($scanning_proxy_count / $matches_total) >= 0.60 && $scanning_proxy_count >= 100) {
-		$verdict_level = 'HIGH';
-	} elseif ($matches_total > 0 && (($scanning_proxy_count / $matches_total) < 0.30 || $scanning_proxy_count < 10)) {
-		$verdict_level = 'LOW';
+	} elseif ($matches_total > 0 && (
+		$scanning_proxy_count < 10
+		|| ($scanning_proxy_pct < 0.05 && $scanning_proxy_count < 25)
+	)) {
+		// Cloud floor: significant cloud IPs upgrade LOW → MODERATE
+		if ($cloud_count >= 50 || $cloud_pct >= 0.15) {
+			$verdict_level = 'MODERATE';
+		} else {
+			$verdict_level = 'LOW';
+		}
 	} else {
 		$verdict_level = 'MODERATE';
+	}
+
+	// Suppress CTA for LOW verdict — avoids "LOW THREAT + buy report" contradiction
+	if ($verdict_level === 'LOW') {
+		$show_cta = false;
+	}
+
+	// One-sentence reason explaining what triggered the verdict
+	if ($verdict_level === 'HIGH') {
+		if ($scanning_proxy_count >= 250 && $scanning_proxy_pct < 0.60) {
+			$verdict_reason = $scanning_proxy_count . ' confirmed scanners/proxies detected.';
+		} else {
+			$verdict_reason = $scanning_pct . '% of IPs are confirmed scanning or proxy infrastructure.';
+		}
+	} elseif ($verdict_level === 'MODERATE') {
+		if ($scanning_proxy_count < 10 && ($cloud_count >= 50 || $cloud_pct >= 0.15)) {
+			$verdict_reason = $cloud_count . ' cloud infrastructure IPs detected — may indicate botnet use or compromised VMs.';
+		} else {
+			$verdict_reason = $scanning_proxy_count . ' confirmed scanner' . ($scanning_proxy_count === 1 ? '' : 's') . '/proxies detected (' . $scanning_pct . '% of total).';
+		}
+	} else {
+		$verdict_reason = '';
 	}
 
 	arsort($country_counts);
@@ -357,6 +404,9 @@ if ($_POST || $view_token_mode)
 		<p class="asn-verdict asn-verdict--<?php echo htmlspecialchars(strtolower($verdict_level), ENT_QUOTES, 'UTF-8'); ?>">
 			<?php echo htmlspecialchars($verdict_level, ENT_QUOTES, 'UTF-8'); ?> THREAT
 		</p>
+		<?php if ($verdict_reason !== ''): ?>
+		<p style="font-size:0.9em;margin:-0.4em 0 0.6em"><?php echo htmlspecialchars($verdict_reason, ENT_QUOTES, 'UTF-8'); ?></p>
+		<?php endif; ?>
 		<p><?php echo round($non_residential_pct * 100); ?>% of IPs from cloud, scanning, or proxy infrastructure
 			(<?php echo $non_residential_count; ?> of <?php echo $matches_total; ?> IPs)</p>
 		<p>
@@ -366,7 +416,7 @@ if ($_POST || $view_token_mode)
 			<input type="hidden" name="geo_results_json" id="geo-results-json"
 				value="<?php echo htmlspecialchars(json_encode($geo_results_data), ENT_QUOTES, 'UTF-8'); ?>" />
 			<p style="font-size:0.85em;opacity:0.75;margin-bottom:0.4em">The paid report adds AbuseIPDB reputation scores, ASN CIDR ranges for resilient blocking, and a saved 30-day link &mdash; things not shown above.</p>
-			<button type="submit" id="cta-button" class="button">Get Full Report + Block Script &mdash; $9</button>
+			<button type="submit" id="cta-button" class="button">Get Threat Report + Block Scripts &mdash; $9</button>
 		</form>
 		</p>
 		<p style="font-size:0.8em;opacity:0.7;margin-top:-0.5em">
