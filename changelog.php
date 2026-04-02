@@ -34,6 +34,9 @@
 					<section id="main" class="wrapper">
 						<div class="inner">
 							<h1 class="major">Changelog</h1>
+								<h3>3.0.0 - 2026-04-02</h3>
+							<p>ip2geo now does something genuinely new: upload your server logs, and it tells you what's actually hitting you. The lookup tool is still here, but it's now joined by Threat Reports — paste in a batch of IPs from your access logs, pay once, and get back a full threat assessment: a verdict (clean, watchlist, or threat), a breakdown of scanning and proxy infrastructure, AbuseIPDB abuse scores for the worst offenders, and ASN CIDR ranges grouped by network so you can block the whole subnet instead of playing whack-a-mole with individual addresses.</p>
+							<p>The actionable part: ready-to-run block scripts for iptables, ufw, and nginx, generated for both individual IPs and CIDR ranges, downloadable directly from the report. Reports are tied to a token and expire after 30 days. Stripe handles payment. The webhook handler, token lifecycle, and report generation are all tested — 95 unit tests, 119 assertions, covering verdict logic, token states, AbuseIPDB ranking, ASN classification, and the webhook handler.</p>
 								<h3>2.6.3 - 2026-03-23</h3>
 							<p>Swapped Google Analytics for <a href="https://umami.is/" target="_blank">Umami</a>. Same lookup and CSV download events are tracked, same visitor stats — just without sending your data to Google first. Umami is open-source and privacy-friendly, which feels more in keeping with a tool that doesn't log IPs.</p>
 							<h3>2.6.2 - 2026-03-13</h3>
