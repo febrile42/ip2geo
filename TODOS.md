@@ -257,7 +257,7 @@ context" column in paid reports ("this IP hit 31 other servers this week, escala
   ```
 - [ ] **Clear community stats tables** before go-live to remove test data:
   `TRUNCATE community_cidr_stats; TRUNCATE community_ip_stats; TRUNCATE community_ip_first_seen; TRUNCATE community_weekly_stats;`
-- [ ] **Staging DB isolation** — create `ip2geo_staging` schema on same MariaDB server; copy full schema (including static lookup tables); update `config-staging.php` to `$db_name = 'ip2geo_staging'`. See TODOS note below for workflow impact.
+- [x] **Staging DB isolation** — `ip2geo_staging` schema created, full schema copied (including static lookup tables), schema migration (week_start → report_date + community_weekly_stats) complete. `config-staging.php` updated to `$db_name = 'ip2geo_staging'` (2026-04-03).
 - [ ] **Monthly update workflow** — after staging DB isolation, update `.github/workflows/update-db.yml` to also update `ip2geo_staging` DB (MaxMind + AbuseIPDB) to prevent drift.
 - [ ] **Caching on intel.php** — public scrapable page, no caching currently. Add APCu page-level cache (15-min TTL for HTML; downloads bypass). Cache key: `intel_page_7d`. Must-do before go-live.
 - [ ] **Fix CommunityConsentTest.php** — still references `week_start` column; will fail CI after prod schema migration. Update to use `report_date`.
