@@ -245,22 +245,12 @@ context" column in paid reports ("this IP hit 31 other servers this week, escala
 
 **Must-do before go-live (community intel):**
 - [x] **Schema migration on ip2geo_staging** — `ALTER TABLE` (week_start → report_date) + `CREATE TABLE community_weekly_stats` run on staging (2026-04-03). Confirmed working: 6 opted-in reports showing on staging.
-- [ ] **Schema migration on prod** — same SQL must run on `ip2geo` (prod) DB before merging to main:
-  ```sql
-  ALTER TABLE community_cidr_stats CHANGE week_start report_date DATE NOT NULL;
-  ALTER TABLE community_ip_stats   CHANGE week_start report_date DATE NOT NULL;
-  CREATE TABLE IF NOT EXISTS community_weekly_stats (
-      report_date DATE NOT NULL,
-      opted_in_reports INT NOT NULL DEFAULT 0,
-      PRIMARY KEY (report_date)
-  );
-  ```
-- [ ] **Clear community stats tables** before go-live to remove test data:
-  `TRUNCATE community_cidr_stats; TRUNCATE community_ip_stats; TRUNCATE community_ip_first_seen; TRUNCATE community_weekly_stats;`
+- [x] **Schema migration on prod** — ALTER TABLE (week_start → report_date) + CREATE TABLE community_weekly_stats run on `ip2geo` prod DB (2026-04-03).
+- [x] **Clear community stats tables** — all 4 community tables truncated on prod (2026-04-03).
 - [x] **Staging DB isolation** — `ip2geo_staging` schema created, full schema copied (including static lookup tables), schema migration (week_start → report_date + community_weekly_stats) complete. `config-staging.php` updated to `$db_name = 'ip2geo_staging'` (2026-04-03).
 - [ ] **Monthly update workflow** — after staging DB isolation, update `.github/workflows/update-db.yml` to also update `ip2geo_staging` DB (MaxMind + AbuseIPDB) to prevent drift.
 - [ ] **Caching on intel.php** — public scrapable page, no caching currently. Add APCu page-level cache (15-min TTL for HTML; downloads bypass). Cache key: `intel_page_7d`. Must-do before go-live.
-- [ ] **Fix CommunityConsentTest.php** — still references `week_start` column; will fail CI after prod schema migration. Update to use `report_date`.
+- [x] **Fix CommunityConsentTest.php** — updated to `report_date`, `community_weekly_stats` added to setUp, rolling date logic updated. 37/37 tests passing (2026-04-03).
 
 **Revisit gate:** Once 50+ opted-in reports exist, re-evaluate beta thresholds, framing,
 and whether community column needs a total reframe. Log findings.

@@ -26,7 +26,7 @@ use PHPUnit\Framework\TestCase;
  * 10. Opt-in filters residential IPs (not ingested)
  * 11. Opt-in filters unknown IPs (not ingested)
  * 12. Opt-in ingests scanning / vpn_proxy / cloud_exit IPs
- * 13. week_start format is correct (Monday, YYYY-MM-DD)
+ * 13. report_date format is correct (today's date, YYYY-MM-DD)
  * 14. CIDR entries as string AND as ['cidr'=>…,'hits'=>…] objects are both handled
  *
  * Run: vendor/bin/phpunit tests/CommunityConsentTest.php
@@ -63,20 +63,20 @@ class CommunityConsentTest extends TestCase
                 cidr         VARCHAR(50)  NOT NULL,
                 asn          VARCHAR(20)  NOT NULL,
                 org          VARCHAR(255) NOT NULL DEFAULT '',
-                week_start   DATE         NOT NULL,
+                report_date  DATE         NOT NULL,
                 report_count INTEGER      NOT NULL DEFAULT 0,
                 total_hits   INTEGER      NOT NULL DEFAULT 0,
-                PRIMARY KEY (cidr, week_start)
+                PRIMARY KEY (cidr, report_date)
             )
         ");
 
         $this->pdo->exec("
             CREATE TABLE community_ip_stats (
                 ip           VARCHAR(45) NOT NULL,
-                week_start   DATE        NOT NULL,
+                report_date  DATE        NOT NULL,
                 report_count INTEGER     NOT NULL DEFAULT 0,
                 total_hits   INTEGER     NOT NULL DEFAULT 0,
-                PRIMARY KEY (ip, week_start)
+                PRIMARY KEY (ip, report_date)
             )
         ");
 
@@ -84,6 +84,13 @@ class CommunityConsentTest extends TestCase
             CREATE TABLE community_ip_first_seen (
                 ip         VARCHAR(45) NOT NULL PRIMARY KEY,
                 first_seen DATE        NOT NULL
+            )
+        ");
+
+        $this->pdo->exec("
+            CREATE TABLE community_weekly_stats (
+                report_date      DATE    NOT NULL PRIMARY KEY,
+                opted_in_reports INTEGER NOT NULL DEFAULT 0
             )
         ");
     }
@@ -328,16 +335,15 @@ class CommunityConsentTest extends TestCase
             return ['ok' => true, 'ingested' => false];
         }
 
-        // Step 3: compute week_start (Monday of current ISO week, UTC)
-        $daysSinceMonday = (int) gmdate('N') - 1;
-        $weekStart = gmdate('Y-m-d', strtotime("-{$daysSinceMonday} days"));
+        // Step 3: use today's date (rolling 7-day window)
+        $reportDate = gmdate('Y-m-d');
 
         // Step 4: ingest CIDR data
         $asnRanges = $report['asn_ranges'] ?? [];
 
         if (!empty($asnRanges)) {
             $cidrStmt = $this->pdo->prepare(
-                'INSERT OR IGNORE INTO community_cidr_stats (cidr, asn, org, week_start, report_count, total_hits)
+                'INSERT OR IGNORE INTO community_cidr_stats (cidr, asn, org, report_date, report_count, total_hits)
                  VALUES (?, ?, ?, ?, 1, ?)'
             );
             // ON DUPLICATE KEY UPDATE is MySQL-only; SQLite uses INSERT OR IGNORE for the
@@ -357,7 +363,7 @@ class CommunityConsentTest extends TestCase
                     if ($cidr === '' || $asn === '') {
                         continue;
                     }
-                    $cidrStmt->execute([$cidr, $asn, $org, $weekStart, $hits]);
+                    $cidrStmt->execute([$cidr, $asn, $org, $reportDate, $hits]);
                 }
             }
         }
@@ -366,14 +372,12 @@ class CommunityConsentTest extends TestCase
         $allowedClassifications = ['scanning', 'vpn_proxy', 'cloud_exit'];
 
         $ipStmt = $this->pdo->prepare(
-            'INSERT OR IGNORE INTO community_ip_stats (ip, week_start, report_count, total_hits)
+            'INSERT OR IGNORE INTO community_ip_stats (ip, report_date, report_count, total_hits)
              VALUES (?, ?, 1, ?)'
         );
         $fsStmt = $this->pdo->prepare(
             'INSERT OR IGNORE INTO community_ip_first_seen (ip, first_seen) VALUES (?, ?)'
         );
-
-        $today = gmdate('Y-m-d');
 
         foreach ($ipList as $entry) {
             $classification = $entry['classification'] ?? '';
@@ -385,26 +389,33 @@ class CommunityConsentTest extends TestCase
             if ($ip === '') {
                 continue;
             }
-            $ipStmt->execute([$ip, $weekStart, $hits]);
-            $fsStmt->execute([$ip, $today]);
+            $ipStmt->execute([$ip, $reportDate, $hits]);
+            $fsStmt->execute([$ip, $reportDate]);
         }
 
-        // Step 6: fetch top CIDRs for this week
+        // Step 6: increment daily opted-in report counter
+        $wkStmt = $this->pdo->prepare(
+            'INSERT OR IGNORE INTO community_weekly_stats (report_date, opted_in_reports)
+             VALUES (?, 1)'
+        );
+        $wkStmt->execute([$reportDate]);
+
+        // Step 7: fetch top CIDRs for rolling window
         $ctxStmt = $this->pdo->prepare(
             'SELECT cidr, org, report_count, total_hits
              FROM community_cidr_stats
-             WHERE week_start = ?
+             WHERE report_date = ?
              ORDER BY report_count DESC, total_hits DESC
              LIMIT 5'
         );
-        $ctxStmt->execute([$weekStart]);
+        $ctxStmt->execute([$reportDate]);
         $topCidrs = $ctxStmt->fetchAll(\PDO::FETCH_ASSOC);
 
         return [
-            'ok'         => true,
-            'ingested'   => true,
-            'week_start' => $weekStart,
-            'top_cidrs'  => $topCidrs,
+            'ok'          => true,
+            'ingested'    => true,
+            'report_date' => $reportDate,
+            'top_cidrs'   => $topCidrs,
         ];
     }
 
@@ -434,7 +445,7 @@ class CommunityConsentTest extends TestCase
 
         $this->assertTrue($result['ok']);
         $this->assertTrue($result['ingested']);
-        $this->assertArrayHasKey('week_start', $result);
+        $this->assertArrayHasKey('report_date', $result);
         $this->assertArrayHasKey('top_cidrs', $result);
     }
 
@@ -558,26 +569,24 @@ class CommunityConsentTest extends TestCase
         $this->assertSame(3, $count, 'Only scanning/vpn_proxy/cloud_exit should be ingested');
     }
 
-    // ── week_start format ─────────────────────────────────────────────────────
+    // ── report_date format ────────────────────────────────────────────────────
 
-    public function testWeekStartIsMonday(): void
+    public function testReportDateIsToday(): void
     {
-        $daysSinceMonday = (int) gmdate('N') - 1;
-        $weekStart = gmdate('Y-m-d', strtotime("-{$daysSinceMonday} days"));
+        $reportDate = gmdate('Y-m-d');
 
         // Must be a valid date string in YYYY-MM-DD format
         $this->assertMatchesRegularExpression(
             '/^\d{4}-\d{2}-\d{2}$/',
-            $weekStart,
-            'week_start must be in YYYY-MM-DD format'
+            $reportDate,
+            'report_date must be in YYYY-MM-DD format'
         );
 
-        // The date must be a Monday (ISO weekday 1)
-        $weekday = (int) gmdate('N', strtotime($weekStart));
-        $this->assertSame(1, $weekday, 'week_start must be a Monday (ISO weekday 1)');
+        // Must equal today's UTC date
+        $this->assertSame(gmdate('Y-m-d'), $reportDate, 'report_date must be today (UTC)');
     }
 
-    public function testWeekStartReturnedInOptInResponse(): void
+    public function testReportDateReturnedInOptInResponse(): void
     {
         $token = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
         $this->insertReport(['status' => 'paid']);
@@ -588,13 +597,12 @@ class CommunityConsentTest extends TestCase
             '[]'
         );
 
-        $this->assertArrayHasKey('week_start', $result);
+        $this->assertArrayHasKey('report_date', $result);
         $this->assertMatchesRegularExpression(
             '/^\d{4}-\d{2}-\d{2}$/',
-            $result['week_start']
+            $result['report_date']
         );
-        $weekday = (int) gmdate('N', strtotime($result['week_start']));
-        $this->assertSame(1, $weekday, 'week_start in response must be a Monday');
+        $this->assertSame(gmdate('Y-m-d'), $result['report_date'], 'report_date in response must be today (UTC)');
     }
 
     // ── CIDR entry formats ────────────────────────────────────────────────────
