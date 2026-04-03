@@ -250,6 +250,7 @@ and whether community column needs a total reframe. Log findings.
 - API access for community data (Phase C.5 — after flywheel proves value)
 - Weekly email digest to opted-in users (Resend already integrated; defer until data is meaningful)
 - Historical trend sparklines on /intel.php (data already in weekly buckets; UI deferred)
+- Week-over-week trend indicator in community column on report.php — data is already stored (`last_week` queried alongside `this_week` in `fetch_community_data`). Deferred because ↑/→/↓ arrows are ambiguous at low report counts and the dataset is too small to make trend signals trustworthy. Revisit once 50+ opted-in reports establish a baseline: consider `<abbr>` tooltip or short text label ("rising"/"stable"/"falling") rather than bare arrows.
 - Firewall automation daemon (Phase D — after API is established)
 
 ---

@@ -696,8 +696,8 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                 <table style="width:100%;font-size:0.85em;border-collapse:collapse">
                     <thead><tr style="opacity:0.6"><th style="text-align:left;padding:0.2em 0.6em 0.2em 0;font-weight:normal">IP</th><th style="text-align:left;padding:0.2em 0.6em;font-weight:normal">Category</th><th style="text-align:left;padding:0.2em 0;font-weight:normal">Community</th></tr></thead>
                     <tbody>
-                        <tr><td style="padding:0.15em 0.6em 0.15em 0;font-family:monospace;opacity:0.8">185.220.101.x</td><td style="padding:0.15em 0.6em">Scanning</td><td style="padding:0.15em 0">23 reports &#8593;</td></tr>
-                        <tr><td style="padding:0.15em 0.6em 0.15em 0;font-family:monospace;opacity:0.8">193.32.162.x</td><td style="padding:0.15em 0.6em">VPN/Proxy</td><td style="padding:0.15em 0">8 reports &#8594; <span style="font-size:0.75em;opacity:0.55">(beta)</span></td></tr>
+                        <tr><td style="padding:0.15em 0.6em 0.15em 0;font-family:monospace;opacity:0.8">185.220.101.x</td><td style="padding:0.15em 0.6em">Scanning</td><td style="padding:0.15em 0">23 reports</td></tr>
+                        <tr><td style="padding:0.15em 0.6em 0.15em 0;font-family:monospace;opacity:0.8">193.32.162.x</td><td style="padding:0.15em 0.6em">VPN/Proxy</td><td style="padding:0.15em 0">8 reports</td></tr>
                         <tr><td style="padding:0.15em 0.6em 0.15em 0;font-family:monospace;opacity:0.8">192.168.x.x</td><td style="padding:0.15em 0.6em">Residential</td><td style="padding:0.15em 0"><span style="opacity:0.4">&mdash;</span></td></tr>
                     </tbody>
                 </table>
@@ -1223,17 +1223,8 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                             $tooltip = $days_ago !== null ? ' title="First seen in community data: ' . $days_ago . ' day' . ($days_ago === 1 ? '' : 's') . ' ago"' : '';
                             if ($this_week_count < 3): ?>
                         <td><span style="opacity:0.4">—</span></td>
-                        <?php else:
-                            if ($last_week_count > 0) {
-                                if ($this_week_count > $last_week_count * 1.2) $trend = ' &#8593;';
-                                elseif ($this_week_count < $last_week_count * 0.8) $trend = ' &#8595;';
-                                else $trend = ' &#8594;';
-                            } else {
-                                $trend = '';
-                            }
-                            $beta = ($this_week_count < 20) ? ' <span style="font-size:0.75em;opacity:0.55">(beta)</span>' : '';
-                        ?>
-                        <td<?php echo $tooltip; ?>><?php echo $this_week_count; ?> reports<?php echo $trend; ?><?php echo $beta; ?></td>
+                        <?php else: ?>
+                        <td<?php echo $tooltip; ?>><?php echo $this_week_count; ?> reports</td>
                         <?php endif; ?>
                         <?php endif; ?>
                     </tr>
