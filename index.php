@@ -568,7 +568,7 @@ else
 							</div>
 							<div class="col-6 col-12-medium">
 								<h3>See it in action</h3>
-								<p>The sample report uses real Tor exit node data with live AbuseIPDB enrichment. Opt in to community sharing and you'll also see how many other servers reported the same IPs this week.</p>
+								<p>The sample report uses real Tor exit node data with live AbuseIPDB enrichment. Opt in to community sharing and you'll also see how many other ip2geo reports contained the same IPs this week &mdash; corroborating active threats across users.</p>
 								<p style="text-align:right"><a href="/report.php?token=00000000-0000-0000-0000-000000000000" target="_blank" class="button">See a sample report &rarr;</a></p>
 							</div>
 						</div>
