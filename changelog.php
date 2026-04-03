@@ -6,8 +6,10 @@
 -->
 <html>
 	<head>
-		<!-- Umami -->
+		<!-- Umami (production only) -->
+		<?php if ($_SERVER['HTTP_HOST'] === 'ip2geo.org'): ?>
 		<script defer src="https://cloud.umami.is/script.js" data-website-id="656d7a15-6282-4079-af1e-b8ed857fba2e"></script>
+		<?php endif; ?>
 		<title>ip2geo.org Changelog</title>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
@@ -34,6 +36,10 @@
 					<section id="main" class="wrapper">
 						<div class="inner">
 							<h1 class="major">Changelog</h1>
+								<h3>3.1.0 - 2026-04-03</h3>
+							<p>A rolling 7-day <a href="/intel.php">Community Block List</a> built from opted-in Threat Reports. CIDR ranges corroborated by three or more independent users — filtered by prefix size and hit density so coarse ISP blocks don't slip through — appear on the public list, downloadable as iptables, ufw, nginx, or plain CIDR format.</p>
+								<h3>3.0.0 - 2026-04-02</h3>
+							<p>Threat Reports: paste a batch of IPs from your server logs, pay once, and get back a verdict (clean, watchlist, or threat), AbuseIPDB scores for the worst offenders, and ASN CIDR ranges so you can block whole subnets instead of individual addresses. Ready-to-run block scripts for iptables, ufw, and nginx download directly from the report. Reports are token-tied and expire after 30 days.</p>
 								<h3>2.6.3 - 2026-03-23</h3>
 							<p>Swapped Google Analytics for <a href="https://umami.is/" target="_blank">Umami</a>. Same lookup and CSV download events are tracked, same visitor stats — just without sending your data to Google first. Umami is open-source and privacy-friendly, which feels more in keeping with a tool that doesn't log IPs.</p>
 							<h3>2.6.2 - 2026-03-13</h3>
@@ -68,20 +74,7 @@
 
 			</div>
 
-		<!-- Footer -->
-		<!-- Footer -->
-			<footer id="footer" class="wrapper style1-alt">
-				<div class="inner">
-					<ul class="menu">
-						<li>This product includes GeoLite2 data created by MaxMind, available from <a href="http://www.maxmind.com" target="_new">http://www.maxmind.com</a>.</li>
-					</ul>
-					<ul class="menu">
-						<li>&copy;<?php echo date("Y"); ?></li>
-						<li><a href="/privacy.php">Privacy Policy</a></li>
-						<li>Design: <a href="http://html5up.net" target="_blank">HTML5 UP</a></li>
-					</ul>
-				</div>
-			</footer>
+	<?php require __DIR__ . '/includes/footer.php'; ?>
 
 		<!-- Scripts -->
 			<script src="assets/js/jquery.min.js"></script>

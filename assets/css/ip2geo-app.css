@@ -1,0 +1,659 @@
+/* ip2geo Phase C+A — app-specific styles */
+
+/* --- Verdict badge --- */
+.asn-verdict {
+    font-family: monospace;
+    font-size: 1.4em;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    padding-left: 0.75em;
+    margin-bottom: 0.25em;
+}
+.asn-verdict--high     { color: #e06c9f; border-left: 3px solid #e06c9f; }
+.asn-verdict--moderate { color: #e0a85a; border-left: 3px solid #e0a85a; }
+.asn-verdict--low      { color: #6cb87a; border-left: 3px solid #6cb87a; }
+
+/* --- ASN category labels in table --- */
+.asn-category {
+    font-family: monospace;
+    font-size: 0.85em;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.asn-category--scanning    { color: #e06c9f; }
+.asn-category--cloud       { color: #8ab4d4; }
+.asn-category--vpn         { color: #e0a85a; }
+.asn-category--residential { color: #6cb87a; }
+.asn-category--unknown     { color: #888; }
+
+/* --- Filter panel accordion header --- */
+#filter-details > summary {
+    cursor: pointer;
+    padding: 0.4em 0;
+    font-size: 0.8em;
+    font-weight: bold;
+    list-style: none;
+}
+#filter-details > summary::-webkit-details-marker { display: none; }
+#filter-details > summary::before {
+    content: '▸ ';
+    font-size: 0.85em;
+}
+#filter-details[open] > summary::before { content: '▾ '; }
+
+/* --- Two-column filter layout --- */
+#filter-layout {
+    display: flex;
+    gap: 2.5em;
+    padding: 0.6em 0 0.5em;
+    flex-wrap: wrap;
+    align-items: flex-start;
+}
+
+/* Left: action buttons + firewall rule output */
+#filter-left {
+    flex: 1 1 45%;
+    min-width: 220px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5em;
+}
+
+#action-buttons-primary,
+#export-buttons {
+    display: flex;
+    gap: 0.4em;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+/* Right: filter chips */
+#filter-right {
+    flex: 0 0 auto;
+    display: flex;
+    gap: 1.5em;
+    align-items: flex-start;
+}
+
+/* Section headers above chip columns */
+#filter-countries > strong,
+#filter-categories > strong {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 0.65em;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    opacity: 0.5;
+    margin-bottom: 0.5em;
+}
+
+.chip-hint {
+    font-weight: normal;
+    text-transform: none;
+    letter-spacing: normal;
+    font-style: italic;
+}
+
+/* Scrollable chip container for countries.
+   9.8em lands mid-chip (~5.5 rows), so a partial chip peeks out when
+   there are 6+ countries — natural scroll affordance, no extra markup. */
+#filter-countries .filter-chips {
+    max-height: 9.8em;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3em;
+}
+
+#filter-categories {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3em;
+}
+
+/* Toggle chip labels — inactive state
+   font-size overrides main.css label { font-size: 1.1em } */
+#filter-countries label,
+#filter-categories label {
+    font-size: 0.7em;
+    font-weight: normal;
+    display: block;
+    padding: 0.3em 0.9em;
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 2em;
+    cursor: pointer;
+    opacity: 0.4;
+    transition: opacity 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+    user-select: none;
+    white-space: nowrap;
+    margin: 0;
+    line-height: 1.5;
+}
+
+/* Active (checked) state */
+#filter-countries label:has(input:checked),
+#filter-categories label:has(input:checked) {
+    opacity: 1;
+    border-color: rgba(255,255,255,0.35);
+    background: rgba(255,255,255,0.04);
+}
+
+/* ASN category chip accent colors */
+#filter-categories label.cat-scanning    { color: #e06c9f; }
+#filter-categories label.cat-cloud       { color: #8ab4d4; }
+#filter-categories label.cat-vpn         { color: #e0a85a; }
+#filter-categories label.cat-residential { color: #6cb87a; }
+#filter-categories label.cat-unknown     { color: #aaa; }
+
+/* Active category chip: border color matches accent */
+#filter-categories label.cat-scanning:has(input:checked)    { border-color: rgba(224,108,159,0.6); }
+#filter-categories label.cat-cloud:has(input:checked)       { border-color: rgba(138,180,212,0.6); }
+#filter-categories label.cat-vpn:has(input:checked)         { border-color: rgba(224,168,90,0.6);  }
+#filter-categories label.cat-residential:has(input:checked) { border-color: rgba(108,184,122,0.6); }
+#filter-categories label.cat-unknown:has(input:checked)     { border-color: rgba(170,170,170,0.4); }
+
+/* Zero-count chip: heavily dimmed */
+#filter-countries label.chip--empty,
+#filter-categories label.chip--empty {
+    opacity: 0.15;
+}
+
+/* Hide native checkbox; keep in tab order for a11y */
+#filter-countries input[type="checkbox"],
+#filter-categories input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+}
+
+/* --- Firewall rules output --- */
+.rules-block {
+    position: relative;
+    margin-top: 0.25em;
+}
+.rules-block pre {
+    background: rgba(255,255,255,0.05);
+    border-radius: 4px;
+    padding: 1em;
+    font-family: monospace;
+    font-size: 0.5em;
+    overflow-x: auto;
+    white-space: pre;
+    max-height: 300px;
+    overflow-y: auto;
+    margin-top: 0;
+}
+.rules-block .copy-rules {
+    position: absolute;
+    top: 0.4em;
+    right: 0.4em;
+    z-index: 1;
+}
+
+/* --- abbr tooltips in results table --- */
+#results-table abbr[title] {
+    text-decoration: underline dotted;
+    cursor: help;
+}
+
+/* --- Results table: smaller font for density --- */
+/* Body is 16.5pt (~22px); 0.85em ≈ 18.7px at desktop, scales with breakpoints */
+#results-table { font-size: 0.85em; }
+
+/* --- Column overflow absorption ---
+   ASN Org is the prime overflow culprit; State/Province and City are secondary.
+   Truncate with ellipsis at a fixed em cap; title attribute exposes full text on hover.
+   The outer overflow-x:auto wrapper stays as a last-resort fallback for very narrow
+   viewports. */
+#results-table .cell-asn-org {
+    max-width: 14em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+#results-table .cell-region,
+#results-table .cell-city {
+    max-width: 10em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* --- Report table (report.php) — matches public results table density --- */
+.report-table { font-size: 0.85em; }
+.report-table .cell-asn-org {
+    max-width: 14em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Alternating row stripes — JS-managed so filtering keeps correct alternation.
+   Override the theme's nth-child rule (which counts hidden rows) with an explicit class. */
+#results-table tbody tr:nth-child(2n + 1) { background-color: transparent; }
+#results-table tbody tr.row-stripe        { background-color: rgba(255,255,255,0.05); }
+#results-table tbody tr.row-hidden        { display: none; }
+
+/* --- Touch targets (a11y) --- */
+.button.small { min-height: 44px; line-height: 44px; }
+
+
+/* --- Mobile --- */
+@media (max-width: 767px) {
+    #filter-details:not([open]) #filter-layout { display: none; }
+    #filter-layout {
+        flex-direction: column;
+        gap: 1em;
+    }
+    #filter-right {
+        flex-wrap: wrap;
+        gap: 1em;
+    }
+}
+
+/* --- Cancel notice --- */
+#cancel-notice {
+    background: rgba(255,255,255,0.07);
+    border-left: 3px solid #e0a85a;
+    padding: 0.6em 1em;
+    margin-bottom: 1em;
+    font-size: 0.9em;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+#cancel-notice button {
+    background: none;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    font-size: 1.1em;
+    opacity: 0.6;
+    padding: 0 0.25em;
+}
+
+/* --- Ranges + Block Rules side-by-side grid (report.php) --- */
+.ranges-rules-grid {
+    display: flex !important;
+    gap: 2.5em;
+    align-items: flex-start;
+    margin-bottom: 2em;
+}
+.ranges-col {
+    flex: 2;
+    min-width: 0;
+    overflow: hidden;
+}
+.rules-col {
+    flex: 1;
+    min-width: 0;
+    position: sticky;
+    top: 2em;
+    align-self: flex-start;
+}
+
+/* In right column, stack download buttons vertically, full width */
+.rules-col .block-rules-panel {
+    flex-direction: column;
+    gap: 0.45em;
+}
+.rules-col .block-rules-panel .button {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    text-align: center;
+}
+
+/* --- ASN range groups (report.php) --- */
+.asn-range-group {
+    margin-bottom: 1em;
+    padding-bottom: 1em;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+.asn-range-group:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+    margin-bottom: 0;
+}
+.asn-range-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.35em;
+    margin-bottom: 0.5em;
+}
+.asn-range-org {
+    font-size: 0.88em;
+    opacity: 0.65;
+}
+.asn-range-count {
+    font-size: 0.72em;
+    opacity: 0.4;
+}
+.cidr-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35em;
+}
+.cidr-chip {
+    font-family: monospace;
+    font-size: 0.78em;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 3px;
+    padding: 0.2em 0.5em;
+    white-space: nowrap;
+    line-height: 1.4;
+    user-select: all;
+}
+
+/* Stack columns on tablet and below */
+@media (max-width: 900px) {
+    .ranges-rules-grid {
+        flex-direction: column;
+        gap: 0;
+    }
+    .rules-col {
+        position: static;
+        margin-top: 3.5em;
+    }
+    .rules-col .block-rules-panel {
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+    .rules-col .block-rules-panel .button {
+        display: inline-block;
+        width: auto;
+    }
+}
+
+/* Block rules tab + panel styles (shared for both grid and full-width layouts) */
+.block-rules-tablist {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid rgba(255,255,255,0.12);
+    margin-bottom: 1em;
+}
+.block-rules-tab {
+    cursor: pointer;
+    padding: 0.3em 1.2em 0.4em;
+    font-size: 0.72em;
+    font-weight: bold;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    opacity: 0.45;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    user-select: none;
+    transition: opacity 0.15s ease, border-color 0.15s ease;
+    outline: none;
+}
+.block-rules-tab.active {
+    opacity: 1;
+    border-bottom-color: rgba(255,255,255,0.75);
+}
+.block-rules-tab:not(.active):not(.brt-disabled):hover {
+    opacity: 0.7;
+}
+.block-rules-tab:focus-visible {
+    outline: 2px solid rgba(255,255,255,0.5);
+    outline-offset: 2px;
+}
+.block-rules-tab.brt-disabled {
+    opacity: 0.2;
+    cursor: not-allowed;
+}
+.block-rules-panel {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5em;
+    padding: 0.25em 0;
+}
+.block-rules-panel .button {
+    margin: 0;
+}
+
+/* --- Report page block-script filter (report.php) --- */
+#report-filter {
+    margin-bottom: 2em;
+}
+
+#report-filter-details > summary {
+    cursor: pointer;
+    padding: 0.4em 0;
+    font-size: 0.8em;
+    font-weight: bold;
+    list-style: none;
+}
+#report-filter-details > summary::-webkit-details-marker { display: none; }
+#report-filter-details > summary::before {
+    content: '▸ ';
+    font-size: 0.85em;
+}
+#report-filter-details[open] > summary::before { content: '▾ '; }
+
+#report-filter-layout {
+    display: flex;
+    gap: 1.5em;
+    padding: 0.6em 0 0.5em;
+    flex-wrap: wrap;
+    align-items: flex-start;
+}
+
+#report-filter-categories {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3em;
+}
+
+#report-filter-countries {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3em;
+}
+
+#report-filter-countries > strong,
+#report-filter-categories > strong {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 0.65em;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    opacity: 0.5;
+    margin-bottom: 0.5em;
+}
+
+#report-filter-countries .filter-chips {
+    max-height: 9.8em;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3em;
+}
+
+#report-filter-countries label,
+#report-filter-categories label {
+    font-size: 0.7em;
+    font-weight: normal;
+    display: block;
+    padding: 0.3em 0.9em;
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 2em;
+    cursor: pointer;
+    opacity: 0.4;
+    transition: opacity 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+    user-select: none;
+    white-space: nowrap;
+    margin: 0;
+    line-height: 1.5;
+}
+
+#report-filter-countries label:has(input:checked),
+#report-filter-categories label:has(input:checked) {
+    opacity: 1;
+    border-color: rgba(255,255,255,0.35);
+    background: rgba(255,255,255,0.04);
+}
+
+#report-filter-categories label.cat-scanning    { color: #e06c9f; }
+#report-filter-categories label.cat-cloud       { color: #8ab4d4; }
+#report-filter-categories label.cat-vpn         { color: #e0a85a; }
+#report-filter-categories label.cat-residential { color: #6cb87a; }
+#report-filter-categories label.cat-unknown     { color: #aaa; }
+
+#report-filter-categories label.cat-scanning:has(input:checked)    { border-color: rgba(224,108,159,0.6); }
+#report-filter-categories label.cat-cloud:has(input:checked)       { border-color: rgba(138,180,212,0.6); }
+#report-filter-categories label.cat-vpn:has(input:checked)         { border-color: rgba(224,168,90,0.6);  }
+#report-filter-categories label.cat-residential:has(input:checked) { border-color: rgba(108,184,122,0.6); }
+#report-filter-categories label.cat-unknown:has(input:checked)     { border-color: rgba(170,170,170,0.4); }
+
+#report-filter-countries input[type="checkbox"],
+#report-filter-categories input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+}
+
+@media (max-width: 767px) {
+    #report-filter-layout {
+        flex-direction: column;
+        gap: 1em;
+    }
+}
+
+/* --- What to do next checklist --- */
+.next-steps {
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.09);
+    border-radius: 6px;
+    padding: 1em 1.4em;
+    margin: 1.5em 0;
+}
+.next-steps h3 {
+    margin-top: 0;
+    margin-bottom: 0.5em;
+    font-size: 1em;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    opacity: 0.8;
+}
+.next-steps ol {
+    margin: 0;
+    padding-left: 1.4em;
+}
+.next-steps li {
+    margin-bottom: 0.4em;
+    font-size: 0.9em;
+    opacity: 0.85;
+}
+
+/* --- AbuseIPDB verification callout --- */
+.abuseipdb-callout {
+    color: rgba(138,180,212,0.9);
+    font-size: 0.9em;
+    margin: 0.75em 0;
+}
+
+/* --- Threat CTA box --- */
+.threat-cta-box {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2em;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-left-width: 4px;
+    border-radius: 6px;
+    padding: 1.4em 1.6em;
+    margin: 1.5em 0 2em;
+}
+.threat-cta-box--high     { border-left-color: #e06c9f; background: rgba(224,108,159,0.06); }
+.threat-cta-box--moderate { border-left-color: #e0a85a; background: rgba(224,168,90,0.06); }
+.threat-cta-box--low      { border-left-color: #6cb87a; background: rgba(108,184,122,0.06); }
+
+.threat-cta-left {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.4em;
+}
+.threat-cta-left .asn-verdict {
+    margin-bottom: 0;
+}
+.threat-cta-reason {
+    font-size: 0.9em;
+    opacity: 0.85;
+    margin: 0;
+}
+.threat-cta-stats {
+    font-size: 0.85em;
+    opacity: 0.65;
+    margin: 0;
+}
+
+.threat-cta-right {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+.threat-cta-right form {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.threat-cta-features {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 1em;
+    font-size: 0.82em;
+    opacity: 0.8;
+}
+.threat-cta-features li {
+    padding: 0.18em 0;
+}
+.threat-cta-features li::before {
+    content: '✓  ';
+    opacity: 0.55;
+}
+
+/* Prominent CTA button — verdict-color fill */
+#cta-button {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    text-align: center;
+    font-weight: bold;
+    letter-spacing: 0.04em;
+    border-color: transparent !important;
+    color: #111 !important;
+    margin: 0;
+}
+.threat-cta-box--high     #cta-button { background-color: #e06c9f !important; }
+.threat-cta-box--moderate #cta-button { background-color: #e0a85a !important; }
+.threat-cta-box--low      #cta-button { background-color: #6cb87a !important; }
+
+.threat-cta-fine {
+    font-size: 0.75em;
+    opacity: 0.55;
+    margin: 0.6em 0 0;
+    text-align: center;
+}
+.threat-cta-fine a {
+    color: inherit;
+    border-bottom: 1px dotted rgba(255,255,255,0.3);
+    padding-bottom: 1px;
+}
+
+@media (max-width: 767px) {
+    .threat-cta-box {
+        grid-template-columns: 1fr;
+        gap: 1.2em;
+    }
+}
