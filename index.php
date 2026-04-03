@@ -581,7 +581,7 @@ else
 				<section id="contribute" class="wrapper style4 fade-up">
 					<div class="inner">
 						<h2>Contact / Contribute</h2>
-						<p>ip2geo.org is maintained and run by me, Josh. Hi. If this tool was helpful, feel free to say hello &mdash; or help contribute to hosting if this really saved the day.</p>
+						<p>ip2geo.org is maintained and run by me, Josh. Hi. If this tool was helpful, feel free to say hello &mdash; or help contribute to hosting if the free tools here really saved the day.</p>
 						<div class="row">
 							<div class="col-6 col-12-medium">
 								<ul class="contact">
