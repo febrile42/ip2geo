@@ -38,7 +38,7 @@ Phase A is built and deployed to staging. Revenue-gating is live behind Stripe C
 - [x] Cancel URL flow (/?cancelled=1 → repopulate textarea)
 - [x] Umami custom events (form submit with IP count bucket; export button clicks; report_view, report_download, report_tab_switch, report_copy_link, report_view_all_ips)
 - [x] PHPUnit tests (VerdictAlgorithmTest, TokenLifecycleTest, WebhookHandlerTest, AbuseIPDBRankingTest, AsnClassificationTest, CacheTest) — 95 tests, 119 assertions
-- [ ] WCAG AA contrast check on verdict badge colors (#e06c9f, #e0a85a, #6cb87a)
+- [x] WCAG AA contrast check on verdict badge colors (#e06c9f, #e0a85a, #6cb87a) — all pass on #312450 body bg (4.55, 6.62, 5.85); CTA button (#111 on color) also passes (6.13, 8.92, 7.89). Print CSS overrides to black. HIGH is borderline at 4.55 but verdict text is large+bold (3:1 threshold applies).
 - [ ] QA agent doc (see item 6 below)
 - [x] Report layout: move ranges and block rules above top threat sources (2026-03-30)
 - [x] Block script downloads for ASN ranges + nginx format + tabbed button UX (2026-03-30)
