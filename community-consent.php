@@ -67,11 +67,15 @@ if (!$row || !in_array($row['status'], ['paid', 'redeemed'], true)) {
 }
 
 // ── Idempotency: already set ──────────────────────────────────────────────────
+// Allow upgrading from declined (0) → opted-in (1); block all other repeats.
 
 if ($row['data_consent'] !== null) {
-    echo json_encode(['ok' => true, 'already_set' => true]);
-    mysqli_close($con);
-    exit;
+    $upgrading = ($consent === 1 && (int)$row['data_consent'] === 0);
+    if (!$upgrading) {
+        echo json_encode(['ok' => true, 'already_set' => true]);
+        mysqli_close($con);
+        exit;
+    }
 }
 
 // ── Decline: record and return ────────────────────────────────────────────────

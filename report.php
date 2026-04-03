@@ -700,15 +700,25 @@ function render_report(array $report, string $token, ?string $expires_at, array 
             </div>
             <?php endif; ?>
 
-            <?php if (!$is_demo && $data_consent === null): ?>
+            <?php if (!$is_demo && ($data_consent === null || $data_consent === 0)): ?>
             <div id="community-consent-banner" class="community-intel-banner" style="background:rgba(108,184,122,0.12);border-left:3px solid #6cb87a;padding:0.8em 1em;margin-bottom:1.5em;font-size:0.9em">
-                <strong>Community Intel &mdash; opt in</strong>
-                <p style="margin:0.4em 0 0.8em">Share anonymized network and IP data to see how your traffic compares to this week's global attack trends. <a href="/privacy.php" target="_blank" rel="noopener noreferrer" style="opacity:0.7;font-size:0.9em">Privacy policy</a></p>
-                <div style="display:flex;gap:0.5em;flex-wrap:wrap">
-                    <button class="button small" id="consent-yes-btn">Opt in &mdash; show me the comparison</button>
-                    <button class="button small alt" id="consent-no-btn">No thanks</button>
+                <?php if ($data_consent === 0): ?>
+                <div id="consent-full" style="display:none">
+                <?php else: ?>
+                <div id="consent-full">
+                <?php endif; ?>
+                    <strong>Community Intel &mdash; opt in</strong>
+                    <p style="margin:0.4em 0 0.8em">Share anonymized network and IP data to see how your traffic compares to this week's global attack trends. <a href="/privacy.php" target="_blank" rel="noopener noreferrer" style="opacity:0.7;font-size:0.9em">Privacy policy</a></p>
+                    <div style="display:flex;gap:0.5em;flex-wrap:wrap">
+                        <button class="button small" id="consent-yes-btn">Opt in &mdash; show me the comparison</button>
+                        <button class="button small alt" id="consent-no-btn">No thanks</button>
+                    </div>
+                    <p style="margin:0.6em 0 0;font-size:0.82em;opacity:0.55">Community data is currently limited as this feature grows &mdash; your opt-in helps build it.</p>
                 </div>
-                <p style="margin:0.6em 0 0;font-size:0.82em;opacity:0.55">Community data is currently limited as this feature grows &mdash; your opt-in helps build it.</p>
+                <div id="consent-collapsed" style="<?php echo $data_consent === 0 ? '' : 'display:none'; ?>font-size:0.9em;opacity:0.65">
+                    Community Intel &mdash; you opted out.
+                    <button id="consent-reconsider-btn" style="background:none;border:none;color:inherit;text-decoration:underline;cursor:pointer;padding:0;font-size:inherit;opacity:1">Change your mind?</button>
+                </div>
             </div>
             <script>
             (function() {
@@ -721,6 +731,14 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                         .then(function(r) { return r.json(); })
                         .then(callback)
                         .catch(function() {});
+                }
+                function showCollapsed() {
+                    document.getElementById('consent-full').style.display = 'none';
+                    document.getElementById('consent-collapsed').style.display = '';
+                }
+                function showFull() {
+                    document.getElementById('consent-collapsed').style.display = 'none';
+                    document.getElementById('consent-full').style.display = '';
                 }
                 document.getElementById('consent-yes-btn').addEventListener('click', function() {
                     var btn = this;
@@ -749,10 +767,10 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                 });
                 document.getElementById('consent-no-btn').addEventListener('click', function() {
                     this.disabled = true;
-                    postConsent(0, function() {
-                        var banner = document.getElementById('community-consent-banner');
-                        if (banner) banner.style.display = 'none';
-                    });
+                    postConsent(0, function() { showCollapsed(); });
+                });
+                document.getElementById('consent-reconsider-btn').addEventListener('click', function() {
+                    showFull();
                 });
             })();
             </script>
