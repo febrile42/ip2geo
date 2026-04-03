@@ -318,6 +318,22 @@ class CommunityConsentTest extends TestCase
     // ── Opt-in (consent=1) ────────────────────────────────────────────────────
 
     /**
+     * Mirrors the ip_in_cidr() function from community-consent.php.
+     */
+    private static function ipInCidr(string $ip, string $cidr): bool
+    {
+        if (strpos($cidr, '/') === false) return $ip === $cidr;
+        [$network, $prefix] = explode('/', $cidr, 2);
+        $prefix  = (int)$prefix;
+        $ipLong  = ip2long($ip);
+        $netLong = ip2long($network);
+        if ($ipLong === false || $netLong === false) return false;
+        if ($prefix === 0) return true;
+        $mask = ~0 << (32 - $prefix);
+        return ($ipLong & $mask) === ($netLong & $mask);
+    }
+
+    /**
      * Run the full opt-in ingestion logic mirroring community-consent.php.
      * Returns the response array that the endpoint would json_encode().
      */
@@ -338,6 +354,16 @@ class CommunityConsentTest extends TestCase
         // Step 3: use today's date (rolling 7-day window)
         $reportDate = gmdate('Y-m-d');
 
+        // Step 3.5: build IP→freq map from all IPs regardless of classification
+        // (mirrors community-consent.php — all IPs count toward CIDR hit totals)
+        $ipFreq = [];
+        foreach ($ipList as $entry) {
+            $ip = $entry['ip'] ?? '';
+            if ($ip !== '') {
+                $ipFreq[$ip] = (int)($entry['freq'] ?? 1);
+            }
+        }
+
         // Step 4: ingest CIDR data
         $asnRanges = $report['asn_ranges'] ?? [];
 
@@ -353,16 +379,17 @@ class CommunityConsentTest extends TestCase
                 $asn = $range['asn'] ?? '';
                 $org = $range['org'] ?? '';
                 foreach ($range['cidrs'] ?? [] as $cidrEntry) {
-                    if (is_array($cidrEntry)) {
-                        $cidr = $cidrEntry['cidr'] ?? '';
-                        $hits = (int) ($cidrEntry['hits'] ?? 1);
-                    } else {
-                        $cidr = (string) $cidrEntry;
-                        $hits = 1;
-                    }
+                    $cidr = is_array($cidrEntry) ? ($cidrEntry['cidr'] ?? '') : (string)$cidrEntry;
                     if ($cidr === '' || $asn === '') {
                         continue;
                     }
+                    // Compute hits via IP membership — mirrors production ip_in_cidr() logic.
+                    // The 'hits' field on CIDR entries is not used; only observed IPs count.
+                    $hits = 0;
+                    foreach ($ipFreq as $ip => $freq) {
+                        if (self::ipInCidr($ip, $cidr)) $hits += $freq;
+                    }
+                    if ($hits === 0) continue; // No observed hits from this report — skip
                     $cidrStmt->execute([$cidr, $asn, $org, $reportDate, $hits]);
                 }
             }
@@ -400,15 +427,20 @@ class CommunityConsentTest extends TestCase
         );
         $wkStmt->execute([$reportDate]);
 
-        // Step 7: fetch top CIDRs for rolling window
+        // Step 7: fetch top CIDRs for rolling window (mirrors production filters)
+        // Note: SUBSTRING_INDEX is MySQL-only; density/prefix filters are omitted here.
+        // report_count >= 3 and asn in GROUP BY are the behavioral filters under test.
+        $ctxCutoff = gmdate('Y-m-d', strtotime('-7 days'));
         $ctxStmt = $this->pdo->prepare(
-            'SELECT cidr, org, report_count, total_hits
+            'SELECT cidr, asn, org, SUM(report_count) AS report_count, SUM(total_hits) AS total_hits
              FROM community_cidr_stats
-             WHERE report_date = ?
-             ORDER BY report_count DESC, total_hits DESC
+             WHERE report_date >= ?
+             GROUP BY cidr, asn, org
+             HAVING SUM(report_count) >= 3
+             ORDER BY SUM(report_count) DESC, SUM(total_hits) DESC
              LIMIT 5'
         );
-        $ctxStmt->execute([$reportDate]);
+        $ctxStmt->execute([$ctxCutoff]);
         $topCidrs = $ctxStmt->fetchAll(\PDO::FETCH_ASSOC);
 
         return [
@@ -615,59 +647,69 @@ class CommunityConsentTest extends TestCase
         $reportJson = json_encode(['asn_ranges' => [
             ['asn' => 'AS9876', 'org' => 'String CIDR Org', 'cidrs' => ['203.0.113.0/24']],
         ]]);
+        // Provide a matching IP so the CIDR gets non-zero hits and is stored
+        $ipListJson = json_encode([
+            ['ip' => '203.0.113.5', 'classification' => 'scanning', 'freq' => 2],
+        ]);
 
-        $this->runOptIn($token, $reportJson, '[]');
+        $this->runOptIn($token, $reportJson, $ipListJson);
 
         $row = $this->pdo->query(
             "SELECT cidr, total_hits FROM community_cidr_stats WHERE cidr = '203.0.113.0/24'"
         )->fetch(\PDO::FETCH_ASSOC);
 
-        $this->assertNotFalse($row, 'String-format CIDR must be ingested');
+        $this->assertNotFalse($row, 'String-format CIDR must be ingested when matching IPs present');
         $this->assertSame('203.0.113.0/24', $row['cidr']);
-        $this->assertSame(1, (int) $row['total_hits'], 'String CIDR defaults to hits=1');
+        $this->assertSame(2, (int) $row['total_hits'], 'Hits come from matching IP frequency');
     }
 
-    public function testCidrAsObjectWithHitsIsIngested(): void
+    public function testCidrHitsComputedFromIpMembership(): void
     {
+        // The 'hits' field on a CIDR entry is ignored — hits come from IPs in ip_list
+        // that fall within the CIDR (mirrors production ip_in_cidr() logic).
         $token = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
         $this->insertReport(['status' => 'paid']);
 
         $reportJson = json_encode(['asn_ranges' => [
             ['asn' => 'AS5555', 'org' => 'Object CIDR Org', 'cidrs' => [
-                ['cidr' => '198.51.100.0/24', 'hits' => 42],
+                ['cidr' => '198.51.100.0/24', 'hits' => 42], // hits field is ignored
             ]],
         ]]);
+        $ipListJson = json_encode([
+            ['ip' => '198.51.100.1', 'classification' => 'scanning', 'freq' => 5],
+            ['ip' => '198.51.100.2', 'classification' => 'scanning', 'freq' => 3],
+        ]);
 
-        $this->runOptIn($token, $reportJson, '[]');
+        $this->runOptIn($token, $reportJson, $ipListJson);
 
         $row = $this->pdo->query(
-            "SELECT cidr, total_hits FROM community_cidr_stats WHERE cidr = '198.51.100.0/24'"
+            "SELECT total_hits FROM community_cidr_stats WHERE cidr = '198.51.100.0/24'"
         )->fetch(\PDO::FETCH_ASSOC);
 
-        $this->assertNotFalse($row, 'Object-format CIDR must be ingested');
-        $this->assertSame('198.51.100.0/24', $row['cidr']);
-        $this->assertSame(42, (int) $row['total_hits'], 'Object CIDR must use hits field');
+        $this->assertNotFalse($row, 'CIDR must be ingested when matching IPs are present');
+        $this->assertSame(8, (int) $row['total_hits'],
+            'total_hits must be sum of matching IP frequencies (5+3=8), not CIDR entry hits field (42)');
     }
 
-    public function testCidrObjectWithoutHitsDefaultsToOne(): void
+    public function testCidrWithNoMatchingIpsIsSkipped(): void
     {
+        // A CIDR that appears in asn_ranges but has no IPs from the report mapping
+        // into it must not be stored — zero-hit CIDRs are dropped.
         $token = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
         $this->insertReport(['status' => 'paid']);
 
         $reportJson = json_encode(['asn_ranges' => [
-            ['asn' => 'AS7777', 'org' => 'No Hits Org', 'cidrs' => [
-                ['cidr' => '100.64.0.0/10'],
-            ]],
+            ['asn' => 'AS7777', 'org' => 'No Hits Org', 'cidrs' => ['100.64.0.0/10']],
         ]]);
+        // IP that does NOT fall in 100.64.0.0/10
+        $ipListJson = json_encode([
+            ['ip' => '8.8.8.8', 'classification' => 'scanning', 'freq' => 10],
+        ]);
 
-        $this->runOptIn($token, $reportJson, '[]');
+        $this->runOptIn($token, $reportJson, $ipListJson);
 
-        $row = $this->pdo->query(
-            "SELECT total_hits FROM community_cidr_stats WHERE cidr = '100.64.0.0/10'"
-        )->fetch(\PDO::FETCH_ASSOC);
-
-        $this->assertNotFalse($row, 'CIDR object without hits key must be ingested');
-        $this->assertSame(1, (int) $row['total_hits'], 'Missing hits must default to 1');
+        $count = (int) $this->pdo->query('SELECT COUNT(*) FROM community_cidr_stats')->fetchColumn();
+        $this->assertSame(0, $count, 'CIDR with no matching IPs must not be stored');
     }
 
     public function testMixedStringAndObjectCidrsAreAllIngested(): void
@@ -677,41 +719,74 @@ class CommunityConsentTest extends TestCase
 
         $reportJson = json_encode(['asn_ranges' => [
             ['asn' => 'AS1111', 'org' => 'Mixed Org', 'cidrs' => [
-                '10.0.0.0/8',                              // string format
-                ['cidr' => '172.16.0.0/12', 'hits' => 7], // object format
+                '10.0.0.0/8',
+                ['cidr' => '172.16.0.0/12', 'hits' => 7], // hits field ignored
             ]],
         ]]);
+        // Provide matching IPs for both CIDRs
+        $ipListJson = json_encode([
+            ['ip' => '10.0.0.1',   'classification' => 'scanning', 'freq' => 1],
+            ['ip' => '172.16.1.1', 'classification' => 'scanning', 'freq' => 1],
+        ]);
 
-        $this->runOptIn($token, $reportJson, '[]');
+        $this->runOptIn($token, $reportJson, $ipListJson);
 
         $count = (int) $this->pdo->query('SELECT COUNT(*) FROM community_cidr_stats')->fetchColumn();
-        $this->assertSame(2, $count, 'Both string and object CIDRs must be ingested');
+        $this->assertSame(2, $count, 'Both string and object CIDRs must be ingested when matching IPs present');
     }
 
     // ── top_cidrs in response ─────────────────────────────────────────────────
 
     public function testTopCidrsReturnedInResponse(): void
     {
+        // Pre-seed two prior days so report_count reaches 3 after opt-in (satisfies HAVING report_count >= 3)
+        $today = gmdate('Y-m-d');
+        $yesterday = gmdate('Y-m-d', strtotime('-1 day'));
+        $this->pdo->exec("INSERT INTO community_cidr_stats (cidr, asn, org, report_date, report_count, total_hits)
+            VALUES ('8.8.0.0/16', 'AS15169', 'Google LLC', '{$yesterday}', 2, 200)");
+
         $token = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
         $this->insertReport(['status' => 'paid']);
 
         $reportJson = json_encode(['asn_ranges' => [
-            ['asn' => 'AS2222', 'org' => 'Top CIDR Org', 'cidrs' => [
-                ['cidr' => '8.8.0.0/16', 'hits' => 100],
-                ['cidr' => '8.9.0.0/16', 'hits' => 50],
-            ]],
+            ['asn' => 'AS15169', 'org' => 'Google LLC', 'cidrs' => ['8.8.0.0/16']],
         ]]);
+        $ipListJson = json_encode([
+            ['ip' => '8.8.0.1', 'classification' => 'scanning', 'freq' => 10],
+        ]);
 
-        $result = $this->runOptIn($token, $reportJson, '[]');
+        $result = $this->runOptIn($token, $reportJson, $ipListJson);
 
         $this->assertIsArray($result['top_cidrs']);
-        $this->assertNotEmpty($result['top_cidrs']);
+        $this->assertNotEmpty($result['top_cidrs'],
+            'top_cidrs must be non-empty when report_count >= 3 threshold is met');
 
         $firstEntry = $result['top_cidrs'][0];
         $this->assertArrayHasKey('cidr', $firstEntry);
+        $this->assertArrayHasKey('asn', $firstEntry);
         $this->assertArrayHasKey('org', $firstEntry);
         $this->assertArrayHasKey('report_count', $firstEntry);
         $this->assertArrayHasKey('total_hits', $firstEntry);
+    }
+
+    public function testTopCidrsEmptyWhenBelowReportCountThreshold(): void
+    {
+        // A single opt-in (report_count=1) must not appear in top_cidrs
+        $token = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
+        $this->insertReport(['status' => 'paid']);
+
+        $reportJson = json_encode(['asn_ranges' => [
+            ['asn' => 'AS2222', 'org' => 'New Org', 'cidrs' => ['198.18.0.0/15']],
+        ]]);
+        $ipListJson = json_encode([
+            ['ip' => '198.18.0.1', 'classification' => 'scanning', 'freq' => 5],
+        ]);
+
+        $result = $this->runOptIn($token, $reportJson, $ipListJson);
+
+        $this->assertIsArray($result['top_cidrs']);
+        $this->assertEmpty($result['top_cidrs'],
+            'top_cidrs must be empty when CIDR has fewer than 3 corroborating reports');
     }
 
     public function testTopCidrsLimitedToFive(): void
@@ -719,16 +794,25 @@ class CommunityConsentTest extends TestCase
         $token = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
         $this->insertReport(['status' => 'paid']);
 
-        // Insert 7 distinct CIDRs
-        $cidrs = [];
+        // Pre-seed 7 CIDRs with report_count=2 each so opt-in brings them to 3
+        $yesterday = gmdate('Y-m-d', strtotime('-1 day'));
         for ($i = 1; $i <= 7; $i++) {
-            $cidrs[] = ['cidr' => "10.{$i}.0.0/16", 'hits' => $i];
+            $this->pdo->exec("INSERT INTO community_cidr_stats (cidr, asn, org, report_date, report_count, total_hits)
+                VALUES ('10.{$i}.0.0/16', 'AS3333', 'Limit Test Org', '{$yesterday}', 2, {$i}0)");
+        }
+
+        // Opt-in with matching IPs for all 7 CIDRs
+        $cidrs = [];
+        $ips   = [];
+        for ($i = 1; $i <= 7; $i++) {
+            $cidrs[] = "10.{$i}.0.0/16";
+            $ips[]   = ['ip' => "10.{$i}.0.1", 'classification' => 'scanning', 'freq' => $i];
         }
         $reportJson = json_encode(['asn_ranges' => [
             ['asn' => 'AS3333', 'org' => 'Limit Test Org', 'cidrs' => $cidrs],
         ]]);
 
-        $result = $this->runOptIn($token, $reportJson, '[]');
+        $result = $this->runOptIn($token, $reportJson, json_encode($ips));
 
         $this->assertLessThanOrEqual(5, count($result['top_cidrs']), 'top_cidrs must be limited to 5 entries');
     }
