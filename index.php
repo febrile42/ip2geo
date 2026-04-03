@@ -58,6 +58,7 @@ $view_token_val  = $view_token_mode ? preg_replace('/[^a-f0-9\-]/', '', trim($_G
 					<ul>
 						<li><a href="#intro">Bulk IP Location Lookup</a></li>
 						<li><a href="#reports">Threat Reports</a></li>
+						<li><a href="/intel.php">Community Block List</a></li>
 						<li><a href="#contribute">Contact / Contribute</a></li>
 						<li><a href="#about">About</a></li>
 					</ul>
@@ -464,6 +465,8 @@ if ($_POST || $view_token_mode)
 	echo '<div id="rules-iptables" class="rules-block" style="display:none" aria-label="iptables block rules"><button class="button small copy-rules" data-target="rules-iptables-pre">Copy</button><pre id="rules-iptables-pre"></pre></div>';
 	echo '<div id="rules-ufw"      class="rules-block" style="display:none" aria-label="ufw deny rules"><button class="button small copy-rules" data-target="rules-ufw-pre">Copy</button><pre id="rules-ufw-pre"></pre></div>';
 	echo '<div id="rules-nginx"    class="rules-block" style="display:none" aria-label="nginx geo block"><button class="button small copy-rules" data-target="rules-nginx-pre">Copy</button><pre id="rules-nginx-pre"></pre></div>';
+
+	echo '<p style="margin:0.8em 0 0;font-size:0.85em;opacity:0.7">Block known scanners reported by the ip2geo community &mdash; <a href="/intel.php">Community Block List &rarr;</a></p>';
 
 	echo '</div>'; // end #filter-left
 
