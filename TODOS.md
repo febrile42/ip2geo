@@ -1,6 +1,6 @@
 # ip2geo — TODOs, Deferred Items & Open Questions
 
-Last updated: 2026-04-03 (Phase C go-live checklist updated; staging schema migration done).
+Last updated: 2026-04-03 (Phase C go-live checklist updated; staging schema migration done; Stripe account flags cleared — payments live).
 Source of truth for what's done, what's next, and what's deferred.
 
 Plans live in: `~/.gstack/projects/febrile42-ip2geo/`
@@ -14,8 +14,7 @@ Plans live in: `~/.gstack/projects/febrile42-ip2geo/`
 
 ## Current Phase State (as of 2026-04-02)
 
-**v3.0.0 tagged** — Phase A complete, deployed to staging, QA clean (97/100).
-Stripe account under review; payments not yet live. Tagged `v3.0.0` on develop.
+**v3.0.0 tagged** — Phase A + Phase C complete. Stripe flags cleared (2026-04-03) — payments live. QA clean: 95/100 (0 issues, 2026-04-03). Ready to merge develop → main.
 Phase C (community intel flywheel) now in active development on develop branch.
 
 Phase A is built and deployed to staging. Revenue-gating is live behind Stripe Checkout.
@@ -248,7 +247,7 @@ context" column in paid reports ("this IP hit 31 other servers this week, escala
 - [x] **Schema migration on prod** — ALTER TABLE (week_start → report_date) + CREATE TABLE community_weekly_stats run on `ip2geo` prod DB (2026-04-03).
 - [x] **Clear community stats tables** — all 4 community tables truncated on prod (2026-04-03).
 - [x] **Staging DB isolation** — `ip2geo_staging` schema created, full schema copied (including static lookup tables), schema migration (week_start → report_date + community_weekly_stats) complete. `config-staging.php` updated to `$db_name = 'ip2geo_staging'` (2026-04-03).
-- [ ] **Monthly update workflow** — after staging DB isolation, update `.github/workflows/update-db.yml` to also update `ip2geo_staging` DB (MaxMind + AbuseIPDB) to prevent drift.
+- [x] **Monthly update workflow** — `.github/workflows/update-db.yml` updated: syncs GeoIP tables (network/location/ASN) to `ip2geo_staging` after each prod update, and runs 52-week retention cleanup on both DBs (2026-04-03).
 - [x] **Caching on intel.php** — APCu page-level cache added (15-min TTL, key `intel_page_7d_{date}` auto-invalidates at UTC midnight; downloads bypass; graceful fallback if APCu unavailable). (2026-04-03)
 - [x] **Fix CommunityConsentTest.php** — updated to `report_date`, `community_weekly_stats` added to setUp, rolling date logic updated. 37/37 tests passing (2026-04-03).
 

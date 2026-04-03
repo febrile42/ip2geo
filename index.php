@@ -626,8 +626,11 @@ else
 							<h3>The Fix</h3>
 							<p>I was maintaining an aging email system with no password policies and no support — a perfect storm for account compromises. With no time or budget to overhaul it, I built this tool instead.</p>
 							<p>ip2geo.org lets you paste raw output from tools like <code>netstat</code>, <code>fail2ban</code>, or anything else that spits out IPs. It automatically extracts valid IPv4 addresses, runs a fast geolocation lookup, and gives you clean, actionable data — instantly. With one glance, I could see login attempts from every corner of the globe and quickly block entire botnets.</p>
+							<h3>What It's Grown Into</h3>
+							<p>The free lookup is still here. But over time, ip2geo.org has grown into something more complete. When a lookup shows a high concentration of scanning or proxy infrastructure, you can now generate a full <strong>Threat Report</strong> — AbuseIPDB verification for your top IPs, ASN CIDR ranges for resilient blocking, and ready-to-run scripts for iptables, ufw, and nginx.</p>
+							<p>There's also a <a href="/intel.php">Community Block List</a> — a rolling 7-day feed of CIDR ranges reported by opted-in ip2geo users. If you contribute your report, your data joins the aggregate anonymously. If you just want the list, download it and apply it directly to your firewall.</p>
 							<h3>How It Works</h3>
-							<p>Paste any block of text. ip2geo.org scans it for IPv4 addresses, checks them against a geolocation database, and returns results you can filter by country. Want to ignore U.S. traffic while investigating a weird spike in Romania? Done. Focus only on what matters.</p>
+							<p>Paste any block of text. ip2geo.org scans it for IPv4 addresses, checks them against a geolocation database, and returns results you can filter by country or infrastructure category — scanning ranges, cloud exit nodes, VPN and proxy infrastructure, or residential traffic. Want to only see scanning infrastructure hits from outside the US? Done. Focus only on what matters.</p>
 							<h3>Why It's Free</h3>
 							<p>This tool was built using free and open-source resources, and it's free because I wish something like this had existed when I needed it most. If it helps you too, consider <a href="https://www.buymeacoffee.com/ip2geo" target="_blank">buying me a coffee</a> or tossing a few bucks toward hosting costs.</p>
 						</section>
