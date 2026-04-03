@@ -1,6 +1,6 @@
 # ip2geo — TODOs, Deferred Items & Open Questions
 
-Last updated: 2026-04-02 (CEO review: report perceived value).
+Last updated: 2026-04-02 (post-commit audit).
 Source of truth for what's done, what's next, and what's deferred.
 
 Plans live in: `~/.gstack/projects/febrile42-ip2geo/`
@@ -39,7 +39,8 @@ Phase A is built and deployed to staging. Revenue-gating is live behind Stripe C
 - [x] Umami custom events (form submit with IP count bucket; export button clicks; report_view, report_download, report_tab_switch, report_copy_link, report_view_all_ips)
 - [x] PHPUnit tests (VerdictAlgorithmTest, TokenLifecycleTest, WebhookHandlerTest, AbuseIPDBRankingTest, AsnClassificationTest, CacheTest) — 95 tests, 119 assertions
 - [x] WCAG AA contrast check on verdict badge colors (#e06c9f, #e0a85a, #6cb87a) — all pass on #312450 body bg (4.55, 6.62, 5.85); CTA button (#111 on color) also passes (6.13, 8.92, 7.89). Print CSS overrides to black. HIGH is borderline at 4.55 but verdict text is large+bold (3:1 threshold applies).
-- [ ] QA agent doc (see item 6 below)
+- [ ] Investigate Umami Event properties page error (see item 6 below)
+- [ ] QA agent doc (see item 7 below)
 - [x] Report layout: move ranges and block rules above top threat sources (2026-03-30)
 - [x] Block script downloads for ASN ranges + nginx format + tabbed button UX (2026-03-30)
 - [x] Report print/PDF stylesheet (2026-03-30) — deployed, needs design review
@@ -153,7 +154,21 @@ Design the schema now even if Phase B isn't built yet:
 
 ---
 
-### 6. QA agent doc
+### 6. Investigate Umami Event properties page error
+
+Umami is firing custom events (form submit, export, report_view, etc.) but the Event properties
+page in the Umami dashboard is returning an error. Investigate before relying on event data
+to answer Q6 (visitor intent: incident response vs. curiosity).
+
+Steps:
+- Log into Umami, navigate to Events → Event properties
+- Capture the error message
+- Check whether the issue is a Umami version bug, a misconfigured event payload, or a data volume issue
+- Verify raw event counts look sane (Events tab, not properties)
+
+---
+
+### 7. QA agent doc
 
 Write a doc that a Claude Code QA agent can use to verify everything end-to-end,
 without needing Stripe credentials or context on how the code works.
@@ -178,40 +193,29 @@ Contents:
 These are product/design decisions that need a call before implementation.
 Full context in `QUESTIONS.md`.
 
-### Q1 — Shell script content: paid vs. free
-The free page filter-then-copy is more flexible than the paid static scripts.
-- Should paid scripts include cloud IPs (not just scanning+VPN)?
-- Should paid scripts add an nginx format? (trivially easy — question is positioning)
-- Is the free filter intentionally better, or an accident of implementation?
-- Cap at top-1000 IPs in block scripts for very large batches?
+### Q1 — Shell script content: paid vs. free — RESOLVED 2026-04-02
+Paid report now has category filters + Block by IP + Block by Range tabs. Parity with free page achieved. Closed.
 
-### Q2 — Frequency data on free page
-Freq is paid-only today. Options: free column, "top repeat offenders" callout, keep paid.
+### Q2 — Frequency data on free page — RESOLVED 2026-04-02
+Freq stays paid-only. Intentional differentiator.
 
-### Q3 — View all IPs performance
-Re-running full geo lookup on every view_token load is 2–4s for large batches.
-Cache in `geo_results_json` DB column vs. accept re-query cost?
-(See TODO #5 above — this feeds the IP collapse plan.)
+### Q3 — View all IPs performance — RESOLVED
+`geo_results_json` column added, stored at generation time, nulled on redemption. No re-query. (commits f5666a5, 57c7e84)
 
-### Q4 — Country filter carry-through
-view_token page shows all IPs with no filter pre-applied. Should it remember the
-original country filter? (We don't currently store it.)
+### Q4 — Country filter carry-through — WONTDO
+"Show all, filter client-side" is the right default. Not worth storing original filter state.
 
-### Q5 — Report expiry model
-30 days right? Should "view all IPs" have a different expiry than the report itself?
-Currently they're tied to the same token.
+### Q5 — Report expiry model — RESOLVED 2026-04-02
+30-day expiry is correct. view_token tied to same token is fine. Cleanup cron handles expiry.
 
 ### Q6 — Visitor intent (from CEO plan)
-Do the 800/month visitors skew toward incident response or curiosity/diagnostics?
-High IP count (>1K) = incident; low count (<50) = casual. Check Umami once events fire.
+Umami Event properties page is erroring — investigate before relying on event data. See near-term TODO below.
 
-### Q7 — Programmatic access check
-Check server access logs for POST requests with non-browser user agents.
-5 minutes, reopens the API monetization question if present. (CEO plan item.)
+### Q7 — Programmatic access check — WONTDO
+Not worth the investigation at Phase A scale. Revisit if API monetization becomes a priority.
 
-### Q8 — asn_org not stored in ip_list_json for real paid reports
-**RESOLVED 2026-03-30 (commit e1b18f6).** Added `'asn_org' => $asn_org` to `$ip_classified_data`
-in `index.php:244`. Forward fix only — existing DB rows not back-filled.
+### Q8 — asn_org not stored in ip_list_json for real paid reports — RESOLVED 2026-03-30
+Added `'asn_org' => $asn_org` to `$ip_classified_data` in `index.php:244`. Forward fix only — existing DB rows not back-filled.
 
 ---
 
@@ -222,18 +226,11 @@ in `index.php:244`. Forward fix only — existing DB rows not back-filled.
 Stripe reviews the live site for compliance before activating the account for payments.
 Contact email: **support@ip2geo.org**
 
-- [ ] **Add contact email to index.php and footer** — add `support@ip2geo.org` to the "Contact / Contribute" section and footer. Stripe requires a direct contact method (phone, email, address, form, or chat). Current social links alone are insufficient.
-
-- [ ] **Update privacy.php** — current policy says "no data collected except Umami." Now false: we process payments via Stripe, store report tokens/results in DB for 30 days, optionally store notification email, and send IPs to AbuseIPDB for enrichment. Add sections covering: what's collected, retention period, Stripe as payment processor (link their privacy policy), AbuseIPDB as third-party lookup service.
-
-- [ ] **Create legal.php** — new page covering three policies required before first transaction:
-  - *Refund policy:* "Digital reports are generated immediately upon payment. All sales are final. If a technical failure prevents your report from generating, contact support@ip2geo.org within 7 days for a full refund."
-  - *Cancellation policy:* "Reports are one-time purchases. There is no subscription to cancel."
-  - *Dispute policy:* "Contact support@ip2geo.org before filing a dispute. Legitimate issues resolved promptly."
-
-- [ ] **Describe the paid product publicly** — Stripe requires that goods/services on the site match what was told to Stripe during signup. Add a brief description of the $9 threat report (what it includes: verdict, top-25 threat sources, ASN ranges, block scripts, AbuseIPDB scores) somewhere visible before the CTA — either a section in index.php or a linked `/report-info` page.
-
-- [ ] **Add Legal / Refund Policy link to footer** — alongside the existing Privacy Policy link, add a link to legal.php.
+- [x] **Add contact email to index.php and footer** — `support@ip2geo.org` added to footer (commit 7ae6172)
+- [x] **Update privacy.php** — updated for v3.0.0: Stripe, DB retention, AbuseIPDB all covered (commit 7ae6172)
+- [x] **Create legal.php** — refund/cancellation/dispute policies live (commit 3c5ebb6)
+- [x] **Describe the paid product publicly** — "Full Threat Reports" section added to index.php with pricing and what's included (commit 083d54a)
+- [x] **Add Legal / Refund Policy link to footer** — "Refund Policy" link in footer alongside Privacy Policy (commit 3c5ebb6)
 
 ---
 
@@ -248,12 +245,7 @@ Contact email: **support@ip2geo.org**
 **Effort:** S | **Priority:** P2 | **Depends on:** Phase A revenue validation
 
 ### Email delivery for paid report
-**What:** "Send to my inbox" input on the report page. Sends verdict summary + shareable link + CIDR ranges inline. Uses existing `notification_email` DB column — zero schema changes.
-**Why:** A physical email makes the $9 feel permanent. Buyer can forward to boss. The report becomes a shareable artifact.
-**Pros:** High perceived-value lift. Schema is already ready. Natural Phase B hook.
-**Cons:** Requires transactional email provider decision (SendGrid free tier is easiest).
-**Context:** From 2026-04-02 CEO review. Decision needed: SendGrid / Postmark / PHP mail(). ~30min CC after provider is set up.
-**Effort:** M (human: ~4h / CC: ~30min after provider setup) | **Priority:** P2 | **Depends on:** email provider decision
+**DONE** — Shipped via Resend. Report link emailed automatically after payment (webhook triggers send). Resend link shown on report page if buyer needs it re-sent. Implementation: `send-report-link.php` + `includes/email_helper.php`. Different from original plan (user-triggered form) — automatic delivery is better UX. (commits 44b0e1a, 8d0c43b, 170a285)
 
 ---
 
@@ -281,27 +273,20 @@ Monthly update-db.yml step: curl Spamhaus ASN-DROP, diff against asn_classificat
 open draft PR with proposed additions. Never auto-merged. See CEO plan for bash sketch.
 
 ### Expired report cleanup job
-Two queries needed, run via cron on lime (preferred over GHA — avoids 60-day inactivity kill):
-
-```sql
--- Dead pending rows (never paid, window elapsed)
-DELETE FROM reports WHERE status = 'pending' AND pending_expires_at < NOW() - INTERVAL 2 HOUR;
-
--- Expired paid reports (30-day access window elapsed)
-DELETE FROM reports WHERE status = 'redeemed' AND report_expires_at IS NOT NULL AND report_expires_at < NOW();
-```
-
-Phase A scale is fine without this; Phase B scale needs it. At ~2.6 MB/paid report (ip_list_json + report_json, geo_results_json now nulled on redemption), disk limit is ~3,200 paid rows on current 8.5 GB free. Add cleanup before that ceiling is near.
+**DONE** — Cleanup script created and deployed for cron on lime (commit 6d7502a). `geo_results_json` nulled on redemption to reclaim space (commit 57c7e84). At ~2.6 MB/paid report effective storage, disk ceiling is ~3,200 paid rows on 8.5 GB free.
 
 ---
 
-## Tests — Not Yet Built
+## Tests — Built
 
-Per CEO plan test strategy (all PHPUnit, no E2E):
-- `tests/VerdictAlgorithmTest.php` — 7 cases covering edge conditions
-- `tests/TokenLifecycleTest.php` — 6 status transitions
-- `tests/WebhookHandlerTest.php` — 5 cases
-- `tests/AbuseIPDBRankingTest.php` — 4 cases including cache behavior
-- `tests/CacheTest.php` — submission hash cache hit/miss
+All PHPUnit tests built (8 files, 95+ tests):
+- [x] `tests/VerdictAlgorithmTest.php`
+- [x] `tests/TokenLifecycleTest.php`
+- [x] `tests/WebhookHandlerTest.php`
+- [x] `tests/AbuseIPDBRankingTest.php`
+- [x] `tests/CacheTest.php`
+- [x] `tests/AsnClassificationTest.php`
+- [x] `tests/ReportFunctionsTest.php`
+- [x] `tests/EmailHelperTest.php` (added beyond original plan)
 
 Pre-launch manual Stripe test protocol (from CEO plan) — run before any production traffic.
