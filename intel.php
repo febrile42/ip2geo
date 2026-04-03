@@ -305,6 +305,12 @@ ob_start();
 <?php
 // ── Store rendered HTML in APCu (15-min TTL) ──────────────────────────────────
 $_html = ob_get_clean();
+if ($_html === false || $_html === '') {
+    // Output buffering failed — do not cache; emit a recoverable error.
+    http_response_code(500);
+    echo 'Page rendering error. Please try again.';
+    exit;
+}
 if (function_exists('apcu_store')) {
     apcu_store($_cache_key, $_html, 900);
 }
