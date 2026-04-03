@@ -113,6 +113,29 @@ if ($report === null || $ip_list === null) {
 // ── Use today's date for rolling 7-day aggregation ───────────────────────────
 $report_date = gmdate('Y-m-d');
 
+// ── Build IP → freq map for CIDR hit counting (all IPs, all classifications) ──
+// Counts all hits from the report's IP list, regardless of classification —
+// the CIDR represents the network, and we want total traffic from it.
+$ip_freq = [];
+foreach ($ip_list as $entry) {
+    $ip = $entry['ip'] ?? '';
+    if ($ip !== '') {
+        $ip_freq[$ip] = (int)($entry['freq'] ?? 1);
+    }
+}
+
+function ip_in_cidr(string $ip, string $cidr): bool {
+    if (strpos($cidr, '/') === false) return $ip === $cidr;
+    [$network, $prefix] = explode('/', $cidr, 2);
+    $prefix    = (int)$prefix;
+    $ip_long   = ip2long($ip);
+    $net_long  = ip2long($network);
+    if ($ip_long === false || $net_long === false) return false;
+    if ($prefix === 0) return true;
+    $mask = ~0 << (32 - $prefix);
+    return ($ip_long & $mask) === ($net_long & $mask);
+}
+
 // ── Ingest CIDR data ──────────────────────────────────────────────────────────
 
 $asn_ranges = $report['asn_ranges'] ?? [];
@@ -130,15 +153,16 @@ if (!empty($asn_ranges)) {
         $asn = $range['asn'] ?? '';
         $org = $range['org'] ?? '';
         foreach ($range['cidrs'] ?? [] as $cidr_entry) {
-            // cidr_entry may be a string or ['cidr'=>..., 'hits'=>...]
-            if (is_array($cidr_entry)) {
-                $cidr = $cidr_entry['cidr'] ?? '';
-                $hits = (int) ($cidr_entry['hits'] ?? 1);
-            } else {
-                $cidr = (string) $cidr_entry;
-                $hits = 1;
-            }
+            $cidr = is_array($cidr_entry) ? ($cidr_entry['cidr'] ?? '') : (string)$cidr_entry;
             if ($cidr === '' || $asn === '') continue;
+
+            // Count total hits from report IPs that fall within this CIDR.
+            $hits = 0;
+            foreach ($ip_freq as $ip => $freq) {
+                if (ip_in_cidr($ip, $cidr)) $hits += $freq;
+            }
+            if ($hits === 0) $hits = 1; // Fallback: CIDR appears in ranges so at least one hit
+
             $cidr_stmt->bind_param('ssssi', $cidr, $asn, $org, $report_date, $hits);
             $cidr_stmt->execute();
         }
