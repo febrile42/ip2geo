@@ -23,12 +23,31 @@ function is_public(int $n, array $reserved): bool {
     return true;
 }
 
-$ips = [];
-while (count($ips) < $no) {
+// ?pool=X — generate X unique IPs then sample $no total from them (some IPs repeat).
+// Realistic: a small number of sources account for most hits.
+// Example: ?no=500&pool=50 → 500 entries drawn from 50 unique IPs (~10 hits each on average).
+$pool_size = isset($_GET['pool']) ? min(max(1, (int)$_GET['pool']), $no) : 0;
+
+// Build unique IP pool
+$target = $pool_size > 0 ? $pool_size : $no;
+$pool = [];
+while (count($pool) < $target) {
     $n = random_int(0, 4294967295);
     if (is_public($n, $reserved)) {
-        $ips[] = long2ip($n);
+        $pool[] = long2ip($n);
     }
+}
+
+// In clustered mode, sample $no entries from the pool (with replacement) then shuffle
+if ($pool_size > 0) {
+    $last = $pool_size - 1;
+    $ips  = [];
+    for ($i = 0; $i < $no; $i++) {
+        $ips[] = $pool[random_int(0, $last)];
+    }
+    shuffle($ips);
+} else {
+    $ips = $pool;
 }
 
 echo implode(' ', $ips);
