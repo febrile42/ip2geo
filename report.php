@@ -715,9 +715,9 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                     </div>
                     <p style="margin:0.6em 0 0;font-size:0.82em;opacity:0.55">Community data is currently limited as this feature grows &mdash; your opt-in helps build it.</p>
                 </div>
-                <div id="consent-collapsed" style="<?php echo $data_consent === 0 ? '' : 'display:none'; ?>font-size:0.9em;opacity:0.65">
+                <div id="consent-collapsed" style="<?php echo $data_consent === 0 ? '' : 'display:none'; ?>font-size:0.9em;opacity:0.75">
                     Community Intel &mdash; you opted out.
-                    <button id="consent-reconsider-btn" style="background:none;border:none;color:inherit;text-decoration:underline;cursor:pointer;padding:0;font-size:inherit;opacity:1">Change your mind?</button>
+                    <a id="consent-reconsider-btn" tabindex="0" style="color:inherit;text-decoration:underline;cursor:pointer;margin-left:0.2em">Change your mind?</a>
                 </div>
             </div>
             <script>
@@ -769,7 +769,8 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                     this.disabled = true;
                     postConsent(0, function() { showCollapsed(); });
                 });
-                document.getElementById('consent-reconsider-btn').addEventListener('click', function() {
+                document.getElementById('consent-reconsider-btn').addEventListener('click', function(e) {
+                    e.preventDefault();
                     showFull();
                 });
             })();
