@@ -26,6 +26,8 @@
     .block-rules-heading,      /* orphaned h3 when no ASN ranges (no content below) */
     .rules-col,                /* download-only column: useless in print */
     #report-filter,            /* interactive filter UI: irrelevant in print */
+    .report-email-notice,      /* save/sent email callout: not relevant in print */
+    .community-intel-banner,   /* consent/opted-in/thank-you callouts: not relevant in print */
     .button,
     #share-link-btn,
     hr,                        /* footer separator: hides solo since following content is hidden */

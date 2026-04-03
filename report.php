@@ -663,7 +663,7 @@ function render_report(array $report, string $token, ?string $expires_at, array 
             <?php endif; ?>
 
             <?php if ($is_demo): ?>
-            <div style="background:rgba(108,184,122,0.12);border-left:3px solid #6cb87a;padding:0.8em 1em;margin-bottom:1.5em;font-size:0.9em">
+            <div class="community-intel-banner" style="background:rgba(108,184,122,0.12);border-left:3px solid #6cb87a;padding:0.8em 1em;margin-bottom:1.5em;font-size:0.9em">
                 <strong>Community Intel</strong> <span style="opacity:0.6;font-size:0.85em;margin-left:0.3em">Preview</span>
                 <p style="margin:0.4em 0 0.7em">When you generate your own report and opt in, ip2geo cross-references your IPs against anonymized data from other users this week. You see how many servers reported the same IPs, with trend indicators showing whether activity is escalating.</p>
                 <p style="margin:0 0 0.4em;opacity:0.85;font-size:0.9em">This is what the Community column looks like in the Top Threat Sources table:</p>
@@ -681,7 +681,7 @@ function render_report(array $report, string $token, ?string $expires_at, array 
             <?php endif; ?>
 
             <?php if (!$is_demo && $data_consent === null): ?>
-            <div id="community-consent-banner" style="background:rgba(108,184,122,0.12);border-left:3px solid #6cb87a;padding:0.8em 1em;margin-bottom:1.5em;font-size:0.9em">
+            <div id="community-consent-banner" class="community-intel-banner" style="background:rgba(108,184,122,0.12);border-left:3px solid #6cb87a;padding:0.8em 1em;margin-bottom:1.5em;font-size:0.9em">
                 <strong>Community Intel &mdash; opt in</strong>
                 <p style="margin:0.4em 0 0.8em">Share anonymized network and IP data to see how your traffic compares to this week's global attack trends. <a href="/privacy.php" target="_blank" rel="noopener noreferrer" style="opacity:0.7;font-size:0.9em">Privacy policy</a></p>
                 <div style="display:flex;gap:0.5em;flex-wrap:wrap">
@@ -709,7 +709,7 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                     postConsent(1, function(data) {
                         if (!data.ok) return;
                         var banner = document.getElementById('community-consent-banner');
-                        var html = '<div style="background:rgba(108,184,122,0.12);border-left:3px solid #6cb87a;padding:0.8em 1em;margin-bottom:1.5em;font-size:0.9em">';
+                        var html = '<div class="community-intel-banner" style="background:rgba(108,184,122,0.12);border-left:3px solid #6cb87a;padding:0.8em 1em;margin-bottom:1.5em;font-size:0.9em">';
                         html += '<strong>&#10003; Thanks for contributing!</strong>';
                         if (data.top_cidrs && data.top_cidrs.length) {
                             if (data.week_start) {
@@ -752,7 +752,7 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                     }
                 }
             ?>
-            <div style="background:rgba(108,184,122,0.12);border-left:3px solid #6cb87a;padding:0.8em 1em;margin-bottom:1.5em;font-size:0.9em">
+            <div class="community-intel-banner" style="background:rgba(108,184,122,0.12);border-left:3px solid #6cb87a;padding:0.8em 1em;margin-bottom:1.5em;font-size:0.9em">
                 <strong>&#10003; Thank you for contributing to Community Intel</strong>
                 <?php if (!$community_has_data): ?>
                 <p style="margin:0.4em 0 0;opacity:0.8">The community dataset is still in its early days &mdash; data will grow as more users opt in. Check back on future reports for richer comparisons.</p>
