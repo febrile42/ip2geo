@@ -296,4 +296,42 @@ class EmailHelperTest extends TestCase
         $stmt->execute(['tok_reclaim']);
         $this->assertSame(1, $stmt->rowCount(), 'After reset, next caller must be able to claim');
     }
+
+    // ── send-report-link.php resend path regression ────────────────────────────
+    // Regression: send-report-link.php was calling send_report_email() without
+    // first clearing email_sent_at. The atomic guard returned true (slot already
+    // claimed) without sending, producing a silent no-send that looked like
+    // success to the caller.
+
+    public function testResendPathBlockedWhenEmailSentAtAlreadySet(): void
+    {
+        // Simulate a token that was already emailed (report.php or webhook.php won the race)
+        $this->insertPaid('tok_resend_block', 'user@example.com');
+        $this->pdo->exec("UPDATE reports SET email_sent_at = datetime('now') WHERE token = 'tok_resend_block'");
+
+        // The guard fires: second claim returns 0 rows — no send would happen
+        $stmt = $this->pdo->prepare(
+            "UPDATE reports SET email_sent_at = datetime('now') WHERE token = ? AND email_sent_at IS NULL"
+        );
+        $stmt->execute(['tok_resend_block']);
+        $this->assertSame(0, $stmt->rowCount(), 'Guard must block when email_sent_at already set');
+    }
+
+    public function testResendPathSucceedsAfterClearingGuard(): void
+    {
+        // Simulate the fix: send-report-link.php resets the guard before calling send_report_email
+        $this->insertPaid('tok_resend_ok', 'user@example.com');
+        $this->pdo->exec("UPDATE reports SET email_sent_at = datetime('now') WHERE token = 'tok_resend_ok'");
+
+        // Fix: clear the guard first
+        $reset = $this->pdo->prepare('UPDATE reports SET email_sent_at = NULL WHERE token = ?');
+        $reset->execute(['tok_resend_ok']);
+
+        // Now the claim succeeds and send_report_email would proceed to Resend
+        $stmt = $this->pdo->prepare(
+            "UPDATE reports SET email_sent_at = datetime('now') WHERE token = ? AND email_sent_at IS NULL"
+        );
+        $stmt->execute(['tok_resend_ok']);
+        $this->assertSame(1, $stmt->rowCount(), 'After guard reset, resend path must claim the slot');
+    }
 }

@@ -62,6 +62,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $error === '' && $resend_enabled) {
     } elseif ($stored_email !== null && strtolower($stored_email) !== $submitted_email) {
         $error = 'That address does not match the one provided at checkout. Contact support@ip2geo.org if you need help.';
     } else {
+        // Resend path: clear the atomic send-slot guard so send_report_email can
+        // claim it again. The guard exists to prevent report.php/webhook.php from
+        // double-sending on first delivery; here the user is explicitly requesting
+        // a resend, so the guard must be cleared first.
+        $reset = $con->prepare('UPDATE reports SET email_sent_at = NULL WHERE token = ?');
+        $reset->bind_param('s', $token);
+        $reset->execute();
+        $reset->close();
+
         $sent = send_report_email($con, $token, $submitted_email, $expires_at, $resend_api_key, $resend_from, (int)($row['ip_count'] ?? 0));
         if ($sent) {
             $success = true;
