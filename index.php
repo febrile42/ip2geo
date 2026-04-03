@@ -159,7 +159,7 @@ if ($_POST || $view_token_mode)
 		$countries_all = array_filter($countries_all); // remove spurious empty entries
 
 		// parse country filter: normalize, sanitize, and validate against known country codes
-		$good_countries = array_filter(explode(" ", mysqli_real_escape_string($con, strtoupper($_POST['countries_filter']))));
+		$good_countries = array_filter(explode(" ", mysqli_real_escape_string($con, strtoupper($_POST['countries_filter'] ?? ''))));
 		foreach ($good_countries as $key => $value) {
 			if (!in_array($value, $countries_all))
 			{
