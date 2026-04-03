@@ -2,7 +2,7 @@
 // Single source of truth for the site footer.
 // Included from page-level scope and from inside render_page_close() (function scope),
 // so $db_data_date is accessed via $GLOBALS to work correctly in both contexts.
-defined('APP_VERSION') || define('APP_VERSION', '3.0.0');
+defined('APP_VERSION') || define('APP_VERSION', '3.1.0');
 $_footer_data_date = $GLOBALS['db_data_date'] ?? null;
 ?>
 <!-- Footer -->
