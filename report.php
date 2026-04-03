@@ -701,7 +701,7 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                         <tr><td style="padding:0.15em 0.6em 0.15em 0;font-family:monospace;opacity:0.8">192.168.x.x</td><td style="padding:0.15em 0.6em">Residential</td><td style="padding:0.15em 0"><span style="opacity:0.4">&mdash;</span></td></tr>
                     </tbody>
                 </table>
-                <p style="font-size:0.85em;opacity:0.6;margin:0.6em 0 0.75em">Residential IPs are never shared. 52-week retention. <a href="/privacy.php">Privacy policy</a></p>
+                <p style="font-size:0.85em;opacity:0.6;margin:0.6em 0 0.75em">Residential IPs are never collected. 52-week retention. <a href="/privacy.php">Privacy policy</a></p>
                 <a href="/" class="button small">Try with your own IPs &rarr;</a>
             </div>
             <?php endif; ?>
