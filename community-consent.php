@@ -161,7 +161,7 @@ if (!empty($asn_ranges)) {
             foreach ($ip_freq as $ip => $freq) {
                 if (ip_in_cidr($ip, $cidr)) $hits += $freq;
             }
-            if ($hits === 0) $hits = 1; // Fallback: CIDR appears in ranges so at least one hit
+            if ($hits === 0) continue; // No observed hits from this report — skip
 
             $cidr_stmt->bind_param('ssssi', $cidr, $asn, $org, $report_date, $hits);
             $cidr_stmt->execute();
@@ -217,11 +217,12 @@ $wk_stmt->close();
 
 $_ctx_cutoff = gmdate('Y-m-d', strtotime('-7 days'));
 $ctx_stmt = $con->prepare(
-    'SELECT cidr, org, SUM(report_count) AS report_count, SUM(total_hits) AS total_hits
+    'SELECT cidr, asn, org, SUM(report_count) AS report_count, SUM(total_hits) AS total_hits
      FROM community_cidr_stats
      WHERE report_date >= ?
-     GROUP BY cidr, org
-     HAVING CAST(SUBSTRING_INDEX(cidr, \'/\', -1) AS UNSIGNED) >= 16
+     GROUP BY cidr, asn, org
+     HAVING report_count >= 3
+        AND CAST(SUBSTRING_INDEX(cidr, \'/\', -1) AS UNSIGNED) >= 16
         AND SUM(total_hits) / POW(2, 32 - CAST(SUBSTRING_INDEX(cidr, \'/\', -1) AS UNSIGNED)) >= 0.001
      ORDER BY report_count DESC, total_hits DESC
      LIMIT 5'

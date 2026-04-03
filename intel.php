@@ -95,6 +95,13 @@ if ($has_data) {
 mysqli_close($con);
 
 // ── Serve download if ?format= is set ────────────────────────────────────────
+if ($is_download && (!$has_data || empty($cidrs))) {
+    http_response_code(404);
+    header('Content-Type: text/plain; charset=utf-8');
+    echo 'No community data available yet. Check back soon.';
+    exit;
+}
+
 if ($is_download && $has_data && !empty($cidrs)) {
     $cidr_list = array_column($cidrs, 'cidr');
     $count     = count($cidr_list);
