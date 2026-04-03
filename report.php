@@ -662,6 +662,24 @@ function render_report(array $report, string $token, ?string $expires_at, array 
             </div>
             <?php endif; ?>
 
+            <?php if ($is_demo): ?>
+            <div style="background:rgba(108,184,122,0.12);border-left:3px solid #6cb87a;padding:0.8em 1em;margin-bottom:1.5em;font-size:0.9em">
+                <strong>Community Intel</strong> <span style="opacity:0.6;font-size:0.85em;margin-left:0.3em">Preview</span>
+                <p style="margin:0.4em 0 0.7em">When you generate your own report and opt in, ip2geo cross-references your IPs against anonymized data from other users this week. You see how many servers reported the same IPs, with trend indicators showing whether activity is escalating.</p>
+                <p style="margin:0 0 0.4em;opacity:0.85;font-size:0.9em">This is what the Community column looks like in the Top Threat Sources table:</p>
+                <table style="width:100%;font-size:0.85em;border-collapse:collapse">
+                    <thead><tr style="opacity:0.6"><th style="text-align:left;padding:0.2em 0.6em 0.2em 0;font-weight:normal">IP</th><th style="text-align:left;padding:0.2em 0.6em;font-weight:normal">Category</th><th style="text-align:left;padding:0.2em 0;font-weight:normal">Community</th></tr></thead>
+                    <tbody>
+                        <tr><td style="padding:0.15em 0.6em 0.15em 0;font-family:monospace;opacity:0.8">185.220.101.x</td><td style="padding:0.15em 0.6em">Scanning</td><td style="padding:0.15em 0"><a href="/intel.php">23 servers &#8593;</a></td></tr>
+                        <tr><td style="padding:0.15em 0.6em 0.15em 0;font-family:monospace;opacity:0.8">193.32.162.x</td><td style="padding:0.15em 0.6em">VPN/Proxy</td><td style="padding:0.15em 0"><a href="/intel.php">8 servers &#8594; <span style="font-size:0.75em;opacity:0.55">(beta)</span></a></td></tr>
+                        <tr><td style="padding:0.15em 0.6em 0.15em 0;font-family:monospace;opacity:0.8">192.168.x.x</td><td style="padding:0.15em 0.6em">Residential</td><td style="padding:0.15em 0"><span style="opacity:0.4">&mdash;</span></td></tr>
+                    </tbody>
+                </table>
+                <p style="font-size:0.85em;opacity:0.6;margin:0.6em 0 0.75em">Residential IPs are never shared. Data resets weekly. <a href="/privacy.php">Privacy policy</a></p>
+                <a href="/" class="button small">Try with your own IPs &rarr;</a>
+            </div>
+            <?php endif; ?>
+
             <?php if (!$is_demo && $data_consent === null): ?>
             <div id="community-consent-banner" style="background:rgba(108,184,122,0.12);border-left:3px solid #6cb87a;padding:0.8em 1em;margin-bottom:1.5em;font-size:0.9em">
                 <strong>Community Intel &mdash; opt in</strong>

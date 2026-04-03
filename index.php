@@ -562,12 +562,13 @@ else
 									<li><strong>AbuseIPDB reputation scores</strong> for your top 25 IPs: see which ones are confirmed attackers</li>
 									<li><strong>ASN CIDR ranges</strong> for resilient blocking: block entire scanning networks, not just individual IPs that rotate</li>
 									<li><strong>Ready-to-paste firewall rules</strong> for iptables, ufw, and nginx</li>
+									<li><strong>Community intel</strong> (opt-in): see how many other ip2geo users reported the same IPs this week, with trend indicators showing whether activity is escalating</li>
 									<li><strong>Shareable link</strong> saved for 30 days: send it to your team or come back later</li>
 								</ul>
 							</div>
 							<div class="col-6 col-12-medium">
 								<h3>See it in action</h3>
-								<p>The sample report below is built from real Tor exit node data with live AbuseIPDB enrichment — the same format you'd get after a paid lookup.</p>
+								<p>The sample report uses real Tor exit node data with live AbuseIPDB enrichment. Opt in to community sharing and you'll also see how many other servers reported the same IPs this week.</p>
 								<p style="text-align:right"><a href="/report.php?token=00000000-0000-0000-0000-000000000000" target="_blank" class="button">See a sample report &rarr;</a></p>
 							</div>
 						</div>
