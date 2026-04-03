@@ -23,7 +23,8 @@ if (mysqli_connect_errno()) {
     $row   = null;
 } else {
     $stmt = $con->prepare(
-        'SELECT token, status, report_expires_at, notification_email, email_sent_at
+        'SELECT token, status, report_expires_at, notification_email, email_sent_at,
+                JSON_LENGTH(ip_list_json) AS ip_count
          FROM reports WHERE token = ?'
     );
     $stmt->bind_param('s', $token);
@@ -61,7 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $error === '' && $resend_enabled) {
     } elseif ($stored_email !== null && strtolower($stored_email) !== $submitted_email) {
         $error = 'That address does not match the one provided at checkout. Contact support@ip2geo.org if you need help.';
     } else {
-        $sent = send_report_email($con, $token, $submitted_email, $expires_at, $resend_api_key, $resend_from);
+        $sent = send_report_email($con, $token, $submitted_email, $expires_at, $resend_api_key, $resend_from, (int)($row['ip_count'] ?? 0));
         if ($sent) {
             $success = true;
             $stored_email = $submitted_email;

@@ -11,6 +11,16 @@
  */
 
 /**
+ * Build the subject line for a report delivery email.
+ * Exported as a pure function so it can be unit-tested.
+ */
+function report_email_subject(int $ip_count): string {
+    return $ip_count > 0
+        ? "Threat Intelligence Report ({$ip_count} IPs) - ip2geo"
+        : 'Threat Intelligence Report - ip2geo';
+}
+
+/**
  * Attempt to send the report link email.
  *
  * @param mysqli  $con         Open DB connection (caller keeps ownership)
@@ -89,9 +99,7 @@ HTML;
         $resend->emails->send([
             'from'    => $from,
             'to'      => [$email],
-            'subject' => $ip_count > 0
-                ? "Threat Intelligence Report ({$ip_count} IPs) - ip2geo"
-                : 'Threat Intelligence Report - ip2geo',
+            'subject' => report_email_subject($ip_count),
             'html'    => $html,
         ]);
         return true;

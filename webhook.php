@@ -98,7 +98,14 @@ $stmt->close();
 // report_expires_at is not set yet (report not generated); use 30 days from now as estimate.
 if ($notification_email !== '' && !empty($resend_api_key) && !empty($resend_from)) {
     $approx_expires = date('Y-m-d H:i:s', strtotime('+30 days'));
-    send_report_email($con, $token, $notification_email, $approx_expires, $resend_api_key, $resend_from);
+    $ip_count = 0;
+    $cnt_stmt = $con->prepare('SELECT JSON_LENGTH(ip_list_json) AS ip_count FROM reports WHERE token = ?');
+    $cnt_stmt->bind_param('s', $token);
+    $cnt_stmt->execute();
+    $cnt_row = $cnt_stmt->get_result()->fetch_assoc();
+    $cnt_stmt->close();
+    $ip_count = (int)($cnt_row['ip_count'] ?? 0);
+    send_report_email($con, $token, $notification_email, $approx_expires, $resend_api_key, $resend_from, $ip_count);
 }
 
 mysqli_close($con);

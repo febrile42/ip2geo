@@ -55,6 +55,26 @@ class EmailHelperTest extends TestCase
         $this->assertSame('***', mask_email('invalidemail'));
     }
 
+    // ── report_email_subject ───────────────────────────────────────────────────
+
+    public function testSubjectIncludesIpCountWhenPositive(): void
+    {
+        // Regression: webhook.php was not passing ip_count, so subject always
+        // dropped the count. Verify the subject includes the count when > 0.
+        $this->assertSame(
+            'Threat Intelligence Report (500 IPs) - ip2geo',
+            report_email_subject(500)
+        );
+    }
+
+    public function testSubjectOmitsCountWhenZero(): void
+    {
+        $this->assertSame(
+            'Threat Intelligence Report - ip2geo',
+            report_email_subject(0)
+        );
+    }
+
     // ── build_payment_alert_html ───────────────────────────────────────────────
 
     public function testAlertHtmlContainsDescription(): void
