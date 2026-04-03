@@ -58,7 +58,7 @@ $view_token_val  = $view_token_mode ? preg_replace('/[^a-f0-9\-]/', '', trim($_G
 					<ul>
 						<li><a href="#intro">Bulk IP Location Lookup</a></li>
 						<li><a href="#reports">Threat Reports</a></li>
-						<li><a href="/intel.php">Community Block List</a></li>
+						<li><a href="/intel.php" target="_blank" rel="noopener noreferrer">Community Block List <i class="fas fa-external-link-alt" style="font-size:0.7em;opacity:0.6;vertical-align:middle"></i></a></li>
 						<li><a href="#contribute">Contact / Contribute</a></li>
 						<li><a href="#about">About</a></li>
 					</ul>
