@@ -739,6 +739,7 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                 function showFull() {
                     document.getElementById('consent-collapsed').style.display = 'none';
                     document.getElementById('consent-full').style.display = '';
+                    document.getElementById('consent-no-btn').disabled = false;
                 }
                 document.getElementById('consent-yes-btn').addEventListener('click', function() {
                     var btn = this;
