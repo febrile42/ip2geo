@@ -1,9 +1,10 @@
-# Spamhaus ASN-DROP additions — March 2026
+# Spamhaus ASN-DROP additions — April 2026
 # Review and move appropriate entries into asn_classification.php
 # NEVER auto-merged. Human review required.
 
     'AS11938' => 'scanning',  // Spamhaus ASN-DROP — verify and classify
     'AS131750' => 'scanning',  // Spamhaus ASN-DROP — verify and classify
+    'AS131831' => 'scanning',  // Spamhaus ASN-DROP — verify and classify
     'AS132574' => 'scanning',  // Spamhaus ASN-DROP — verify and classify
     'AS132827' => 'scanning',  // Spamhaus ASN-DROP — verify and classify
     'AS132930' => 'scanning',  // Spamhaus ASN-DROP — verify and classify
@@ -89,6 +90,7 @@
     'AS198981' => 'scanning',  // Spamhaus ASN-DROP — verify and classify
     'AS199052' => 'scanning',  // Spamhaus ASN-DROP — verify and classify
     'AS199420' => 'scanning',  // Spamhaus ASN-DROP — verify and classify
+    'AS199639' => 'scanning',  // Spamhaus ASN-DROP — verify and classify
     'AS199785' => 'scanning',  // Spamhaus ASN-DROP — verify and classify
     'AS200010' => 'scanning',  // Spamhaus ASN-DROP — verify and classify
     'AS200130' => 'scanning',  // Spamhaus ASN-DROP — verify and classify
@@ -163,6 +165,7 @@
     'AS208525' => 'scanning',  // Spamhaus ASN-DROP — verify and classify
     'AS208846' => 'scanning',  // Spamhaus ASN-DROP — verify and classify
     'AS209121' => 'scanning',  // Spamhaus ASN-DROP — verify and classify
+    'AS209274' => 'scanning',  // Spamhaus ASN-DROP — verify and classify
     'AS209373' => 'scanning',  // Spamhaus ASN-DROP — verify and classify
     'AS209375' => 'scanning',  // Spamhaus ASN-DROP — verify and classify
     'AS209396' => 'scanning',  // Spamhaus ASN-DROP — verify and classify
@@ -224,13 +227,13 @@
     'AS213474' => 'scanning',  // Spamhaus ASN-DROP — verify and classify
     'AS213511' => 'scanning',  // Spamhaus ASN-DROP — verify and classify
     'AS213652' => 'scanning',  // Spamhaus ASN-DROP — verify and classify
-    'AS213676' => 'scanning',  // Spamhaus ASN-DROP — verify and classify
     'AS213702' => 'scanning',  // Spamhaus ASN-DROP — verify and classify
     'AS213725' => 'scanning',  // Spamhaus ASN-DROP — verify and classify
     'AS213753' => 'scanning',  // Spamhaus ASN-DROP — verify and classify
     'AS213790' => 'scanning',  // Spamhaus ASN-DROP — verify and classify
     'AS213897' => 'scanning',  // Spamhaus ASN-DROP — verify and classify
     'AS213921' => 'scanning',  // Spamhaus ASN-DROP — verify and classify
+    'AS213995' => 'scanning',  // Spamhaus ASN-DROP — verify and classify
     'AS213999' => 'scanning',  // Spamhaus ASN-DROP — verify and classify
     'AS214018' => 'scanning',  // Spamhaus ASN-DROP — verify and classify
     'AS214295' => 'scanning',  // Spamhaus ASN-DROP — verify and classify
@@ -251,7 +254,6 @@
     'AS215340' => 'scanning',  // Spamhaus ASN-DROP — verify and classify
     'AS215376' => 'scanning',  // Spamhaus ASN-DROP — verify and classify
     'AS215381' => 'scanning',  // Spamhaus ASN-DROP — verify and classify
-    'AS215420' => 'scanning',  // Spamhaus ASN-DROP — verify and classify
     'AS215460' => 'scanning',  // Spamhaus ASN-DROP — verify and classify
     'AS215462' => 'scanning',  // Spamhaus ASN-DROP — verify and classify
     'AS215474' => 'scanning',  // Spamhaus ASN-DROP — verify and classify
