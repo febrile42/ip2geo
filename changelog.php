@@ -37,7 +37,7 @@
 						<div class="inner">
 							<h1 class="major">Changelog</h1>
 								<h3>3.1.0 - 2026-04-03</h3>
-							<p>A rolling 7-day <a href="/intel.php">Community Block List</a> built from opted-in Threat Reports. CIDR ranges corroborated by three or more independent users — filtered by prefix size and hit density so coarse ISP blocks don't slip through — appear on the public list, downloadable as iptables, ufw, nginx, or plain CIDR format. Data rolls off after 52 weeks.</p>
+							<p>A rolling 7-day <a href="/intel.php">Community Block List</a> built from opted-in Threat Reports. CIDR ranges corroborated by three or more independent users — filtered by prefix size and hit density so coarse ISP blocks don't slip through — appear on the public list, downloadable as iptables, ufw, nginx, or plain CIDR format.</p>
 								<h3>3.0.0 - 2026-04-02</h3>
 							<p>Threat Reports: paste a batch of IPs from your server logs, pay once, and get back a verdict (clean, watchlist, or threat), AbuseIPDB scores for the worst offenders, and ASN CIDR ranges so you can block whole subnets instead of individual addresses. Ready-to-run block scripts for iptables, ufw, and nginx download directly from the report. Reports are token-tied and expire after 30 days.</p>
 								<h3>2.6.3 - 2026-03-23</h3>
