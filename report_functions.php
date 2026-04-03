@@ -191,7 +191,7 @@ function generate_threat_narrative(string $verdict, array $asn_ranges, int $scan
 
     if ($verdict === 'HIGH') {
         if ($asn_count === 0) {
-            return "This traffic shows a high concentration of known scanning infrastructure ({$pct_str} from known scanning infrastructure). No ASN ranges were found — use the IP-based block scripts below.";
+            return "This traffic shows a high concentration of scanning infrastructure ({$pct_str}). No ASN ranges were found — use the IP-based block scripts below.";
         } elseif ($asn_count === 1) {
             return "This traffic is a coordinated scan originating from {$org0} ({$asn0}), which accounts for the majority of your scanning hits. The CIDR ranges below cover this network permanently — blocking them stops the rotation.";
         } else {

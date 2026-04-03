@@ -683,11 +683,12 @@ function render_report(array $report, string $token, ?string $expires_at, array 
             <?php if (!$is_demo && $data_consent === null): ?>
             <div id="community-consent-banner" style="background:rgba(108,184,122,0.12);border-left:3px solid #6cb87a;padding:0.8em 1em;margin-bottom:1.5em;font-size:0.9em">
                 <strong>Community Intel &mdash; opt in</strong>
-                <p style="margin:0.4em 0 0.8em">Share anonymized network and IP data to see how your traffic compares to this week's global attack trends. <a href="/privacy.php" style="opacity:0.7;font-size:0.9em">Privacy policy</a></p>
+                <p style="margin:0.4em 0 0.8em">Share anonymized network and IP data to see how your traffic compares to this week's global attack trends. <a href="/privacy.php" target="_blank" rel="noopener noreferrer" style="opacity:0.7;font-size:0.9em">Privacy policy</a></p>
                 <div style="display:flex;gap:0.5em;flex-wrap:wrap">
                     <button class="button small" id="consent-yes-btn">Opt in &mdash; show me the comparison</button>
                     <button class="button small alt" id="consent-no-btn">No thanks</button>
                 </div>
+                <p style="margin:0.6em 0 0;font-size:0.82em;opacity:0.55">Community data is currently limited as this feature grows &mdash; your opt-in helps build it.</p>
             </div>
             <script>
             (function() {
@@ -709,11 +710,11 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                         if (!data.ok) return;
                         var banner = document.getElementById('community-consent-banner');
                         var html = '<div style="background:rgba(108,184,122,0.12);border-left:3px solid #6cb87a;padding:0.8em 1em;margin-bottom:1.5em;font-size:0.9em">';
-                        html += '<strong>Community Intel</strong>';
-                        if (data.week_start) {
-                            html += ' <span style="opacity:0.6;font-size:0.85em">Week of ' + data.week_start + '</span>';
-                        }
+                        html += '<strong>&#10003; Thanks for contributing!</strong>';
                         if (data.top_cidrs && data.top_cidrs.length) {
+                            if (data.week_start) {
+                                html += ' <span style="opacity:0.6;font-size:0.85em">Week of ' + data.week_start + '</span>';
+                            }
                             html += '<p style="margin:0.5em 0 0.3em;opacity:0.85">Top reported ranges this week:</p>';
                             html += '<ul style="margin:0;padding-left:1.5em">';
                             data.top_cidrs.slice(0, 3).forEach(function(c) {
@@ -721,11 +722,12 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                             });
                             html += '</ul>';
                         } else {
-                            html += '<p style="margin:0.5em 0 0;opacity:0.7">Your data has been added. Community data will appear as reports accumulate.</p>';
+                            html += '<p style="margin:0.5em 0 0.3em;opacity:0.85">The community dataset is still in its early days &mdash; data will grow as more users opt in. You\'ll get richer comparisons on future reports as the dataset builds.</p>';
                         }
-                        html += '<p style="margin:0.6em 0 0;font-size:0.85em;opacity:0.6">Reload this page to see the Community column in the Top Threat Sources table.</p>';
+                        html += '<p style="margin:0.6em 0 0;font-size:0.85em;opacity:0.6">Reloading to show your community data\u2026</p>';
                         html += '</div>';
                         banner.outerHTML = html;
+                        setTimeout(function() { window.location.reload(); }, 2000);
                     });
                 });
                 document.getElementById('consent-no-btn').addEventListener('click', function() {
@@ -814,13 +816,13 @@ function render_report(array $report, string $token, ?string $expires_at, array 
             <?php if ($verdict === 'LOW'): ?>
             <p style="opacity:0.7;font-size:0.9em">No high-confidence threats detected. Scores below confirm low risk.</p>
             <?php endif; ?>
-            <p><?php echo htmlspecialchars($verdict_text, ENT_QUOTES, 'UTF-8'); ?></p>
-
-            <!-- Threat narrative -->
+            <!-- Threat narrative (supersedes verdict_text when present) -->
             <?php
             $narrative = generate_threat_narrative($verdict, $report['asn_ranges'] ?? [], (int)($report['scanning_pct'] ?? 0));
             if ($narrative !== ''): ?>
             <p><?php echo $narrative; ?></p>
+            <?php else: ?>
+            <p><?php echo htmlspecialchars($verdict_text, ENT_QUOTES, 'UTF-8'); ?></p>
             <?php endif; ?>
 
             <!-- AbuseIPDB callout -->
