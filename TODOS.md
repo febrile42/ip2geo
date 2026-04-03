@@ -332,23 +332,10 @@ and whether community column needs a total reframe. Log findings.
 
 ## Investigate — Email Reputation
 
-### DMARC reports show mail "from" google.com
-**What:** ip2geo is now enrolled in DMARCLY. Resend is correctly aligned (DKIM + SPF + DMARC pass for ip2geo.org), but DMARC aggregate reports include hits attributed to google.com as the sending domain. This is unexpected and needs root-cause before tightening DMARC policy from `p=none` → `p=quarantine` or `p=reject`.
+### DMARC reports show mail "from" google.com — RESOLVED 2026-04-03
+**Root cause:** Benign forwarding artifact. A recipient forwarded a Resend-sent ip2geo.org email via Gmail. Google's mail servers appeared as the source IP; envelope-from rewrote to gmail.com (SPF aligned: fail), but the original ip2geo.org DKIM signature survived intact (DKIM aligned: pass), so DMARC passed overall. No spoofing, no misconfiguration.
 
-**Hypotheses to investigate:**
-1. Forwarding (e.g. a Gmail address auto-forwarding to another inbox) — forwarded mail rewrites the envelope-from, breaking SPF alignment and appearing as a google.com sender in DMARC reports.
-2. A google.com form or notification that references ip2geo.org in a header (e.g. Google Forms confirmation emails, Google Calendar invites).
-3. Misconfigured MX or SPF include pulling in google.com IP space.
-4. Test emails sent from a personal Gmail that hit the same recipient — unrelated to ip2geo sending infrastructure but shows up in reports if recipient's domain reports on all incoming.
-
-**Steps:**
-- Pull the raw DMARC XML from DMARCLY for the affected period — check `<source_ip>`, `<header_from>`, `<envelope_from>`, and `<dkim>`/`<spf>` result fields for the google.com rows.
-- Cross-reference source IP against Google's SPF range (`dig TXT _spf.google.com`).
-- Check if any ip2geo.org user-facing flow triggers a Google service to send on our behalf (unlikely but worth ruling out).
-- Once root cause is clear, either suppress the source or confirm it's benign forwarding noise, then move DMARC to `p=quarantine` for 1–2 weeks and monitor before hardening to `p=reject`.
-
-**Why urgent:** Leaving DMARC at `p=none` forever provides no protection. Any confirmed spoofing or misalignment hurts deliverability for report link emails — directly impacts the product. Keep email rep pristine before user base grows.
-**Effort:** S (DMARCLY already has the data — it's a read + diagnose session) | **Priority:** P1
+**Action taken:** DMARC policy hardened from `p=none` → `p=quarantine`, `sp=quarantine`, `fo=0`. Record confirmed in DNS (2026-04-03). Monitor DMARCLY for 1–2 weeks, then move to `p=reject`.
 
 ---
 
