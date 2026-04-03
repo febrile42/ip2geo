@@ -288,6 +288,12 @@ and whether community column needs a total reframe. Log findings.
 
 ## Deferred — Infrastructure / Maintenance
 
+### config.php file permissions — LOW PRIORITY
+**What:** `config.php` (and `config-staging.php`) must be readable by the web server process (e.g. `www-data`). If permissions are set to `700`, the file is only readable by the owner, causing PHP to 500 as soon as the in-memory cached file handle is released.
+**Correct permissions:** `744` (owner rwx, group+world read). Or `640` with the web server user in the owner's group.
+**History:** 2026-04-03 — permissions set to `700` on both staging and production, causing intermittent 500s during deploy. Reverted to `744` to restore. CI smoke test also false-positive'd during this window.
+**Fix needed:** Add a deploy step that enforces `chmod 744 config.php` post-deploy, or document in DEPLOYMENT.md. Low priority.
+
 ### Spamhaus ASN-DROP workflow — DONE
 Built and merged (febrile42/ip2geo#5). Monthly step in update-db.yml: fetches asndrop.json,
 diffs against asn_classification.php, opens draft PR with candidates. Never auto-merged.
