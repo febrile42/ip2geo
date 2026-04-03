@@ -1107,7 +1107,9 @@ function render_page_open(string $title, string $meta_desc = ''): void {
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <?php if ($_SERVER['HTTP_HOST'] === 'ip2geo.org'): ?>
     <script defer src="https://cloud.umami.is/script.js" data-website-id="656d7a15-6282-4079-af1e-b8ed857fba2e"></script>
+    <?php endif; ?>
     <title><?php echo $safe_title; ?></title>
     <meta charset="utf-8" />
     <meta name="description" content="<?php echo $safe_desc; ?>" />

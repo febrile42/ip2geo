@@ -36,8 +36,10 @@ $view_token_val  = $view_token_mode ? preg_replace('/[^a-f0-9\-]/', '', trim($_G
 -->
 <html lang="en">
 	<head>
-		<!-- Umami -->
+		<!-- Umami (production only) -->
+		<?php if ($_SERVER['HTTP_HOST'] === 'ip2geo.org'): ?>
 		<script defer src="https://cloud.umami.is/script.js" data-website-id="656d7a15-6282-4079-af1e-b8ed857fba2e"></script>
+		<?php endif; ?>
 		<title>Bulk IP Lookup & Location Finder - Free IP Geolocation Lookup Tool</title>
 		<meta charset="utf-8" />
 		<meta name="description" content="Free tool to filter up to 10,000 IP addresses from an arbitrary text blob and list their geographic location." />
