@@ -1,10 +1,12 @@
 # ip2geo.org
 
-Two tools in one place.
+Three tools in one place.
 
 **Bulk lookup:** paste in a wall of text, log output, or a raw list of IPs — it extracts the addresses, queries the database, and returns country, region, city, ASN, and threat classification for each one. Handles up to 10,000 IPs per request.
 
 **Threat Reports:** paste in a batch of IPs from your server logs and pay once to get back a full threat assessment — a verdict (HIGH / MODERATE / LOW), a breakdown of scanning and proxy infrastructure, AbuseIPDB abuse scores for the worst offenders, ASN CIDR ranges grouped by network, and ready-to-run block scripts for iptables, ufw, and nginx. Useful if you've just stared at a wall of `fail2ban` output and thought "I wonder where all these are coming from, and how do I make them stop."
+
+**Community Block List:** a rolling 7-day feed of CIDR ranges reported by opted-in ip2geo users. Ranges corroborated by three or more independent users (with quality filters to exclude coarse ISP blocks) appear on [`/intel.php`](https://ip2geo.org/intel.php), downloadable as iptables, ufw, nginx, or plain CIDR format.
 
 Live at [ip2geo.org](https://ip2geo.org) since 2017.
 
@@ -20,7 +22,8 @@ Live at [ip2geo.org](https://ip2geo.org) since 2017.
 - **Resend** — email delivery of report links after payment (optional; reports work without it)
 - **HTML/CSS** — based on [Hyperspace](https://html5up.net/hyperspace) by HTML5 UP (CCA 3.0)
 - **GitHub Actions** — CI/CD pipeline (staging → production) and monthly DB updates
-- **PHPUnit** — 147 tests, 221 assertions covering verdict logic, token lifecycle, webhook handling, ASN classification, AbuseIPDB ranking, cache behaviour, and email helper functions
+- **APCu** — server-side page cache for `/intel.php` (15-min TTL; downloads bypass)
+- **PHPUnit** — 184 tests, 275 assertions covering verdict logic, token lifecycle, webhook handling, ASN classification, AbuseIPDB ranking, cache behaviour, email helpers, community consent flow, and intel page cache logic
 
 No frameworks. No npm. No build step. It's fast on purpose.
 
@@ -64,6 +67,25 @@ This creates:
 | `reports` | Token lifecycle, IP list, report JSON, payment intent, notification email |
 | `abuseipdb_cache` | Per-IP AbuseIPDB scores with 7-day TTL |
 | `abuseipdb_daily_usage` | Daily API call counter to stay within the free tier limit |
+
+#### Community Block List tables
+
+Run `scripts/migrate-community.sql` once to add the community tables:
+
+```bash
+mysql -u youruser -p yourdb < scripts/migrate-community.sql
+```
+
+This creates:
+
+| Table | Contents |
+|-------|----------|
+| `community_cidr_stats` | Per-CIDR daily report counts and hit totals from opted-in users |
+| `community_ip_stats` | Per-IP daily stats for CIDR aggregation |
+| `community_ip_first_seen` | Deduplication table — prevents one user from counting the same IP twice per day |
+| `community_weekly_stats` | Daily opted-in report counter; used to gate the public feed (minimum 5 reports in a rolling 7-day window) |
+
+Data older than 52 weeks is pruned automatically by the monthly `update-db.yml` workflow.
 
 ### Configuration
 
@@ -153,6 +175,21 @@ A demo report is available at any time at `/?view_token=00000000-0000-0000-0000-
 
 ---
 
+## How Community Block List Works
+
+1. After viewing a Threat Report, users are offered the option to share their data. Opting in posts the report's IP list to `community-consent.php` via AJAX.
+2. The consent endpoint ingests IPs, computes CIDR ranges via `geoip2_asn_current_int`, and writes daily rows to `community_cidr_stats` and `community_ip_stats`. Each IP is deduplicated per user per day via `community_ip_first_seen` — one user reporting the same IP 100 times counts as one report.
+3. `/intel.php` queries the rolling 7-day window. A range appears on the public list only if it passes all three quality filters:
+   - **3+ independent reports** — corroborated by at least three distinct opted-in users
+   - **Prefix /16 or more specific** — excludes coarse ASN-level blocks covering millions of IPs
+   - **Hit density ≥ 0.1%** — at least 1 observed hit per 1,000 addresses in the range (filters incidental overlap)
+4. The page is APCu-cached for 15 minutes. Downloads (iptables, ufw, nginx, plain CIDR) bypass the cache and always query the database directly.
+5. The public feed requires a minimum of 5 opted-in reports in the past 7 days before any data is shown. Below that threshold, the page displays a "not enough data yet" message rather than a sparse or misleading list.
+
+Residential IPs are never collected — the consent flow only ingests IPs classified as scanning, proxy, VPN, or cloud infrastructure. Data is retained for 52 weeks.
+
+---
+
 ## Development
 
 ### Workflow
@@ -181,7 +218,7 @@ composer install
 ./vendor/bin/phpunit --testdox
 ```
 
-147 tests, 221 assertions. No network calls, no database required — geo lookups and DB interactions are tested against in-memory SQLite mirrors of the production schema.
+184 tests, 275 assertions. No network calls, no database required — geo lookups and DB interactions are tested against in-memory SQLite mirrors of the production schema.
 
 Test files:
 
@@ -195,6 +232,8 @@ Test files:
 | `AbuseIPDBRankingTest.php` | `rank_ips()` — threat weight, freq ordering, limit |
 | `AsnClassificationTest.php` | `classify_asn()` — known ASN lookups, keyword fallback, edge cases |
 | `CacheTest.php` | AbuseIPDB cache hit/miss/expiry, quota tracking, partial cache splits |
+| `CommunityConsentTest.php` | Opt-in ingestion, CIDR aggregation, deduplication, decline path, malformed input guards |
+| `IntelCacheTest.php` | APCu cache key format, hit/miss/absent paths, ob failure guard, download bypass |
 
 ### CI/CD Pipeline
 
