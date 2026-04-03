@@ -133,7 +133,33 @@ if ($status === 'redeemed') {
     $data_consent      = $row['data_consent'] === null ? null : (int)$row['data_consent'];
     $community_data    = [];
     if ($data_consent === 1 && !empty($report['top25'])) {
-        $community_data = fetch_community_data($con, array_column($report['top25'], 'ip'));
+        if ($token === DEMO_TOKEN) {
+            // Hardcoded sample data for demo report — no DB query, always current week.
+            $days_since_mon = (int) gmdate('N') - 1;
+            $_tw = gmdate('Y-m-d', strtotime("-{$days_since_mon} days"));
+            $_lw = gmdate('Y-m-d', strtotime("{$_tw} -7 days"));
+            $_samples = [
+                '185.220.101.1'  => [31, 24], '185.220.101.2'  => [29, 25],
+                '185.220.101.3'  => [27, 23], '185.220.101.4'  => [24, 19],
+                '185.220.101.5'  => [22, 18], '185.220.101.6'  => [19, 16],
+                '185.220.101.7'  => [17, 14], '185.220.101.8'  => [14, 12],
+                '185.220.101.9'  => [11, 10], '185.220.101.10' => [8,  11],
+                '185.220.101.11' => [7,   6], '185.220.101.12' => [5,   4],
+                '185.220.101.13' => [4,   3], '185.220.101.14' => [3,   2],
+                '5.39.50.1'      => [12,  9], '5.39.50.2'      => [8,   7],
+                '45.141.215.1'   => [6,   8], '185.220.100.240'=> [5,   4],
+                '185.220.100.241'=> [3,   3],
+            ];
+            $_ip_stats    = [];
+            $_first_seen  = [];
+            foreach ($_samples as $_ip => [$_tc, $_lc]) {
+                $_ip_stats[$_ip]   = [$_tw => $_tc, $_lw => $_lc];
+                $_first_seen[$_ip] = gmdate('Y-m-d', strtotime('-' . (60 - (int)substr($_ip, -1) * 2) . ' days'));
+            }
+            $community_data = ['ip_stats' => $_ip_stats, 'first_seen' => $_first_seen, 'this_week' => $_tw, 'last_week' => $_lw];
+        } else {
+            $community_data = fetch_community_data($con, array_column($report['top25'], 'ip'));
+        }
     }
     mysqli_close($con);
     maybe_serve_script_download($report, $token);
