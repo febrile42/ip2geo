@@ -19,6 +19,23 @@ header('X-Content-Type-Options: nosniff');
 $cutoff   = gmdate('Y-m-d', strtotime('-7 days'));
 $date_str = gmdate('Y-m-d');
 
+// ── Detect download request early so it bypasses the page cache ───────────────
+$fmt          = isset($_GET['format']) ? $_GET['format'] : '';
+$valid_formats = ['iptables', 'ufw', 'nginx', 'txt'];
+$is_download  = ($fmt !== '' && in_array($fmt, $valid_formats, true));
+
+// ── APCu page cache (HTML only; downloads always bypass) ─────────────────────
+// Cache key includes today's date — auto-invalidates at UTC midnight.
+// TTL of 900 s (15 min) guards against stale data within the same day.
+$_cache_key = 'intel_page_7d_' . $date_str;
+if (!$is_download && function_exists('apcu_fetch')) {
+    $cached = apcu_fetch($_cache_key, $_cache_hit);
+    if ($_cache_hit) {
+        echo $cached;
+        exit;
+    }
+}
+
 // ── DB connection ─────────────────────────────────────────────────────────────
 $con = mysqli_connect($db_host, $db_user, $db_pass, $db_name);
 if (mysqli_connect_errno()) {
@@ -78,10 +95,7 @@ if ($has_data) {
 mysqli_close($con);
 
 // ── Serve download if ?format= is set ────────────────────────────────────────
-$fmt = isset($_GET['format']) ? $_GET['format'] : '';
-$valid_formats = ['iptables', 'ufw', 'nginx', 'txt'];
-
-if ($fmt !== '' && in_array($fmt, $valid_formats, true) && $has_data && !empty($cidrs)) {
+if ($is_download && $has_data && !empty($cidrs)) {
     $cidr_list = array_column($cidrs, 'cidr');
     $count     = count($cidr_list);
 
@@ -151,6 +165,9 @@ if ($fmt !== '' && in_array($fmt, $valid_formats, true) && $has_data && !empty($
     echo $body;
     exit;
 }
+
+// ── Start output buffer for HTML page cache ───────────────────────────────────
+ob_start();
 ?>
 <!DOCTYPE HTML>
 <!--
@@ -249,7 +266,7 @@ if ($fmt !== '' && in_array($fmt, $valid_formats, true) && $has_data && !empty($
                     <?php else: ?>
 
                     <p>
-                        Derived from <strong><?php echo number_format($total_reports); ?></strong> opted-in
+                        We have <strong><?php echo number_format($total_reports); ?></strong> opted-in
                         ip2geo threat reports this week, but no ranges currently meet the confidence threshold.
                         <a href="/privacy.php" style="opacity:0.7;font-size:0.9em">Privacy policy</a>
                     </p>
@@ -285,3 +302,10 @@ if ($fmt !== '' && in_array($fmt, $valid_formats, true) && $has_data && !empty($
 
     </body>
 </html>
+<?php
+// ── Store rendered HTML in APCu (15-min TTL) ──────────────────────────────────
+$_html = ob_get_clean();
+if (function_exists('apcu_store')) {
+    apcu_store($_cache_key, $_html, 900);
+}
+echo $_html;

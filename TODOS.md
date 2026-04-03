@@ -249,7 +249,7 @@ context" column in paid reports ("this IP hit 31 other servers this week, escala
 - [x] **Clear community stats tables** — all 4 community tables truncated on prod (2026-04-03).
 - [x] **Staging DB isolation** — `ip2geo_staging` schema created, full schema copied (including static lookup tables), schema migration (week_start → report_date + community_weekly_stats) complete. `config-staging.php` updated to `$db_name = 'ip2geo_staging'` (2026-04-03).
 - [ ] **Monthly update workflow** — after staging DB isolation, update `.github/workflows/update-db.yml` to also update `ip2geo_staging` DB (MaxMind + AbuseIPDB) to prevent drift.
-- [ ] **Caching on intel.php** — public scrapable page, no caching currently. Add APCu page-level cache (15-min TTL for HTML; downloads bypass). Cache key: `intel_page_7d`. Must-do before go-live.
+- [x] **Caching on intel.php** — APCu page-level cache added (15-min TTL, key `intel_page_7d_{date}` auto-invalidates at UTC midnight; downloads bypass; graceful fallback if APCu unavailable). (2026-04-03)
 - [x] **Fix CommunityConsentTest.php** — updated to `report_date`, `community_weekly_stats` added to setUp, rolling date logic updated. 37/37 tests passing (2026-04-03).
 
 **Revisit gate:** Once 50+ opted-in reports exist, re-evaluate beta thresholds, framing,
