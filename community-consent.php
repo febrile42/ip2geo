@@ -106,10 +106,8 @@ if ($report === null || $ip_list === null) {
     exit;
 }
 
-// ── Compute week_start (Monday of current ISO week, UTC) ──────────────────────
-// PHP's 'N' format = ISO day of week: 1=Mon … 7=Sun
-$days_since_monday = (int) gmdate('N') - 1;
-$week_start = gmdate('Y-m-d', strtotime("-{$days_since_monday} days"));
+// ── Use today's date for rolling 7-day aggregation ───────────────────────────
+$report_date = gmdate('Y-m-d');
 
 // ── Ingest CIDR data ──────────────────────────────────────────────────────────
 
@@ -117,7 +115,7 @@ $asn_ranges = $report['asn_ranges'] ?? [];
 
 if (!empty($asn_ranges)) {
     $cidr_stmt = $con->prepare(
-        'INSERT INTO community_cidr_stats (cidr, asn, org, week_start, report_count, total_hits)
+        'INSERT INTO community_cidr_stats (cidr, asn, org, report_date, report_count, total_hits)
          VALUES (?, ?, ?, ?, 1, ?)
          ON DUPLICATE KEY UPDATE
            report_count = report_count + 1,
@@ -137,7 +135,7 @@ if (!empty($asn_ranges)) {
                 $hits = 1;
             }
             if ($cidr === '' || $asn === '') continue;
-            $cidr_stmt->bind_param('ssssi', $cidr, $asn, $org, $week_start, $hits);
+            $cidr_stmt->bind_param('ssssi', $cidr, $asn, $org, $report_date, $hits);
             $cidr_stmt->execute();
         }
     }
@@ -148,7 +146,7 @@ if (!empty($asn_ranges)) {
 
 $allowed_classifications = ['scanning', 'vpn_proxy', 'cloud_exit'];
 $ip_stmt = $con->prepare(
-    'INSERT INTO community_ip_stats (ip, week_start, report_count, total_hits)
+    'INSERT INTO community_ip_stats (ip, report_date, report_count, total_hits)
      VALUES (?, ?, 1, ?)
      ON DUPLICATE KEY UPDATE
        report_count = report_count + 1,
@@ -157,8 +155,6 @@ $ip_stmt = $con->prepare(
 $fs_stmt = $con->prepare(
     'INSERT IGNORE INTO community_ip_first_seen (ip, first_seen) VALUES (?, ?)'
 );
-
-$today = gmdate('Y-m-d');
 
 foreach ($ip_list as $entry) {
     $classification = $entry['classification'] ?? '';
@@ -169,27 +165,38 @@ foreach ($ip_list as $entry) {
     $hits = (int) ($entry['freq'] ?? 1);
     if ($ip === '') continue;
 
-    $ip_stmt->bind_param('ssi', $ip, $week_start, $hits);
+    $ip_stmt->bind_param('ssi', $ip, $report_date, $hits);
     $ip_stmt->execute();
 
-    $fs_stmt->bind_param('ss', $ip, $today);
+    $fs_stmt->bind_param('ss', $ip, $report_date);
     $fs_stmt->execute();
 }
 $ip_stmt->close();
 $fs_stmt->close();
 
+// ── Increment daily opted-in report counter ───────────────────────────────────
+$wk_stmt = $con->prepare(
+    'INSERT INTO community_weekly_stats (report_date, opted_in_reports)
+     VALUES (?, 1) ON DUPLICATE KEY UPDATE opted_in_reports = opted_in_reports + 1'
+);
+$wk_stmt->bind_param('s', $report_date);
+$wk_stmt->execute();
+$wk_stmt->close();
+
 // ── Build community context for inline render ─────────────────────────────────
 // Return top CIDR counts for this week so report.php can render the callout
 // without a page reload.
 
+$_ctx_cutoff = gmdate('Y-m-d', strtotime('-7 days'));
 $ctx_stmt = $con->prepare(
-    'SELECT cidr, org, report_count, total_hits
+    'SELECT cidr, org, SUM(report_count) AS report_count, SUM(total_hits) AS total_hits
      FROM community_cidr_stats
-     WHERE week_start = ?
+     WHERE report_date >= ?
+     GROUP BY cidr, org
      ORDER BY report_count DESC, total_hits DESC
      LIMIT 5'
 );
-$ctx_stmt->bind_param('s', $week_start);
+$ctx_stmt->bind_param('s', $_ctx_cutoff);
 $ctx_stmt->execute();
 $top_cidrs = $ctx_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $ctx_stmt->close();
@@ -199,6 +206,5 @@ mysqli_close($con);
 echo json_encode([
     'ok'        => true,
     'ingested'  => true,
-    'week_start' => $week_start,
     'top_cidrs' => $top_cidrs,
 ]);

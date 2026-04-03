@@ -166,7 +166,8 @@ jobs:
             printf '[client]\nhost=%s\nuser=%s\npassword=%s\ndatabase=%s\n' \
               "$DB_HOST" "$DB_USER" "$DB_PASS" "$DB_NAME" > "$MYCNF"
             mysql --defaults-extra-file="$MYCNF" <<'SQL'
-            DELETE FROM community_cidr_stats WHERE week_start < DATE_SUB(CURDATE(), INTERVAL 52 WEEK);
-            DELETE FROM community_ip_stats WHERE week_start < DATE_SUB(CURDATE(), INTERVAL 52 WEEK);
+            DELETE FROM community_cidr_stats    WHERE report_date < DATE_SUB(CURDATE(), INTERVAL 52 WEEK);
+            DELETE FROM community_ip_stats      WHERE report_date < DATE_SUB(CURDATE(), INTERVAL 52 WEEK);
+            DELETE FROM community_weekly_stats  WHERE report_date < DATE_SUB(CURDATE(), INTERVAL 52 WEEK);
             SQL
             rm -f "$MYCNF"

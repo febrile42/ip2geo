@@ -3,9 +3,10 @@
  * Community Block List — /intel.php
  *
  * Public page showing the top CIDR ranges reported by opted-in ip2geo users
- * this week. Data sourced from community_cidr_stats (via community-consent.php).
+ * in the past 7 days. Data sourced from community_cidr_stats (via community-consent.php).
  *
- * Minimum threshold: 5 report_count rows for current week before data is shown.
+ * Global threshold: 5 distinct opted-in reports in the past 7 days before data is shown.
+ * Per-CIDR threshold: only CIDRs seen in 3+ independent reports are included.
  * Download formats: iptables / ufw / nginx / plain .txt (top 50 CIDRs).
  * No auth required. Updated continuously as users opt in.
  */
@@ -14,10 +15,9 @@ require __DIR__ . '/config.php';
 
 header('X-Content-Type-Options: nosniff');
 
-// ── Compute week_start (Monday of current ISO week, UTC) ──────────────────────
-$days_since_monday = (int) gmdate('N') - 1;
-$week_start = gmdate('Y-m-d', strtotime("-{$days_since_monday} days"));
-$week_label = date('F j, Y', strtotime($week_start));
+// ── Rolling 7-day window ──────────────────────────────────────────────────────
+$cutoff   = gmdate('Y-m-d', strtotime('-7 days'));
+$date_str = gmdate('Y-m-d');
 
 // ── DB connection ─────────────────────────────────────────────────────────────
 $con = mysqli_connect($db_host, $db_user, $db_pass, $db_name);
@@ -27,12 +27,12 @@ if (mysqli_connect_errno()) {
     exit;
 }
 
-// ── Check threshold (min 5 opted-in reports this week) ───────────────────────
+// ── Check threshold (min 5 distinct opted-in reports in past 7 days) ─────────
 $thr_stmt = $con->prepare(
-    'SELECT COALESCE(SUM(report_count), 0) AS total_reports
-     FROM community_cidr_stats WHERE week_start = ?'
+    'SELECT COALESCE(SUM(opted_in_reports), 0) AS total_reports
+     FROM community_weekly_stats WHERE report_date >= ?'
 );
-$thr_stmt->bind_param('s', $week_start);
+$thr_stmt->bind_param('s', $cutoff);
 $thr_stmt->execute();
 $thr_row = $thr_stmt->get_result()->fetch_assoc();
 $thr_stmt->close();
@@ -40,17 +40,21 @@ $thr_stmt->close();
 $total_reports = (int)($thr_row['total_reports'] ?? 0);
 $has_data = $total_reports >= 5;
 
-// ── Fetch top 50 CIDRs ────────────────────────────────────────────────────────
+// ── Fetch top 50 CIDRs (rolling 7 days, ≥3 independent reports per CIDR) ────
 $cidrs = [];
 if ($has_data) {
     $cidr_stmt = $con->prepare(
-        'SELECT cidr, asn, org, report_count, total_hits
+        'SELECT cidr, asn, org,
+                SUM(report_count) AS report_count,
+                SUM(total_hits)   AS total_hits
          FROM community_cidr_stats
-         WHERE week_start = ?
+         WHERE report_date >= ?
+         GROUP BY cidr, asn, org
+         HAVING report_count >= 3
          ORDER BY report_count DESC, total_hits DESC
          LIMIT 50'
     );
-    $cidr_stmt->bind_param('s', $week_start);
+    $cidr_stmt->bind_param('s', $cutoff);
     $cidr_stmt->execute();
     $cidr_result = $cidr_stmt->get_result();
     while ($r = $cidr_result->fetch_assoc()) {
@@ -67,7 +71,6 @@ $valid_formats = ['iptables', 'ufw', 'nginx', 'txt'];
 
 if ($fmt !== '' && in_array($fmt, $valid_formats, true) && $has_data && !empty($cidrs)) {
     $cidr_list = array_column($cidrs, 'cidr');
-    $date_str  = gmdate('Y-m-d');
     $count     = count($cidr_list);
 
     if ($fmt === 'iptables') {
@@ -75,46 +78,46 @@ if ($fmt !== '' && in_array($fmt, $valid_formats, true) && $has_data && !empty($
         $body = "#!/bin/bash\n"
               . "# ip2geo community block list — iptables rules\n"
               . "# Generated: {$date_str} UTC\n"
-              . "# Week of: {$week_start}\n"
+              . "# Past 7 days from: {$cutoff} UTC\n"
               . "# Source: ip2geo.org/intel.php\n"
               . "# {$count} CIDR ranges derived from {$total_reports} opted-in threat reports\n"
               . "\nset -euo pipefail\n\n"
               . implode("\n", $lines) . "\n";
-        $filename = 'community-block-iptables.sh';
+        $filename = "ip2geo-community-block-list-iptables-{$date_str}.sh";
         $ctype    = 'text/x-sh';
     } elseif ($fmt === 'ufw') {
         $lines = array_map(fn($c) => 'ufw deny from ' . $c . ' to any', $cidr_list);
         $body = "#!/bin/bash\n"
               . "# ip2geo community block list — ufw rules\n"
               . "# Generated: {$date_str} UTC\n"
-              . "# Week of: {$week_start}\n"
+              . "# Past 7 days from: {$cutoff} UTC\n"
               . "# Source: ip2geo.org/intel.php\n"
               . "# {$count} CIDR ranges derived from {$total_reports} opted-in threat reports\n"
               . "\nset -euo pipefail\n\n"
               . implode("\n", $lines) . "\n";
-        $filename = 'community-block-ufw.sh';
+        $filename = "ip2geo-community-block-list-ufw-{$date_str}.sh";
         $ctype    = 'text/x-sh';
     } elseif ($fmt === 'nginx') {
         $lines = array_map(fn($c) => $c . ' 1;', $cidr_list);
         $body = "# ip2geo community block list — nginx geo block\n"
               . "# Generated: {$date_str} UTC\n"
-              . "# Week of: {$week_start}\n"
+              . "# Past 7 days from: {$cutoff} UTC\n"
               . "# Source: ip2geo.org/intel.php\n"
               . "# {$count} CIDR ranges derived from {$total_reports} opted-in threat reports\n"
               . "# Usage: include this file inside a  geo \$blocked_ip { }  block in nginx.conf\n"
               . "\ndefault 0;\n"
               . implode("\n", $lines) . "\n";
-        $filename = 'community-block-nginx.conf';
+        $filename = "ip2geo-community-block-list-nginx-{$date_str}.conf";
         $ctype    = 'text/plain';
     } else { // txt
         $body = "# ip2geo community block list — CIDR ranges\n"
               . "# Generated: {$date_str} UTC\n"
-              . "# Week of: {$week_start}\n"
+              . "# Past 7 days from: {$cutoff} UTC\n"
               . "# Source: ip2geo.org/intel.php\n"
               . "# {$count} CIDR ranges derived from {$total_reports} opted-in threat reports\n"
               . "# One range per line — paste into ipset, web firewall, or any blocklist tool\n"
               . implode("\n", $cidr_list) . "\n";
-        $filename = 'community-cidrs.txt';
+        $filename = "ip2geo-community-block-list-{$date_str}.txt";
         $ctype    = 'text/plain';
     }
 
@@ -164,7 +167,7 @@ if ($fmt !== '' && in_array($fmt, $valid_formats, true) && $has_data && !empty($
             <section id="main" class="wrapper">
                 <div class="inner">
                     <h1 class="major">Community Block List</h1>
-                    <p style="opacity:0.7;margin-top:-0.5em">Week of <?php echo htmlspecialchars($week_label, ENT_QUOTES, 'UTF-8'); ?></p>
+                    <p style="opacity:0.7;margin-top:-0.5em">Past 7 days &mdash; updates as users contribute</p>
 
                     <?php if (!$has_data): ?>
 
@@ -216,6 +219,7 @@ if ($fmt !== '' && in_array($fmt, $valid_formats, true) && $has_data && !empty($
 
                     <p style="font-size:0.8em;opacity:0.6;margin-top:0.5em">
                         Top <?php echo count($cidrs); ?> ranges by report count. Hits = sum of occurrences across all contributing reports.
+                        Only CIDRs reported by 3 or more independent users in the past 7 days are included.
                         Residential IPs are never collected. Data retained for 52 weeks.
                     </p>
 

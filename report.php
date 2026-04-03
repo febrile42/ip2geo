@@ -134,29 +134,26 @@ if ($status === 'redeemed') {
     $community_data    = [];
     if ($data_consent === 1 && !empty($report['top25'])) {
         if ($token === DEMO_TOKEN) {
-            // Hardcoded sample data for demo report — no DB query, always current week.
-            $days_since_mon = (int) gmdate('N') - 1;
-            $_tw = gmdate('Y-m-d', strtotime("-{$days_since_mon} days"));
-            $_lw = gmdate('Y-m-d', strtotime("{$_tw} -7 days"));
+            // Hardcoded sample data for demo report — no DB query, rolling 7-day counts.
             $_samples = [
-                '185.220.101.1'  => [31, 24], '185.220.101.2'  => [29, 25],
-                '185.220.101.3'  => [27, 23], '185.220.101.4'  => [24, 19],
-                '185.220.101.5'  => [22, 18], '185.220.101.6'  => [19, 16],
-                '185.220.101.7'  => [17, 14], '185.220.101.8'  => [14, 12],
-                '185.220.101.9'  => [11, 10], '185.220.101.10' => [8,  11],
-                '185.220.101.11' => [7,   6], '185.220.101.12' => [5,   4],
-                '185.220.101.13' => [4,   3], '185.220.101.14' => [3,   2],
-                '5.39.50.1'      => [12,  9], '5.39.50.2'      => [8,   7],
-                '45.141.215.1'   => [6,   8], '185.220.100.240'=> [5,   4],
-                '185.220.100.241'=> [3,   3],
+                '185.220.101.1'  => 31, '185.220.101.2'  => 29,
+                '185.220.101.3'  => 27, '185.220.101.4'  => 24,
+                '185.220.101.5'  => 22, '185.220.101.6'  => 19,
+                '185.220.101.7'  => 17, '185.220.101.8'  => 14,
+                '185.220.101.9'  => 11, '185.220.101.10' => 8,
+                '185.220.101.11' => 7,  '185.220.101.12' => 5,
+                '185.220.101.13' => 4,  '185.220.101.14' => 3,
+                '5.39.50.1'      => 12, '5.39.50.2'      => 8,
+                '45.141.215.1'   => 6,  '185.220.100.240'=> 5,
+                '185.220.100.241'=> 3,
             ];
             $_ip_stats    = [];
             $_first_seen  = [];
-            foreach ($_samples as $_ip => [$_tc, $_lc]) {
-                $_ip_stats[$_ip]   = [$_tw => $_tc, $_lw => $_lc];
+            foreach ($_samples as $_ip => $_count) {
+                $_ip_stats[$_ip]   = $_count;
                 $_first_seen[$_ip] = gmdate('Y-m-d', strtotime('-' . (60 - (int)substr($_ip, -1) * 2) . ' days'));
             }
-            $community_data = ['ip_stats' => $_ip_stats, 'first_seen' => $_first_seen, 'this_week' => $_tw, 'last_week' => $_lw];
+            $community_data = ['ip_stats' => $_ip_stats, 'first_seen' => $_first_seen];
         } else {
             $community_data = fetch_community_data($con, array_column($report['top25'], 'ip'));
         }
@@ -552,29 +549,28 @@ function include_block_rules_tabs(string $token, bool $has_ranges): void { ?>
 // ── Community context fetch ───────────────────────────────────────────────────
 
 function fetch_community_data($con, array $ips): array {
-    if (empty($ips)) return ['ip_stats' => [], 'first_seen' => [], 'this_week' => '', 'last_week' => ''];
+    if (empty($ips)) return ['ip_stats' => [], 'first_seen' => []];
 
-    $days_since_monday = (int) gmdate('N') - 1;
-    $this_week = gmdate('Y-m-d', strtotime("-{$days_since_monday} days"));
-    $last_week = gmdate('Y-m-d', strtotime($this_week . ' -7 days'));
+    $cutoff = gmdate('Y-m-d', strtotime('-7 days'));
 
     $placeholders = implode(',', array_fill(0, count($ips), '?'));
     $types        = str_repeat('s', count($ips));
 
-    // This week + last week report counts
+    // Rolling 7-day report counts per IP
     $stmt = $con->prepare(
-        "SELECT ip, week_start, report_count
+        "SELECT ip, SUM(report_count) AS report_count
          FROM community_ip_stats
          WHERE ip IN ({$placeholders})
-           AND week_start IN (?, ?)"
+           AND report_date >= ?
+         GROUP BY ip"
     );
-    $params = array_merge($ips, [$this_week, $last_week]);
-    $stmt->bind_param($types . 'ss', ...$params);
+    $params = array_merge($ips, [$cutoff]);
+    $stmt->bind_param($types . 's', ...$params);
     $stmt->execute();
     $ip_stats = [];
     $res = $stmt->get_result();
     while ($r = $res->fetch_assoc()) {
-        $ip_stats[$r['ip']][$r['week_start']] = (int)$r['report_count'];
+        $ip_stats[$r['ip']] = (int)$r['report_count'];
     }
     $stmt->close();
 
@@ -594,8 +590,6 @@ function fetch_community_data($con, array $ips): array {
     return [
         'ip_stats'   => $ip_stats,
         'first_seen' => $first_seen,
-        'this_week'  => $this_week,
-        'last_week'  => $last_week,
     ];
 }
 
@@ -701,7 +695,7 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                         <tr><td style="padding:0.15em 0.6em 0.15em 0;font-family:monospace;opacity:0.8">192.168.x.x</td><td style="padding:0.15em 0.6em">Residential</td><td style="padding:0.15em 0"><span style="opacity:0.4">&mdash;</span></td></tr>
                     </tbody>
                 </table>
-                <p style="font-size:0.85em;opacity:0.6;margin:0.6em 0 0.75em">Residential IPs are never collected. 52-week retention. <a href="/privacy.php">Privacy policy</a></p>
+                <p style="font-size:0.85em;opacity:0.6;margin:0.6em 0 0.75em">Residential IPs are never collected. 52-week retention. <a href="/privacy.php" target="_blank" rel="noopener noreferrer">Privacy policy</a></p>
                 <a href="/" class="button small">Try with your own IPs &rarr;</a>
             </div>
             <?php endif; ?>
@@ -738,10 +732,7 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                         var html = '<div class="community-intel-banner" style="background:rgba(108,184,122,0.12);border-left:3px solid #6cb87a;padding:0.8em 1em;margin-bottom:1.5em;font-size:0.9em">';
                         html += '<strong>&#10003; Thanks for contributing!</strong>';
                         if (data.top_cidrs && data.top_cidrs.length) {
-                            if (data.week_start) {
-                                html += ' <span style="opacity:0.6;font-size:0.85em">Week of ' + data.week_start + '</span>';
-                            }
-                            html += '<p style="margin:0.5em 0 0.3em;opacity:0.85">Top reported ranges this week:</p>';
+                            html += '<p style="margin:0.5em 0 0.3em;opacity:0.85">Top reported ranges in the past 7 days:</p>';
                             html += '<ul style="margin:0;padding-left:1.5em">';
                             data.top_cidrs.slice(0, 3).forEach(function(c) {
                                 html += '<li><code>' + c.cidr + '</code> &mdash; ' + c.org + ' (' + c.report_count + ' report' + (c.report_count === 1 ? '' : 's') + ', ' + c.total_hits + ' hits)</li>';
@@ -769,9 +760,9 @@ function render_report(array $report, string $token, ?string $expires_at, array 
 
             <?php if (!$is_demo && $data_consent === 1):
                 $community_has_data = false;
-                if (!empty($community_data['ip_stats']) && !empty($community_data['this_week'])) {
-                    foreach ($community_data['ip_stats'] as $ip_counts) {
-                        if (($ip_counts[$community_data['this_week']] ?? 0) >= 3) {
+                if (!empty($community_data['ip_stats'])) {
+                    foreach ($community_data['ip_stats'] as $ip_count) {
+                        if ($ip_count >= 3) {
                             $community_has_data = true;
                             break;
                         }
@@ -1216,8 +1207,7 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                         <td><?php echo $score !== null ? htmlspecialchars((string)$score, ENT_QUOTES, 'UTF-8') : '<span style="opacity:0.4">—</span>'; ?></td>
                         <?php if ($data_consent === 1):
                             $ip = $entry['ip'] ?? '';
-                            $this_week_count = (int)($community_data['ip_stats'][$ip][$community_data['this_week']] ?? 0);
-                            $last_week_count = (int)($community_data['ip_stats'][$ip][$community_data['last_week']] ?? 0);
+                            $this_week_count = (int)($community_data['ip_stats'][$ip] ?? 0);
                             $fs_date = $community_data['first_seen'][$ip] ?? null;
                             $days_ago = $fs_date ? max(0, (int)floor((time() - strtotime($fs_date)) / 86400)) : null;
                             $tooltip = $days_ago !== null ? ' title="First seen in community data: ' . $days_ago . ' day' . ($days_ago === 1 ? '' : 's') . ' ago"' : '';
