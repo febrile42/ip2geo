@@ -1,6 +1,6 @@
 # ip2geo — TODOs, Deferred Items & Open Questions
 
-Last updated: 2026-04-03 (added DB optimization + DMARC investigation items).
+Last updated: 2026-04-03 (Phase C go-live checklist updated; staging schema migration done).
 Source of truth for what's done, what's next, and what's deferred.
 
 Plans live in: `~/.gstack/projects/febrile42-ip2geo/`
@@ -244,7 +244,8 @@ context" column in paid reports ("this IP hit 31 other servers this week, escala
 **Phase C complete. Run `/qa` against staging before merging to main.**
 
 **Must-do before go-live (community intel):**
-- [ ] **Schema migration** — run on staging then prod before deploying these code changes:
+- [x] **Schema migration on ip2geo_staging** — `ALTER TABLE` (week_start → report_date) + `CREATE TABLE community_weekly_stats` run on staging (2026-04-03). Confirmed working: 6 opted-in reports showing on staging.
+- [ ] **Schema migration on prod** — same SQL must run on `ip2geo` (prod) DB before merging to main:
   ```sql
   ALTER TABLE community_cidr_stats CHANGE week_start report_date DATE NOT NULL;
   ALTER TABLE community_ip_stats   CHANGE week_start report_date DATE NOT NULL;
@@ -259,6 +260,7 @@ context" column in paid reports ("this IP hit 31 other servers this week, escala
 - [ ] **Staging DB isolation** — create `ip2geo_staging` schema on same MariaDB server; copy full schema (including static lookup tables); update `config-staging.php` to `$db_name = 'ip2geo_staging'`. See TODOS note below for workflow impact.
 - [ ] **Monthly update workflow** — after staging DB isolation, update `.github/workflows/update-db.yml` to also update `ip2geo_staging` DB (MaxMind + AbuseIPDB) to prevent drift.
 - [ ] **Caching on intel.php** — public scrapable page, no caching currently. Add APCu page-level cache (15-min TTL for HTML; downloads bypass). Cache key: `intel_page_7d`. Must-do before go-live.
+- [ ] **Fix CommunityConsentTest.php** — still references `week_start` column; will fail CI after prod schema migration. Update to use `report_date`.
 
 **Revisit gate:** Once 50+ opted-in reports exist, re-evaluate beta thresholds, framing,
 and whether community column needs a total reframe. Log findings.
@@ -269,7 +271,7 @@ and whether community column needs a total reframe. Log findings.
 - Historical trend sparklines on /intel.php (data already in weekly buckets; UI deferred)
 - Week-over-week trend indicator in community column on report.php — data is already stored (`last_week` queried alongside `this_week` in `fetch_community_data`). Deferred because ↑/→/↓ arrows are ambiguous at low report counts and the dataset is too small to make trend signals trustworthy. Revisit once 50+ opted-in reports establish a baseline: consider `<abbr>` tooltip or short text label ("rising"/"stable"/"falling") rather than bare arrows.
 - Firewall automation daemon (Phase D — after API is established)
-- CIDR hit counts in community data — `total_hits` ingestion now computes real per-CIDR hit sums via `ip_in_cidr()` at opt-in time (commit pending). Display still omits `total_hits` from the UI — add it back to `intel.php` table and the opt-in banner in `report.php` once there's enough data to make it meaningful (revisit at 50+ opted-in reports).
+- CIDR hit counts in community data — `total_hits` ingestion now computes real per-CIDR hit sums via `ip_in_cidr()` at opt-in time (shipped 2026-04-03). Display still omits `total_hits` from the UI — add it back to `intel.php` table and the opt-in banner in `report.php` once there's enough data to make it meaningful (revisit at 50+ opted-in reports).
 
 ---
 
