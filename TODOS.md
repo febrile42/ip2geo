@@ -245,9 +245,9 @@ Contact email: **support@ip2geo.org**
 
 ## Deferred — Infrastructure / Maintenance
 
-### Spamhaus ASN-DROP workflow (ships before Phase A production launch)
-Monthly update-db.yml step: curl Spamhaus ASN-DROP, diff against asn_classification.php,
-open draft PR with proposed additions. Never auto-merged. See CEO plan for bash sketch.
+### Spamhaus ASN-DROP workflow — DONE
+Built and merged (febrile42/ip2geo#5). Monthly step in update-db.yml: fetches asndrop.json,
+diffs against asn_classification.php, opens draft PR with candidates. Never auto-merged.
 
 ### Expired report cleanup job
 **DONE** — Cleanup script created and deployed for cron on lime (commit 6d7502a). `geo_results_json` nulled on redemption to reclaim space (commit 57c7e84). At ~2.6 MB/paid report effective storage, disk ceiling is ~3,200 paid rows on 8.5 GB free.
