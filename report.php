@@ -550,8 +550,10 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                 <a href="/" style="margin-left:1em">Run your own lookup &rarr;</a>
             </div>
             <?php elseif ($email_sent && $notification_email !== ''): ?>
+            <?php $resend_link = '/send-report-link.php?token=' . urlencode($token); ?>
             <div class="report-email-notice sent">
-                <span>&#10003; Report link sent to <strong><?php echo htmlspecialchars(mask_email($notification_email), ENT_QUOTES, 'UTF-8'); ?></strong>. Check your inbox.</span>
+                <span>&#10003; Report link sent to <strong><?php echo htmlspecialchars(mask_email($notification_email), ENT_QUOTES, 'UTF-8'); ?></strong>.
+                <a href="<?php echo htmlspecialchars($resend_link, ENT_QUOTES, 'UTF-8'); ?>" style="margin-left:0.5em">Resend</a></span>
             </div>
             <?php elseif ($token !== DEMO_TOKEN): ?>
             <?php
