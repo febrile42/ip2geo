@@ -30,4 +30,6 @@ asn_classification_candidates.txt
 # Claude Files
 .claude
 TODOS.md
+QUESTIONS.md
+QA.md
 .gstack/
