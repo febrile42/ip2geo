@@ -216,7 +216,7 @@ if ($fmt !== '' && in_array($fmt, $valid_formats, true) && $has_data && !empty($
 
                     <p style="font-size:0.8em;opacity:0.6;margin-top:0.5em">
                         Top <?php echo count($cidrs); ?> ranges by report count. Hits = sum of occurrences across all contributing reports.
-                        Residential IPs are never collected. Data resets weekly (52-week retention).
+                        Residential IPs are never collected. Data retained for 52 weeks.
                     </p>
 
                     <?php endif; ?>
