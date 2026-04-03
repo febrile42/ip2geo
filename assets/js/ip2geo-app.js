@@ -201,17 +201,27 @@
     }
 
     // ── Show/hide rule blocks ──────────────────────────────────────────────
+    var rulesButtonMap = {
+        'rules-iptables': { btnId: 'show-iptables', show: 'Show iptables rules', hide: 'Hide iptables rules' },
+        'rules-ufw':      { btnId: 'show-ufw',      show: 'Show ufw rules',      hide: 'Hide ufw rules'      },
+        'rules-nginx':    { btnId: 'show-nginx',     show: 'Show nginx block',    hide: 'Hide nginx block'    }
+    };
+
     function toggleRulesBlock(blockId) {
         var block = document.getElementById(blockId);
         if (!block) return;
         var wasHidden = block.style.display === 'none';
-        // Close all open blocks first
+        // Close all open blocks and reset all button labels
         ['rules-iptables', 'rules-ufw', 'rules-nginx'].forEach(function (id) {
             var el = document.getElementById(id);
             if (el) el.style.display = 'none';
+            var btn = document.getElementById(rulesButtonMap[id].btnId);
+            if (btn) btn.textContent = rulesButtonMap[id].show;
         });
         if (wasHidden) {
             block.style.display = '';
+            var btn = document.getElementById(rulesButtonMap[blockId].btnId);
+            if (btn) btn.textContent = rulesButtonMap[blockId].hide;
             generateRules();
             umami && umami.track('show_rules_' + blockId.replace('rules-', ''));
         }
