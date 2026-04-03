@@ -39,8 +39,7 @@ Phase A is built and deployed to staging. Revenue-gating is live behind Stripe C
 - [x] Umami custom events (form submit with IP count bucket; export button clicks; report_view, report_download, report_tab_switch, report_copy_link, report_view_all_ips)
 - [x] PHPUnit tests (VerdictAlgorithmTest, TokenLifecycleTest, WebhookHandlerTest, AbuseIPDBRankingTest, AsnClassificationTest, CacheTest) — 95 tests, 119 assertions
 - [x] WCAG AA contrast check on verdict badge colors (#e06c9f, #e0a85a, #6cb87a) — all pass on #312450 body bg (4.55, 6.62, 5.85); CTA button (#111 on color) also passes (6.13, 8.92, 7.89). Print CSS overrides to black. HIGH is borderline at 4.55 but verdict text is large+bold (3:1 threshold applies).
-- [ ] Investigate Umami Event properties page error (see item 6 below)
-- [ ] QA agent doc (see item 7 below)
+- [ ] QA agent doc (see item 6 below)
 - [x] Report layout: move ranges and block rules above top threat sources (2026-03-30)
 - [x] Block script downloads for ASN ranges + nginx format + tabbed button UX (2026-03-30)
 - [x] Report print/PDF stylesheet (2026-03-30) — deployed, needs design review
@@ -154,21 +153,7 @@ Design the schema now even if Phase B isn't built yet:
 
 ---
 
-### 6. Investigate Umami Event properties page error
-
-Umami is firing custom events (form submit, export, report_view, etc.) but the Event properties
-page in the Umami dashboard is returning an error. Investigate before relying on event data
-to answer Q6 (visitor intent: incident response vs. curiosity).
-
-Steps:
-- Log into Umami, navigate to Events → Event properties
-- Capture the error message
-- Check whether the issue is a Umami version bug, a misconfigured event payload, or a data volume issue
-- Verify raw event counts look sane (Events tab, not properties)
-
----
-
-### 7. QA agent doc
+### 6. QA agent doc
 
 Write a doc that a Claude Code QA agent can use to verify everything end-to-end,
 without needing Stripe credentials or context on how the code works.
@@ -208,8 +193,8 @@ Freq stays paid-only. Intentional differentiator.
 ### Q5 — Report expiry model — RESOLVED 2026-04-02
 30-day expiry is correct. view_token tied to same token is fine. Cleanup cron handles expiry.
 
-### Q6 — Visitor intent (from CEO plan)
-Umami Event properties page is erroring — investigate before relying on event data. See near-term TODO below.
+### Q6 — Visitor intent (from CEO plan) — RESOLVED 2026-04-02
+Umami Event properties page error was a known Umami Cloud UI bug, not a data issue. Raw event counts are sane. Check Events tab directly for visitor intent data.
 
 ### Q7 — Programmatic access check — WONTDO
 Not worth the investigation at Phase A scale. Revisit if API monetization becomes a priority.
