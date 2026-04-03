@@ -221,6 +221,8 @@ $ctx_stmt = $con->prepare(
      FROM community_cidr_stats
      WHERE report_date >= ?
      GROUP BY cidr, org
+     HAVING CAST(SUBSTRING_INDEX(cidr, \'/\', -1) AS UNSIGNED) >= 16
+        AND SUM(total_hits) / POW(2, 32 - CAST(SUBSTRING_INDEX(cidr, \'/\', -1) AS UNSIGNED)) >= 0.001
      ORDER BY report_count DESC, total_hits DESC
      LIMIT 5'
 );

@@ -41,16 +41,28 @@ $total_reports = (int)($thr_row['total_reports'] ?? 0);
 $has_data = $total_reports >= 5;
 
 // ── Fetch top 50 CIDRs (rolling 7 days, ≥3 independent reports per CIDR) ────
+//
+// Quality filters applied in HAVING:
+//   1+4. prefix_len >= 16 — hard cap: nothing broader than /16 (65k IPs) ever emitted.
+//        Eliminates coarse ASN-level blocks (/8–/15) from major telecoms and ISPs that
+//        would indiscriminately block millions of legitimate IPs.
+//   3.   hit density >= 0.001 — requires at least 1 observed hit per 1,000 addresses in
+//        the range. For /16 this means 65+ hits; for /20 it means 4+; for /24 it means 1+.
+//        Filters out ranges that appear due to random/incidental IP overlap rather than
+//        genuine concentrated scanning activity.
 $cidrs = [];
 if ($has_data) {
     $cidr_stmt = $con->prepare(
         'SELECT cidr, asn, org,
                 SUM(report_count) AS report_count,
-                SUM(total_hits)   AS total_hits
+                SUM(total_hits)   AS total_hits,
+                CAST(SUBSTRING_INDEX(cidr, \'/\', -1) AS UNSIGNED) AS prefix_len
          FROM community_cidr_stats
          WHERE report_date >= ?
          GROUP BY cidr, asn, org
          HAVING report_count >= 3
+            AND CAST(SUBSTRING_INDEX(cidr, \'/\', -1) AS UNSIGNED) >= 16
+            AND SUM(total_hits) / POW(2, 32 - CAST(SUBSTRING_INDEX(cidr, \'/\', -1) AS UNSIGNED)) >= 0.001
          ORDER BY report_count DESC, total_hits DESC
          LIMIT 50'
     );
@@ -81,6 +93,9 @@ if ($fmt !== '' && in_array($fmt, $valid_formats, true) && $has_data && !empty($
               . "# Past 7 days from: {$cutoff} UTC\n"
               . "# Source: ip2geo.org/intel.php\n"
               . "# {$count} CIDR ranges derived from {$total_reports} opted-in threat reports\n"
+              . "# Filters: 3+ corroborating reports, prefix /16 or more specific, hit density >= 0.1%\n"
+              . "# REVIEW BEFORE APPLYING: ranges reflect reported attack subnets and may include\n"
+              . "# infrastructure shared with legitimate services. Verify against your environment.\n"
               . "\nset -euo pipefail\n\n"
               . implode("\n", $lines) . "\n";
         $filename = "ip2geo-community-block-list-iptables-{$date_str}.sh";
@@ -93,6 +108,9 @@ if ($fmt !== '' && in_array($fmt, $valid_formats, true) && $has_data && !empty($
               . "# Past 7 days from: {$cutoff} UTC\n"
               . "# Source: ip2geo.org/intel.php\n"
               . "# {$count} CIDR ranges derived from {$total_reports} opted-in threat reports\n"
+              . "# Filters: 3+ corroborating reports, prefix /16 or more specific, hit density >= 0.1%\n"
+              . "# REVIEW BEFORE APPLYING: ranges reflect reported attack subnets and may include\n"
+              . "# infrastructure shared with legitimate services. Verify against your environment.\n"
               . "\nset -euo pipefail\n\n"
               . implode("\n", $lines) . "\n";
         $filename = "ip2geo-community-block-list-ufw-{$date_str}.sh";
@@ -104,6 +122,9 @@ if ($fmt !== '' && in_array($fmt, $valid_formats, true) && $has_data && !empty($
               . "# Past 7 days from: {$cutoff} UTC\n"
               . "# Source: ip2geo.org/intel.php\n"
               . "# {$count} CIDR ranges derived from {$total_reports} opted-in threat reports\n"
+              . "# Filters: 3+ corroborating reports, prefix /16 or more specific, hit density >= 0.1%\n"
+              . "# REVIEW BEFORE APPLYING: ranges reflect reported attack subnets and may include\n"
+              . "# infrastructure shared with legitimate services. Verify against your environment.\n"
               . "# Usage: include this file inside a  geo \$blocked_ip { }  block in nginx.conf\n"
               . "\ndefault 0;\n"
               . implode("\n", $lines) . "\n";
@@ -115,6 +136,9 @@ if ($fmt !== '' && in_array($fmt, $valid_formats, true) && $has_data && !empty($
               . "# Past 7 days from: {$cutoff} UTC\n"
               . "# Source: ip2geo.org/intel.php\n"
               . "# {$count} CIDR ranges derived from {$total_reports} opted-in threat reports\n"
+              . "# Filters: 3+ corroborating reports, prefix /16 or more specific, hit density >= 0.1%\n"
+              . "# REVIEW BEFORE APPLYING: ranges reflect reported attack subnets and may include\n"
+              . "# infrastructure shared with legitimate services. Verify against your environment.\n"
               . "# One range per line — paste into ipset, web firewall, or any blocklist tool\n"
               . implode("\n", $cidr_list) . "\n";
         $filename = "ip2geo-community-block-list-{$date_str}.txt";
@@ -216,8 +240,9 @@ if ($fmt !== '' && in_array($fmt, $valid_formats, true) && $has_data && !empty($
                     </div>
 
                     <p style="font-size:0.8em;opacity:0.6;margin-top:0.5em">
-                        Top <?php echo count($cidrs); ?> ranges by report count. Hits = sum of occurrences across all contributing reports.
-                        Only CIDRs reported by 3 or more independent users in the past 7 days are included.
+                        Top <?php echo count($cidrs); ?> ranges by report count.
+                        Included only if: reported by 3+ independent users, prefix /16 or more specific (max 65,536 addresses), and hit density &ge;0.1% of the range.
+                        Ranges from cloud and ISP infrastructure may still appear &mdash; review carefully before applying to production.
                         Residential IPs are never collected. Data retained for 52 weeks.
                     </p>
 
