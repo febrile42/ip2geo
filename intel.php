@@ -201,7 +201,7 @@ if ($fmt !== '' && in_array($fmt, $valid_formats, true) && $has_data && !empty($
                         As more users run reports and share their data, this page will populate automatically.
                     </p>
 
-                    <?php else: ?>
+                    <?php elseif (!empty($cidrs)): ?>
 
                     <p>
                         Derived from <strong><?php echo number_format($total_reports); ?></strong> opted-in
@@ -244,6 +244,19 @@ if ($fmt !== '' && in_array($fmt, $valid_formats, true) && $has_data && !empty($
                         Included only if: reported by 3+ independent users, prefix /16 or more specific (max 65,536 addresses), and hit density &ge;0.1% of the range.
                         Ranges from cloud and ISP infrastructure may still appear &mdash; review carefully before applying to production.
                         Residential IPs are never collected. Data retained for 52 weeks.
+                    </p>
+
+                    <?php else: ?>
+
+                    <p>
+                        Derived from <strong><?php echo number_format($total_reports); ?></strong> opted-in
+                        ip2geo threat reports this week, but no ranges currently meet the confidence threshold.
+                        <a href="/privacy.php" style="opacity:0.7;font-size:0.9em">Privacy policy</a>
+                    </p>
+                    <p style="opacity:0.7;font-size:0.9em">
+                        To appear here, a CIDR must be seen in 3 or more independent reports, have a prefix of /16 or more specific
+                        (at most 65,536 addresses), and show a hit density of at least 0.1% of its range.
+                        The list will populate as more users contribute reports this week.
                     </p>
 
                     <?php endif; ?>
