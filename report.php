@@ -754,7 +754,7 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                             html += '<p style="margin:0.5em 0 0.3em;opacity:0.85">Top reported ranges in the past 7 days:</p>';
                             html += '<ul style="margin:0;padding-left:1.5em">';
                             data.top_cidrs.slice(0, 3).forEach(function(c) {
-                                html += '<li><code>' + c.cidr + '</code> &mdash; ' + c.org + ' (' + c.report_count + ' report' + (c.report_count === 1 ? '' : 's') + ', ' + c.total_hits + ' hits)</li>';
+                                html += '<li><code>' + c.cidr + '</code> &mdash; ' + c.org + ' (' + c.report_count + ' report' + (c.report_count === 1 ? '' : 's') + ')</li>';
                             });
                             html += '</ul>';
                         } else {

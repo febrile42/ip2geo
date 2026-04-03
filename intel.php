@@ -171,7 +171,7 @@ if ($fmt !== '' && in_array($fmt, $valid_formats, true) && $has_data && !empty($
 
                     <?php if (!$has_data): ?>
 
-                    <p>Not enough data yet this week &mdash; check back soon.</p>
+                    <p>Not enough data yet this week. Check back soon.</p>
                     <p style="opacity:0.7;font-size:0.9em">
                         The community feed requires at least 5 opted-in threat reports for the current week.
                         As more users run reports and share their data, this page will populate automatically.
@@ -198,8 +198,7 @@ if ($fmt !== '' && in_array($fmt, $valid_formats, true) && $has_data && !empty($
                             <tr>
                                 <th scope="col" style="font-family:monospace">CIDR</th>
                                 <th scope="col">ASN Org</th>
-                                <th scope="col" title="Opted-in reports containing this range this week">Reports</th>
-                                <th scope="col" title="Sum of hit counts across reports">Hits</th>
+                                <th scope="col" title="Opted-in reports containing this range in the past 7 days">Reports</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -210,7 +209,6 @@ if ($fmt !== '' && in_array($fmt, $valid_formats, true) && $has_data && !empty($
                                 <td style="font-family:monospace"><?php echo htmlspecialchars($row['cidr'], ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td><?php echo htmlspecialchars(($row['asn'] ?? '') . ($row['org'] ? ' ' . $row['org'] : ''), ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td><?php echo (int)$row['report_count']; ?></td>
-                                <td><?php echo number_format((int)$row['total_hits']); ?></td>
                             </tr>
                         <?php endforeach; ?>
                         </tbody>

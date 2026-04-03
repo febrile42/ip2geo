@@ -1,6 +1,6 @@
 # ip2geo — TODOs, Deferred Items & Open Questions
 
-Last updated: 2026-04-02 (community intel flywheel added).
+Last updated: 2026-04-03 (added DB optimization + DMARC investigation items).
 Source of truth for what's done, what's next, and what's deferred.
 
 Plans live in: `~/.gstack/projects/febrile42-ip2geo/`
@@ -269,6 +269,7 @@ and whether community column needs a total reframe. Log findings.
 - Historical trend sparklines on /intel.php (data already in weekly buckets; UI deferred)
 - Week-over-week trend indicator in community column on report.php — data is already stored (`last_week` queried alongside `this_week` in `fetch_community_data`). Deferred because ↑/→/↓ arrows are ambiguous at low report counts and the dataset is too small to make trend signals trustworthy. Revisit once 50+ opted-in reports establish a baseline: consider `<abbr>` tooltip or short text label ("rising"/"stable"/"falling") rather than bare arrows.
 - Firewall automation daemon (Phase D — after API is established)
+- CIDR hit counts in community data (`total_hits` column is stored but currently always equals `report_count` because CIDRs in `asn_ranges` are stored as plain strings with no per-CIDR frequency). To make `total_hits` meaningful: at ingestion time in `community-consent.php`, count how many IPs from `ip_list_json` fall within each CIDR range and store that as hits. Requires IP-in-CIDR math at ingest. Display currently omits `total_hits` entirely — add it back once it carries real signal. Revisit once 50+ opted-in reports exist.
 
 ---
 
@@ -310,6 +311,42 @@ and whether community column needs a total reframe. Log findings.
 - World map SVG choropleth (countries colored by IP count)
 - Log format detection (fail2ban / sshd / nginx / Apache auto-parse)
 - "Re-analyze for $3" upsell on report page (only if Phase A shows repeat purchase friction)
+
+---
+
+## Investigate — Performance
+
+### DB index / storage optimizations
+**What to investigate:** Are there schema-level wins we haven't taken yet? Known candidate:
+- `abuseipdb_cache.ip` is stored as `VARCHAR` — converting to `VARBINARY(16)` (packed `INET6_ATON()`) would halve the index size for that table and speed up point lookups. Need to audit all IP-storing columns across all tables (reports, community_ip_stats, community_ip_first_seen, community_cidr_stats) for the same pattern.
+- Check for missing composite indexes on columns used together in WHERE + GROUP BY (e.g. community tables queried on `report_date` + `ip`/`cidr`).
+- Check whether `geoip2_asn_current_int` range lookups are using the int-pair index correctly (EXPLAIN on a sample lookup).
+
+**Why:** At low traffic this is invisible. At scale (community flywheel + many paid reports) a poor index on a hot lookup path will show up fast. Cheap to fix early.
+**When:** Before or alongside Phase C go-live. One-session audit + migration.
+**Effort:** S–M | **Priority:** P2
+
+---
+
+## Investigate — Email Reputation
+
+### DMARC reports show mail "from" google.com
+**What:** ip2geo is now enrolled in DMARCLY. Resend is correctly aligned (DKIM + SPF + DMARC pass for ip2geo.org), but DMARC aggregate reports include hits attributed to google.com as the sending domain. This is unexpected and needs root-cause before tightening DMARC policy from `p=none` → `p=quarantine` or `p=reject`.
+
+**Hypotheses to investigate:**
+1. Forwarding (e.g. a Gmail address auto-forwarding to another inbox) — forwarded mail rewrites the envelope-from, breaking SPF alignment and appearing as a google.com sender in DMARC reports.
+2. A google.com form or notification that references ip2geo.org in a header (e.g. Google Forms confirmation emails, Google Calendar invites).
+3. Misconfigured MX or SPF include pulling in google.com IP space.
+4. Test emails sent from a personal Gmail that hit the same recipient — unrelated to ip2geo sending infrastructure but shows up in reports if recipient's domain reports on all incoming.
+
+**Steps:**
+- Pull the raw DMARC XML from DMARCLY for the affected period — check `<source_ip>`, `<header_from>`, `<envelope_from>`, and `<dkim>`/`<spf>` result fields for the google.com rows.
+- Cross-reference source IP against Google's SPF range (`dig TXT _spf.google.com`).
+- Check if any ip2geo.org user-facing flow triggers a Google service to send on our behalf (unlikely but worth ruling out).
+- Once root cause is clear, either suppress the source or confirm it's benign forwarding noise, then move DMARC to `p=quarantine` for 1–2 weeks and monitor before hardening to `p=reject`.
+
+**Why urgent:** Leaving DMARC at `p=none` forever provides no protection. Any confirmed spoofing or misalignment hurts deliverability for report link emails — directly impacts the product. Keep email rep pristine before user base grows.
+**Effort:** S (DMARCLY already has the data — it's a read + diagnose session) | **Priority:** P1
 
 ---
 
