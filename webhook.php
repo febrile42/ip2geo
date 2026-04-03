@@ -49,12 +49,34 @@ $notification_email = trim($session->customer_details->email ?? '');
 
 if ($token === '') {
     error_log('ip2geo webhook: checkout.session.completed with no client_reference_id');
+    send_alert_email(
+        'Payment received with no token — untrackable purchase',
+        build_payment_alert_html('checkout.session.completed arrived with no client_reference_id. Payment was received but cannot be matched to a report token.', [
+            'payment_intent' => $intent,
+            'session_id'     => $session->id ?? '',
+            'email'          => $notification_email,
+            'note'           => 'No token available. Find the payment in Stripe by payment intent or customer email above.',
+        ]),
+        $resend_api_key ?? '', $resend_from ?? ''
+    );
     exit;
 }
 
 $con = mysqli_connect($db_host, $db_user, $db_pass, $db_name);
 if (mysqli_connect_errno()) {
     error_log('ip2geo webhook DB connect failed: ' . mysqli_connect_error());
+    send_alert_email(
+        'Webhook DB failure — payment confirmed but token not marked paid',
+        build_payment_alert_html('DB connect failed in webhook.php. Stripe confirmed payment but the token cannot be marked paid. Report will likely fail when the customer lands on the success URL.', [
+            'token'          => $token,
+            'payment_intent' => $intent,
+            'session_id'     => $session->id ?? '',
+            'email'          => $notification_email,
+            'error'          => mysqli_connect_error(),
+            'note'           => 'Token is in pending state. If DB recovers, the customer may succeed via success_url. If not, manual refund may be needed.',
+        ]),
+        $resend_api_key ?? '', $resend_from ?? ''
+    );
     exit;
 }
 

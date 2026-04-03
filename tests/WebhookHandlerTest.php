@@ -150,15 +150,17 @@ class WebhookHandlerTest extends TestCase
         $this->pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
         $this->pdo->exec("
             CREATE TABLE reports (
-                token                 VARCHAR(36) PRIMARY KEY,
-                submission_hash       VARCHAR(64) NOT NULL,
-                ip_list_json          TEXT        NOT NULL,
-                status                VARCHAR(16) NOT NULL DEFAULT 'pending',
+                token                 VARCHAR(36)  PRIMARY KEY,
+                submission_hash       VARCHAR(64)  NOT NULL,
+                ip_list_json          TEXT         NOT NULL,
+                status                VARCHAR(16)  NOT NULL DEFAULT 'pending',
                 pending_expires_at    DATETIME,
                 report_expires_at     DATETIME,
                 report_json           TEXT,
                 stripe_payment_intent VARCHAR(64),
-                created_at            DATETIME    NOT NULL
+                notification_email    VARCHAR(254),
+                email_sent_at         DATETIME,
+                created_at            DATETIME     NOT NULL
             )
         ");
     }
@@ -184,18 +186,25 @@ class WebhookHandlerTest extends TestCase
         return $row ? $row['status'] : null;
     }
 
+    // Current SQL from webhook.php — includes COALESCE for notification_email.
+    // Tests pass '' for notification_email (no email from webhook) except where
+    // the COALESCE behaviour is the specific thing under test.
+    private function webhookUpdate(string $intent, string $notification_email, string $token): \PDOStatement
+    {
+        $stmt = $this->pdo->prepare(
+            'UPDATE reports
+             SET status = "paid", stripe_payment_intent = ?,
+                 notification_email = COALESCE(notification_email, NULLIF(?, ""))
+             WHERE token = ? AND status = "pending" AND pending_expires_at > ?'
+        );
+        $stmt->execute([$intent, $notification_email, $token, date('Y-m-d H:i:s')]);
+        return $stmt;
+    }
+
     public function testWebhookMarksPendingTokenAsPaid(): void
     {
         $this->insertPending('tok_valid');
-        $intent = 'pi_test';
-
-        $stmt = $this->pdo->prepare(
-            'UPDATE reports
-             SET status = "paid", stripe_payment_intent = ?
-             WHERE token = ? AND status = "pending" AND pending_expires_at > ?'
-        );
-        $stmt->execute([$intent, 'tok_valid', date('Y-m-d H:i:s')]);
-
+        $stmt = $this->webhookUpdate('pi_test', '', 'tok_valid');
         $this->assertSame(1, $stmt->rowCount());
         $this->assertSame('paid', $this->getStatus('tok_valid'));
     }
@@ -203,16 +212,8 @@ class WebhookHandlerTest extends TestCase
     public function testWebhookIgnoresAlreadyPaidToken(): void
     {
         $this->insertPending('tok_paid');
-        // Pre-mark as paid
         $this->pdo->exec("UPDATE reports SET status = 'paid' WHERE token = 'tok_paid'");
-
-        $stmt = $this->pdo->prepare(
-            'UPDATE reports
-             SET status = "paid", stripe_payment_intent = ?
-             WHERE token = ? AND status = "pending" AND pending_expires_at > ?'
-        );
-        $stmt->execute(['pi_dup', 'tok_paid', date('Y-m-d H:i:s')]);
-
+        $stmt = $this->webhookUpdate('pi_dup', '', 'tok_paid');
         $this->assertSame(0, $stmt->rowCount(), 'Already-paid token should not be updated again');
     }
 
@@ -220,41 +221,52 @@ class WebhookHandlerTest extends TestCase
     {
         $this->insertPending('tok_redeemed');
         $this->pdo->exec("UPDATE reports SET status = 'redeemed' WHERE token = 'tok_redeemed'");
-
-        $stmt = $this->pdo->prepare(
-            'UPDATE reports
-             SET status = "paid", stripe_payment_intent = ?
-             WHERE token = ? AND status = "pending" AND pending_expires_at > ?'
-        );
-        $stmt->execute(['pi_dup', 'tok_redeemed', date('Y-m-d H:i:s')]);
-
+        $stmt = $this->webhookUpdate('pi_dup', '', 'tok_redeemed');
         $this->assertSame(0, $stmt->rowCount());
     }
 
     public function testWebhookIgnoresExpiredPendingToken(): void
     {
         $this->insertPending('tok_expired', expired: true);
-
-        $stmt = $this->pdo->prepare(
-            'UPDATE reports
-             SET status = "paid", stripe_payment_intent = ?
-             WHERE token = ? AND status = "pending" AND pending_expires_at > ?'
-        );
-        $stmt->execute(['pi_late', 'tok_expired', date('Y-m-d H:i:s')]);
-
+        $stmt = $this->webhookUpdate('pi_late', '', 'tok_expired');
         $this->assertSame(0, $stmt->rowCount(), 'Expired pending token should not be paid');
         $this->assertSame('pending', $this->getStatus('tok_expired'));
     }
 
     public function testWebhookIgnoresNonexistentToken(): void
     {
-        $stmt = $this->pdo->prepare(
-            'UPDATE reports
-             SET status = "paid", stripe_payment_intent = ?
-             WHERE token = ? AND status = "pending" AND pending_expires_at > ?'
-        );
-        $stmt->execute(['pi_ghost', 'tok_ghost', date('Y-m-d H:i:s')]);
-
+        $stmt = $this->webhookUpdate('pi_ghost', '', 'tok_ghost');
         $this->assertSame(0, $stmt->rowCount());
+    }
+
+    // ── notification_email COALESCE behaviour ─────────────────────────────────
+
+    public function testWebhookStoresEmailWhenNoneOnFile(): void
+    {
+        $this->insertPending('tok_email_new');
+        $this->webhookUpdate('pi_1', 'customer@example.com', 'tok_email_new');
+
+        $row = $this->pdo->query("SELECT notification_email FROM reports WHERE token = 'tok_email_new'")->fetch(\PDO::FETCH_ASSOC);
+        $this->assertSame('customer@example.com', $row['notification_email']);
+    }
+
+    public function testWebhookPreservesExistingEmail(): void
+    {
+        $this->insertPending('tok_email_existing');
+        $this->pdo->exec("UPDATE reports SET notification_email = 'original@example.com' WHERE token = 'tok_email_existing'");
+
+        $this->webhookUpdate('pi_2', 'new@example.com', 'tok_email_existing');
+
+        $row = $this->pdo->query("SELECT notification_email FROM reports WHERE token = 'tok_email_existing'")->fetch(\PDO::FETCH_ASSOC);
+        $this->assertSame('original@example.com', $row['notification_email'], 'Existing email must not be overwritten');
+    }
+
+    public function testWebhookDoesNotStoreEmptyEmail(): void
+    {
+        $this->insertPending('tok_email_empty');
+        $this->webhookUpdate('pi_3', '', 'tok_email_empty');
+
+        $row = $this->pdo->query("SELECT notification_email FROM reports WHERE token = 'tok_email_empty'")->fetch(\PDO::FETCH_ASSOC);
+        $this->assertNull($row['notification_email'], 'Empty email string must not be stored (NULLIF guard)');
     }
 }

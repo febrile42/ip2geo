@@ -32,7 +32,7 @@ if (mysqli_connect_errno()) {
 $stmt = $con->prepare(
     'SELECT token, submission_hash, ip_list_json, status,
             pending_expires_at, report_expires_at, report_json,
-            notification_email, email_sent_at
+            notification_email, email_sent_at, stripe_payment_intent
      FROM reports WHERE token = ?'
 );
 $stmt->bind_param('s', $token);
@@ -72,6 +72,16 @@ if ($status === 'pending') {
     } catch (\Stripe\Exception\ApiErrorException $e) {
         error_log('ip2geo report.php Stripe retrieve failed: ' . $e->getMessage());
         mysqli_close($con);
+        send_alert_email(
+            'Stripe session retrieve failed — payment may be undelivered',
+            build_payment_alert_html('Stripe session retrieve failed on success_url. Customer may have paid but cannot access their report.', [
+                'token'      => $token,
+                'session_id' => $stripe_session_id,
+                'error'      => $e->getMessage(),
+                'note'       => 'Payment status unknown. Retrieve the checkout session in Stripe to confirm if payment completed.',
+            ]),
+            $resend_api_key ?? '', $resend_from ?? ''
+        );
         render_error('Payment verification failed. Please contact support@ip2geo.org with your token: ' . htmlspecialchars($token, ENT_QUOTES, 'UTF-8'));
         exit;
     }
@@ -80,6 +90,17 @@ if ($status === 'pending') {
     if (($stripe_session->client_reference_id ?? '') !== $token) {
         error_log('ip2geo report.php: session_id/token mismatch for token ' . $token);
         mysqli_close($con);
+        send_alert_email(
+            'Session/token mismatch — possible fraud or bug',
+            build_payment_alert_html('Stripe session client_reference_id does not match the URL token. Could indicate a tampered URL or an internal bug.', [
+                'token'          => $token,
+                'session_id'     => $stripe_session_id,
+                'payment_intent' => $stripe_session->payment_intent ?? '',
+                'email'          => trim($stripe_session->customer_details->email ?? ''),
+                'note'           => 'Token in URL: ' . $token . ' | Token in Stripe session: ' . ($stripe_session->client_reference_id ?? '(none)'),
+            ]),
+            $resend_api_key ?? '', $resend_from ?? ''
+        );
         render_error('Payment verification failed. Please contact support@ip2geo.org with your token: ' . htmlspecialchars($token, ENT_QUOTES, 'UTF-8'));
         exit;
     }
@@ -129,6 +150,17 @@ if ($status === 'paid') {
 $ip_data = json_decode($row['ip_list_json'], true);
 if (!is_array($ip_data)) {
     error_log('ip2geo report.php: ip_list_json decode failed for token ' . $token);
+    mysqli_close($con);
+    send_alert_email(
+        'Report generation failed after confirmed payment',
+        build_payment_alert_html('ip_list_json could not be decoded. Payment was confirmed but report cannot be generated. Customer needs a refund or manual fix.', [
+            'token'          => $token,
+            'payment_intent' => $row['stripe_payment_intent'] ?? '',
+            'email'          => $notification_email,
+            'note'           => 'ip_list_json in DB is null or malformed. Check the reports row.',
+        ]),
+        $resend_api_key ?? '', $resend_from ?? ''
+    );
     render_error('Report generation failed. Please contact support@ip2geo.org with your token: ' . htmlspecialchars($token, ENT_QUOTES, 'UTF-8'));
     exit;
 }

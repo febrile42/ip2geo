@@ -107,6 +107,106 @@ HTML;
 }
 
 /**
+ * Build an HTML body for a purchase-related failure alert.
+ *
+ * @param string $description  One-line error description shown at the top
+ * @param array  $ctx          Optional keyed context:
+ *                             token, session_id, payment_intent, email, error, note
+ * @return string HTML-safe email body
+ */
+function build_payment_alert_html(string $description, array $ctx = []): string
+{
+    $rows = '';
+    $fields = [
+        'token'          => 'Token',
+        'session_id'     => 'Stripe Session ID',
+        'payment_intent' => 'Payment Intent',
+        'email'          => 'Customer Email',
+        'error'          => 'PHP Error',
+        'note'           => 'Note',
+    ];
+    foreach ($fields as $key => $label) {
+        $val = $ctx[$key] ?? '';
+        if ($val === '') continue;
+        $le = htmlspecialchars($label, ENT_QUOTES, 'UTF-8');
+        $ve = htmlspecialchars($val, ENT_QUOTES, 'UTF-8');
+        $rows .= "<tr><td style=\"padding:4px 8px;font-weight:bold;white-space:nowrap;vertical-align:top\">{$le}</td>"
+               . "<td style=\"padding:4px 8px;word-break:break-all\">{$ve}</td></tr>";
+    }
+    $time_e = htmlspecialchars(gmdate('Y-m-d H:i:s') . ' UTC', ENT_QUOTES, 'UTF-8');
+    $rows .= "<tr><td style=\"padding:4px 8px;font-weight:bold;white-space:nowrap\">Time</td>"
+           . "<td style=\"padding:4px 8px\">{$time_e}</td></tr>";
+
+    $stripe_links = '';
+    if (!empty($ctx['payment_intent'])) {
+        $pi = htmlspecialchars($ctx['payment_intent'], ENT_QUOTES, 'UTF-8');
+        $stripe_links .= "<li><a href=\"https://dashboard.stripe.com/payments/{$pi}\">Open payment in Stripe Dashboard</a></li>";
+    }
+    if (!empty($ctx['session_id'])) {
+        $sid = htmlspecialchars($ctx['session_id'], ENT_QUOTES, 'UTF-8');
+        $stripe_links .= "<li><a href=\"https://dashboard.stripe.com/checkout/sessions/{$sid}\">Open checkout session in Stripe Dashboard</a></li>";
+    }
+    if (!empty($ctx['email'])) {
+        $eq = htmlspecialchars(urlencode($ctx['email']), ENT_QUOTES, 'UTF-8');
+        $stripe_links .= "<li><a href=\"https://dashboard.stripe.com/search?query={$eq}\">Search Stripe by customer email</a></li>";
+    }
+    if ($stripe_links === '') {
+        $stripe_links = '<li>No Stripe identifiers available — check server error log for context</li>';
+    }
+
+    $db_section = '<p>No token available.</p>';
+    if (!empty($ctx['token'])) {
+        $t = htmlspecialchars($ctx['token'], ENT_QUOTES, 'UTF-8');
+        $db_section = "<pre style=\"background:#f5f5f5;padding:0.8em;border-radius:4px;overflow-x:auto\">"
+                    . "SELECT token, status, stripe_payment_intent, notification_email, created_at\n"
+                    . "FROM reports WHERE token = '{$t}';</pre>";
+    }
+
+    $de = htmlspecialchars($description, ENT_QUOTES, 'UTF-8');
+
+    return "<!DOCTYPE html><html><head><meta charset=\"utf-8\"></head>"
+         . "<body style=\"font-family:sans-serif;color:#222;max-width:700px;margin:0 auto;padding:2em 1em\">"
+         . "<h2 style=\"margin-top:0;color:#c00\">ip2geo Payment Alert</h2>"
+         . "<p style=\"background:#fff3cd;border:1px solid #ffc107;padding:0.8em 1em;border-radius:4px\">{$de}</p>"
+         . "<table style=\"border-collapse:collapse;width:100%;border:1px solid #ddd\"><tbody>{$rows}</tbody></table>"
+         . "<h3>Find in Stripe</h3><ul>{$stripe_links}</ul>"
+         . "<h3>DB Lookup</h3>{$db_section}"
+         . "</body></html>";
+}
+
+/**
+ * Send an alert email to info@ip2geo.org via Resend.
+ * Silently logs on failure — never throws.
+ *
+ * @param string $subject  Short subject (will be prefixed with "[ip2geo alert] ")
+ * @param string $body_html Pre-built HTML body (use build_payment_alert_html())
+ * @param string $api_key  Resend API key
+ * @param string $from     Resend from address
+ */
+function send_alert_email(
+    string $subject,
+    string $body_html,
+    string $api_key,
+    string $from
+): void {
+    if ($api_key === '' || $from === '') {
+        error_log('ip2geo alert: cannot send alert (no Resend config). Subject: ' . $subject);
+        return;
+    }
+    try {
+        $resend = \Resend::client($api_key);
+        $resend->emails->send([
+            'from'    => $from,
+            'to'      => ['info@ip2geo.org'],
+            'subject' => '[ip2geo alert] ' . $subject,
+            'html'    => $body_html,
+        ]);
+    } catch (\Throwable $e) {
+        error_log('ip2geo alert email failed: ' . $e->getMessage());
+    }
+}
+
+/**
  * Return a privacy-masked version of an email address.
  * foo@example.com -> f**@example.com
  */

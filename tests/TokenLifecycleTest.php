@@ -41,6 +41,7 @@ class TokenLifecycleTest extends TestCase
                 report_json         TEXT,
                 stripe_payment_intent VARCHAR(64),
                 notification_email  VARCHAR(254),
+                email_sent_at       DATETIME,
                 created_at          DATETIME     NOT NULL
             )
         ");
@@ -118,10 +119,11 @@ class TokenLifecycleTest extends TestCase
 
         $stmt = $this->pdo->prepare(
             'UPDATE reports
-             SET status = "paid", stripe_payment_intent = :intent
+             SET status = "paid", stripe_payment_intent = :intent,
+                 notification_email = COALESCE(notification_email, NULLIF(:email, ""))
              WHERE token = :token AND status = "pending" AND pending_expires_at > :now'
         );
-        $stmt->execute([':intent' => $intent, ':token' => $token, ':now' => date('Y-m-d H:i:s')]);
+        $stmt->execute([':intent' => $intent, ':email' => '', ':token' => $token, ':now' => date('Y-m-d H:i:s')]);
 
         $this->assertSame(1, $stmt->rowCount());
         $row = $this->fetchRow($token);
@@ -134,10 +136,11 @@ class TokenLifecycleTest extends TestCase
 
         $stmt = $this->pdo->prepare(
             'UPDATE reports
-             SET status = "paid", stripe_payment_intent = :intent
+             SET status = "paid", stripe_payment_intent = :intent,
+                 notification_email = COALESCE(notification_email, NULLIF(:email, ""))
              WHERE token = :token AND status = "pending" AND pending_expires_at > :now'
         );
-        $stmt->execute([':intent' => 'pi_test123', ':token' => 'test-token-1', ':now' => date('Y-m-d H:i:s')]);
+        $stmt->execute([':intent' => 'pi_test123', ':email' => '', ':token' => 'test-token-1', ':now' => date('Y-m-d H:i:s')]);
 
         // already paid → WHERE status = "pending" finds nothing → 0 rows updated
         $this->assertSame(0, $stmt->rowCount());
@@ -152,10 +155,11 @@ class TokenLifecycleTest extends TestCase
 
         $stmt = $this->pdo->prepare(
             'UPDATE reports
-             SET status = "paid", stripe_payment_intent = :intent
+             SET status = "paid", stripe_payment_intent = :intent,
+                 notification_email = COALESCE(notification_email, NULLIF(:email, ""))
              WHERE token = :token AND status = "pending" AND pending_expires_at > :now'
         );
-        $stmt->execute([':intent' => 'pi_test', ':token' => 'test-token-1', ':now' => date('Y-m-d H:i:s')]);
+        $stmt->execute([':intent' => 'pi_test', ':email' => '', ':token' => 'test-token-1', ':now' => date('Y-m-d H:i:s')]);
 
         $this->assertSame(0, $stmt->rowCount());
         // Status must still be pending (not paid)

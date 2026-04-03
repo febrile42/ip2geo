@@ -143,6 +143,31 @@ class ReportFunctionsTest extends TestCase
         }
     }
 
+    // ── int_range_to_cidr ──────────────────────────────────────────────────────
+
+    public function testIntRangeToCidr32SingleIp(): void
+    {
+        // Single IP: start === end → size=1, log2(1)=0, prefix=32
+        $ip = ip2long('10.0.0.1');
+        $this->assertSame('10.0.0.1/32', int_range_to_cidr($ip, $ip));
+    }
+
+    public function testIntRangeToCidr24(): void
+    {
+        // /24 block: 256 addresses → log2(256)=8, prefix=24
+        $start = ip2long('192.168.1.0');
+        $end   = ip2long('192.168.1.255');
+        $this->assertSame('192.168.1.0/24', int_range_to_cidr($start, $end));
+    }
+
+    public function testIntRangeToCidr16(): void
+    {
+        // /16 block: 65536 addresses → log2(65536)=16, prefix=16
+        $start = ip2long('10.0.0.0');
+        $end   = ip2long('10.0.255.255');
+        $this->assertSame('10.0.0.0/16', int_range_to_cidr($start, $end));
+    }
+
     // ── compute_abuseipdb_callout ──────────────────────────────────────────────
 
     public function testCalloutWithHighScores(): void
