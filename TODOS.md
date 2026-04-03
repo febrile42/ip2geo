@@ -287,6 +287,15 @@ and whether community column needs a total reframe. Log findings.
 
 ---
 
+## Deferred — AbuseIPDB Block Check enrichment
+
+**What:** Use `/api/v2/check-block` to score CIDR ranges in the ASN Ranges section. Shows "74% of IPs in this range have AbuseIPDB reports" alongside each CIDR — stronger recommendation signal than classification alone.
+**Why deferred:** Free tier is 100 block checks/day. A typical HIGH-verdict report uses 15–30 checks (2–3 ASNs × 5–10 ranges). Quota exhausts at 3–6 paid reports/day — too tight for production.
+**When to revisit:** Once on a paid AbuseIPDB plan with higher block check limits.
+**Effort:** M | **Priority:** P3 | **Depends on:** AbuseIPDB paid plan
+
+---
+
 ## Deferred — Phase B
 
 - AI-powered threat report (Claude API) — replaces rule-based verdict
