@@ -741,6 +741,27 @@ function render_report(array $report, string $token, ?string $expires_at, array 
             </script>
             <?php endif; ?>
 
+            <?php if (!$is_demo && $data_consent === 1):
+                $community_has_data = false;
+                if (!empty($community_data['ip_stats']) && !empty($community_data['this_week'])) {
+                    foreach ($community_data['ip_stats'] as $ip_counts) {
+                        if (($ip_counts[$community_data['this_week']] ?? 0) >= 3) {
+                            $community_has_data = true;
+                            break;
+                        }
+                    }
+                }
+            ?>
+            <div style="background:rgba(108,184,122,0.12);border-left:3px solid #6cb87a;padding:0.8em 1em;margin-bottom:1.5em;font-size:0.9em">
+                <strong>&#10003; Contributing to Community Intel</strong>
+                <?php if (!$community_has_data): ?>
+                <p style="margin:0.4em 0 0;opacity:0.8">The community dataset is still in its early days &mdash; data will grow as more users opt in. You&rsquo;ll see richer comparisons in the table below as it builds.</p>
+                <?php else: ?>
+                <p style="margin:0.4em 0 0;opacity:0.8">Your data is contributing to the community feed. See the Community column in the Top Threat Sources table below.</p>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
+
             <style>
                 .report-header-row {
                     display: flex;
