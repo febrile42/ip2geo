@@ -663,7 +663,7 @@ function render_report(array $report, string $token, ?string $expires_at, array 
             <?php endif; ?>
 
             <?php if ($is_demo): ?>
-            <div class="community-intel-banner" style="background:rgba(108,184,122,0.12);border-left:3px solid #6cb87a;padding:0.8em 1em;margin-bottom:1.5em;font-size:0.9em">
+            <div style="background:rgba(108,184,122,0.12);border-left:3px solid #6cb87a;padding:0.8em 1em;margin-bottom:1.5em;font-size:0.9em">
                 <strong>Community Intel</strong> <span style="opacity:0.6;font-size:0.85em;margin-left:0.3em">Preview</span>
                 <p style="margin:0.4em 0 0.7em">When you generate your own report and opt in, ip2geo cross-references your IPs against anonymized data from other users this week. You see how many servers reported the same IPs, with trend indicators showing whether activity is escalating.</p>
                 <p style="margin:0 0 0.4em;opacity:0.85;font-size:0.9em">This is what the Community column looks like in the Top Threat Sources table:</p>
