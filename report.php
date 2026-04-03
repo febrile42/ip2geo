@@ -193,7 +193,7 @@ $stmt->close();
 
 $email_was_sent = false;
 if ($notification_email !== '' && !empty($resend_api_key) && !empty($resend_from)) {
-    $email_was_sent = send_report_email($con, $token, $notification_email, $report_expires, $resend_api_key, $resend_from);
+    $email_was_sent = send_report_email($con, $token, $notification_email, $report_expires, $resend_api_key, $resend_from, $report['total_ips'] ?? 0);
 }
 mysqli_close($con);
 

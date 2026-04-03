@@ -19,6 +19,7 @@
  * @param string  $expires_at  Report expiry datetime string (Y-m-d H:i:s)
  * @param string  $api_key     Resend API key
  * @param string  $from        Resend from address e.g. "ip2geo <reports@ip2geo.org>"
+ * @param int     $ip_count    Number of IPs analyzed (0 = unknown, omits count from subject)
  * @return bool   true if email was sent (or already sent by another path); false if skipped/failed
  */
 function send_report_email(
@@ -27,7 +28,8 @@ function send_report_email(
     string $email,
     string $expires_at,
     string $api_key,
-    string $from
+    string $from,
+    int $ip_count = 0
 ): bool {
     if ($email === '' || $api_key === '') return false;
 
@@ -87,7 +89,9 @@ HTML;
         $resend->emails->send([
             'from'    => $from,
             'to'      => [$email],
-            'subject' => 'Your ip2geo Threat Report',
+            'subject' => $ip_count > 0
+                ? "Threat Intelligence Report ({$ip_count} IPs) \u{2014} ip2geo"
+                : 'Threat Intelligence Report \u{2014} ip2geo',
             'html'    => $html,
         ]);
         return true;
