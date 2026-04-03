@@ -231,22 +231,17 @@ context" column in paid reports ("this IP hit 31 other servers this week, escala
 
 **Implementation order:**
 
-- [ ] `scripts/migrate-community.sql` — 3 new tables + ALTER reports
-  - `community_cidr_stats (cidr, asn, org, week_start, report_count, total_hits)`
-  - `community_ip_stats (ip, week_start, report_count, total_hits)`
-  - `community_ip_first_seen (ip, first_seen)` — permanent, never pruned
-  - `ALTER TABLE reports ADD COLUMN data_consent TINYINT(1) NULL`
-  - Retention: 52-week cron DELETE added to update-db.yml
-- [ ] `privacy.php` — add "Community Threat Intelligence" section before any data ships
-- [ ] `community-consent.php` — POST-only AJAX endpoint; validates token, sets data_consent,
-  ingests CIDR + IP data from stored JSON; idempotent; returns community context for inline render
-- [ ] `report.php` — consent banner (shown when data_consent IS NULL); community column in
-  top-25 table (shown when data_consent = 1); beta label < 20 reports; two-query trend load
-- [ ] `intel.php` — public block list page; 4 download formats; min 5 reports threshold;
-  ranked CIDR table with ASN org, report count, hit count; CTAs to demo + lookup
-- [ ] `sitemap.xml` — add /intel.php
-- [ ] `QA.md` — add consent flow, community column, /intel.php to test checklist
-- [ ] `update-db.yml` — add 52-week retention DELETE step to monthly cron
+- [x] `scripts/migrate-community.sql` — 3 new tables + ALTER reports (commit 18d9704)
+- [x] `privacy.php` — Community Threat Intelligence section added (commit 5f743d4)
+- [x] `community-consent.php` — POST-only AJAX endpoint (commit 18d9704)
+- [x] `report.php` — consent banner + community column + fetch_community_data() (commit 5f743d4)
+- [x] `intel.php` — public block list, 4 download formats, threshold guard, CTAs (commit 5f743d4)
+- [x] `sitemap.xml` — /intel.php added (commit 5f743d4)
+- [x] `QA.md` — consent flow + community column + /intel.php sections added (commit 5f743d4)
+- [x] `update-db.yml` — 52-week retention DELETE step added (commit 5f743d4)
+- [x] `tests/CommunityConsentTest.php` — 37 tests, 63 assertions (commit 5f743d4)
+
+**Phase C complete. Run `/qa` against staging before merging to main.**
 
 **Revisit gate:** Once 50+ opted-in reports exist, re-evaluate beta thresholds, framing,
 and whether community column needs a total reframe. Log findings.
