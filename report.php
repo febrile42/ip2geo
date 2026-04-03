@@ -715,7 +715,7 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                     </div>
                     <p style="margin:0.6em 0 0;font-size:0.82em;opacity:0.55">Community data is currently limited as this feature grows &mdash; your opt-in helps build it.</p>
                 </div>
-                <div id="consent-collapsed" style="<?php echo $data_consent === 0 ? '' : 'display:none'; ?>font-size:0.9em;opacity:0.75">
+                <div id="consent-collapsed" style="<?php echo $data_consent === 0 ? '' : 'display:none;'; ?>font-size:0.9em;opacity:0.75">
                     Community Intel &mdash; you opted out.
                     <a id="consent-reconsider-btn" tabindex="0" style="color:inherit;text-decoration:underline;cursor:pointer;margin-left:0.2em">Change your mind?</a>
                 </div>
