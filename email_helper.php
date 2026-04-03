@@ -90,8 +90,8 @@ HTML;
             'from'    => $from,
             'to'      => [$email],
             'subject' => $ip_count > 0
-                ? "Threat Intelligence Report ({$ip_count} IPs) \u{2014} ip2geo"
-                : 'Threat Intelligence Report \u{2014} ip2geo',
+                ? "Threat Intelligence Report ({$ip_count} IPs) - ip2geo"
+                : 'Threat Intelligence Report - ip2geo',
             'html'    => $html,
         ]);
         return true;
