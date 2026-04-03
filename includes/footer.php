@@ -15,6 +15,7 @@ $_footer_data_date = $GLOBALS['db_data_date'] ?? null;
             <li><a href="/changelog.php">v<?php echo APP_VERSION; ?></a> &ndash; &copy;<?php echo date('Y'); ?></li>
             <?php if ($_footer_data_date): ?><li>Data: <?php echo htmlspecialchars((string)$_footer_data_date, ENT_QUOTES, 'UTF-8'); ?></li><?php endif; ?>
             <li><a href="/privacy.php">Privacy Policy</a></li>
+            <li><a href="/legal.php">Refund Policy</a></li>
             <li><a href="mailto:support@ip2geo.org">support@ip2geo.org</a></li>
             <li>Design: <a href="http://html5up.net" target="_blank">HTML5 UP</a></li>
         </ul>
