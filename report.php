@@ -753,9 +753,9 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                 }
             ?>
             <div style="background:rgba(108,184,122,0.12);border-left:3px solid #6cb87a;padding:0.8em 1em;margin-bottom:1.5em;font-size:0.9em">
-                <strong>&#10003; Contributing to Community Intel</strong>
+                <strong>&#10003; Thank you for contributing to Community Intel</strong>
                 <?php if (!$community_has_data): ?>
-                <p style="margin:0.4em 0 0;opacity:0.8">The community dataset is still in its early days &mdash; data will grow as more users opt in. You&rsquo;ll see richer comparisons in the table below as it builds.</p>
+                <p style="margin:0.4em 0 0;opacity:0.8">The community dataset is still in its early days &mdash; data will grow as more users opt in. Check back on future reports for richer comparisons.</p>
                 <?php else: ?>
                 <p style="margin:0.4em 0 0;opacity:0.8">Your data is contributing to the community feed. See the Community column in the Top Threat Sources table below.</p>
                 <?php endif; ?>
