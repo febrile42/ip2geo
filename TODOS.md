@@ -153,23 +153,15 @@ Design the schema now even if Phase B isn't built yet:
 
 ---
 
-### 6. QA agent doc
+### 6. QA agent doc — DONE 2026-04-02
 
-Write a doc that a Claude Code QA agent can use to verify everything end-to-end,
-without needing Stripe credentials or context on how the code works.
+`QA.md` created in project root. Covers all 7 public pages, demo token, DO NOT TEST
+list (Stripe, webhook, email), filter/CSV/firewall rule behavior, block script format,
+scroll behavior, and known headless limitations.
 
-Contents:
-- Demo report URL + token (DEMO_TOKEN = 00000000-0000-0000-0000-000000000000)
-- Demo "view all IPs" URL
-- What to check on each page (verdict, table columns, section order, button labels)
-- Filter behavior to verify (category chips hide rows, CSV respects filter, count updates)
-- Block script format to verify (shebang, IP count in comment, one rule per line)
-- ASN ranges format to verify (CIDR notation, correct ASN/org label, range count)
-- Scroll-to-results behavior (form submit AND view_token page load)
-- Buttons to test: iptables download, ufw download, Copy report link, View all IPs,
-  Back to your report, New Lookup, See a sample report
-- What NOT to test: anything requiring Stripe (payment flow, token generation)
-- Known staging URL: staging.ip2geo.org
+**Clean pass run 2026-04-02:** All 7 pages HTTP 200, 0 console errors. One bug found
+and fixed: privacy.php omitted AbuseIPDB as a third-party data processor (ISSUE-001,
+commit a813261). Re-verified on staging post-fix — health score 97/100.
 
 ---
 
