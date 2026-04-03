@@ -564,7 +564,7 @@ else
 								<ul>
 									<li><strong>AbuseIPDB reputation scores</strong> for your top 25 IPs: see which ones are confirmed attackers</li>
 									<li><strong>ASN CIDR ranges</strong> for resilient blocking: block entire scanning networks, not just individual IPs that rotate</li>
-									<li><strong>Ready-to-paste firewall rules</strong> for iptables, ufw, and nginx</li>
+									<li><strong>Ready-to-run firewall scripts</strong> for iptables, ufw, and nginx</li>
 									<li><strong>Community intel</strong> (opt-in): see how many other ip2geo users reported the same IPs this week, with trend indicators showing whether activity is escalating</li>
 									<li><strong>Shareable link</strong> saved for 30 days: send it to your team or come back later</li>
 								</ul>
