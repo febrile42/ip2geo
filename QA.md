@@ -166,7 +166,64 @@ Visit: `https://staging.ip2geo.org/report.php?token=00000000-0000-0000-0000-0000
 
 ---
 
-## 4. View-all page (?view_token=)
+## 4. Community Consent Flow (on report page)
+
+**Test via demo report:** The demo token (`00000000-0000-0000-0000-000000000000`) has `data_consent` hardcoded to show the banner. In actual testing, use a real paid report token where `data_consent IS NULL` — the banner only appears for that state.
+
+**Consent banner (data_consent IS NULL):**
+- The banner should appear near the top of a paid report page for a new report
+- Banner heading: "Community Intel — opt in" (or similar)
+- Banner has two buttons: opt-in and decline
+- Demo report will NOT show the banner (demo has consent pre-set); this flow requires a real paid report token
+
+**AJAX opt-in flow:**
+- POST to `/community-consent.php` with `token` and `consent=1`
+- On success: banner replaces itself with a community callout (no page reload)
+- Response includes `ok: true, ingested: true, week_start: ..., top_cidrs: [...]`
+
+**AJAX decline flow:**
+- POST to `/community-consent.php` with `token` and `consent=0`
+- On success: banner disappears, `data_consent=0` set in DB
+- Idempotent: visiting the report again should NOT show the banner
+
+**Community column in top-25 table (data_consent = 1):**
+- When opted in, a "Community" column appears after the AbuseIPDB column
+- Column shows e.g. "31 servers ↑" or "—" for IPs with <3 reports
+- IPs with 3-19 community reports show "(beta)" badge
+- IPs with 20+ reports show without qualifier
+- Column NOT present in DOM when data_consent != 1
+
+**Direct endpoint tests (can be tested with curl or browser network tab):**
+- POST to `/community-consent.php` with missing token: HTTP 400, `{"error":"bad_request"}`
+- POST with invalid token: HTTP 400, `{"error":"invalid_token"}`
+- GET request (not POST): HTTP 405, `{"error":"method_not_allowed"}`
+
+---
+
+## 5. /intel.php — Public Community Block List
+
+**Page load:**
+- Visit `https://staging.ip2geo.org/intel.php`
+- If < 5 opted-in reports exist for the current week: page shows "Not enough data yet this week — check back soon." message
+- If >= 5 reports: page shows the block list table
+
+**Content (when data is present):**
+- Header: "Community Block List — Week of {date}"
+- Subhead mentions N opted-in ip2geo reports
+- Ranked CIDR table with columns: CIDR, ASN Org, Reports (this week), Hits (this week)
+- 4 download buttons: iptables, ufw, nginx, plain .txt — each triggers a file download
+- CTA links at bottom: "See a sample report" and "Analyze your own logs"
+
+**Download files (if data exists):**
+- Click iptables download: file should start with `#!/bin/bash` comment header
+- Click plain .txt download: one CIDR per line, no shell commands
+
+**Known limitation:**
+- Without enough opted-in real reports, the data threshold page will be shown. QA agent cannot submit real reports to populate this. Test the empty-state page, confirm no 500 errors.
+
+---
+
+## 6. View-all page (?view_token=)
 
 Visit: `https://staging.ip2geo.org/?view_token=00000000-0000-0000-0000-000000000000`
 
@@ -178,7 +235,7 @@ Visit: `https://staging.ip2geo.org/?view_token=00000000-0000-0000-0000-000000000
 
 ---
 
-## 5. Resend report link page (send-report-link.php)
+## 7. Resend report link page (send-report-link.php)
 
 Visit: `https://staging.ip2geo.org/send-report-link.php?token=00000000-0000-0000-0000-000000000000`
 
@@ -200,7 +257,7 @@ Visit `https://staging.ip2geo.org/send-report-link.php?token=bad-token`
 
 ---
 
-## 6. Static pages
+## 8. Static pages
 
 For each page: loads cleanly, no broken layout, correct content present.
 
@@ -231,7 +288,7 @@ For each page: loads cleanly, no broken layout, correct content present.
 
 ---
 
-## 7. Scroll behavior
+## 9. Scroll behavior
 
 - **Form submit on index.php:** after results load, page should be scrolled to the results section (not stuck at top)
 - **view_token page load:** `/?view_token=...` should scroll to the results table on load

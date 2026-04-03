@@ -32,7 +32,8 @@ if (mysqli_connect_errno()) {
 $stmt = $con->prepare(
     'SELECT token, submission_hash, ip_list_json, status,
             pending_expires_at, report_expires_at, report_json,
-            notification_email, email_sent_at, stripe_payment_intent
+            notification_email, email_sent_at, stripe_payment_intent,
+            data_consent
      FROM reports WHERE token = ?'
 );
 $stmt->bind_param('s', $token);
@@ -129,9 +130,14 @@ if ($status === 'redeemed') {
     $ip_data_for_render = json_decode($row['ip_list_json'], true) ?? [];
     $cached_email      = $row['notification_email'] ?? '';
     $cached_email_sent = $row['email_sent_at'] !== null;
+    $data_consent      = $row['data_consent'] === null ? null : (int)$row['data_consent'];
+    $community_data    = [];
+    if ($data_consent === 1 && !empty($report['top25'])) {
+        $community_data = fetch_community_data($con, array_column($report['top25'], 'ip'));
+    }
     mysqli_close($con);
     maybe_serve_script_download($report, $token);
-    render_report($report, $token, $row['report_expires_at'], $ip_data_for_render, $cached_email, $cached_email_sent);
+    render_report($report, $token, $row['report_expires_at'], $ip_data_for_render, $cached_email, $cached_email_sent, $data_consent, $community_data);
     exit;
 }
 
@@ -230,7 +236,7 @@ if ($notification_email !== '' && !empty($resend_api_key) && !empty($resend_from
 mysqli_close($con);
 
 maybe_serve_script_download($report, $token);
-render_report($report, $token, $report_expires, $ip_data, $notification_email, $email_was_sent);
+render_report($report, $token, $report_expires, $ip_data, $notification_email, $email_was_sent, null, []);
 exit;
 
 // ── AbuseIPDB enrichment ──────────────────────────────────────────────────────
@@ -517,6 +523,56 @@ function include_block_rules_tabs(string $token, bool $has_ranges): void { ?>
             </div>
 <?php }
 
+// ── Community context fetch ───────────────────────────────────────────────────
+
+function fetch_community_data($con, array $ips): array {
+    if (empty($ips)) return ['ip_stats' => [], 'first_seen' => [], 'this_week' => '', 'last_week' => ''];
+
+    $days_since_monday = (int) gmdate('N') - 1;
+    $this_week = gmdate('Y-m-d', strtotime("-{$days_since_monday} days"));
+    $last_week = gmdate('Y-m-d', strtotime($this_week . ' -7 days'));
+
+    $placeholders = implode(',', array_fill(0, count($ips), '?'));
+    $types        = str_repeat('s', count($ips));
+
+    // This week + last week report counts
+    $stmt = $con->prepare(
+        "SELECT ip, week_start, report_count
+         FROM community_ip_stats
+         WHERE ip IN ({$placeholders})
+           AND week_start IN (?, ?)"
+    );
+    $params = array_merge($ips, [$this_week, $last_week]);
+    $stmt->bind_param($types . 'ss', ...$params);
+    $stmt->execute();
+    $ip_stats = [];
+    $res = $stmt->get_result();
+    while ($r = $res->fetch_assoc()) {
+        $ip_stats[$r['ip']][$r['week_start']] = (int)$r['report_count'];
+    }
+    $stmt->close();
+
+    // First-seen dates
+    $stmt = $con->prepare(
+        "SELECT ip, first_seen FROM community_ip_first_seen WHERE ip IN ({$placeholders})"
+    );
+    $stmt->bind_param($types, ...$ips);
+    $stmt->execute();
+    $first_seen = [];
+    $res = $stmt->get_result();
+    while ($r = $res->fetch_assoc()) {
+        $first_seen[$r['ip']] = $r['first_seen'];
+    }
+    $stmt->close();
+
+    return [
+        'ip_stats'   => $ip_stats,
+        'first_seen' => $first_seen,
+        'this_week'  => $this_week,
+        'last_week'  => $last_week,
+    ];
+}
+
 function render_error(string $msg): void {
     $title = 'Report Unavailable — ip2geo.org';
     render_page_open($title); ?>
@@ -530,7 +586,7 @@ function render_error(string $msg): void {
     <?php render_page_close();
 }
 
-function render_report(array $report, string $token, ?string $expires_at, array $all_ips = [], string $notification_email = '', bool $email_sent = false): void {
+function render_report(array $report, string $token, ?string $expires_at, array $all_ips = [], string $notification_email = '', bool $email_sent = false, ?int $data_consent = null, array $community_data = []): void {
     $verdict     = $report['verdict'];
     $verdict_lc  = strtolower($verdict);
     $total       = $report['total_ips'];
@@ -605,6 +661,66 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                 </div>
             </div>
             <?php endif; ?>
+
+            <?php if (!$is_demo && $data_consent === null): ?>
+            <div id="community-consent-banner" style="background:rgba(108,184,122,0.12);border-left:3px solid #6cb87a;padding:0.8em 1em;margin-bottom:1.5em;font-size:0.9em">
+                <strong>Community Intel &mdash; opt in</strong>
+                <p style="margin:0.4em 0 0.8em">Share anonymized network and IP data to see how your traffic compares to this week's global attack trends. <a href="/privacy.php" style="opacity:0.7;font-size:0.9em">Privacy policy</a></p>
+                <div style="display:flex;gap:0.5em;flex-wrap:wrap">
+                    <button class="button small" id="consent-yes-btn">Opt in &mdash; show me the comparison</button>
+                    <button class="button small alt" id="consent-no-btn">No thanks</button>
+                </div>
+            </div>
+            <script>
+            (function() {
+                var token = <?php echo json_encode($token); ?>;
+                function postConsent(consent, callback) {
+                    var fd = new FormData();
+                    fd.append('token', token);
+                    fd.append('consent', String(consent));
+                    fetch('/community-consent.php', { method: 'POST', body: fd })
+                        .then(function(r) { return r.json(); })
+                        .then(callback)
+                        .catch(function() {});
+                }
+                document.getElementById('consent-yes-btn').addEventListener('click', function() {
+                    var btn = this;
+                    btn.disabled = true;
+                    btn.textContent = 'Saving\u2026';
+                    postConsent(1, function(data) {
+                        if (!data.ok) return;
+                        var banner = document.getElementById('community-consent-banner');
+                        var html = '<div style="background:rgba(108,184,122,0.12);border-left:3px solid #6cb87a;padding:0.8em 1em;margin-bottom:1.5em;font-size:0.9em">';
+                        html += '<strong>Community Intel</strong>';
+                        if (data.week_start) {
+                            html += ' <span style="opacity:0.6;font-size:0.85em">Week of ' + data.week_start + '</span>';
+                        }
+                        if (data.top_cidrs && data.top_cidrs.length) {
+                            html += '<p style="margin:0.5em 0 0.3em;opacity:0.85">Top reported ranges this week:</p>';
+                            html += '<ul style="margin:0;padding-left:1.5em">';
+                            data.top_cidrs.slice(0, 3).forEach(function(c) {
+                                html += '<li><code>' + c.cidr + '</code> &mdash; ' + c.org + ' (' + c.report_count + ' report' + (c.report_count === 1 ? '' : 's') + ', ' + c.total_hits + ' hits)</li>';
+                            });
+                            html += '</ul>';
+                        } else {
+                            html += '<p style="margin:0.5em 0 0;opacity:0.7">Your data has been added. Community data will appear as reports accumulate.</p>';
+                        }
+                        html += '<p style="margin:0.6em 0 0;font-size:0.85em;opacity:0.6">Reload this page to see the Community column in the Top Threat Sources table.</p>';
+                        html += '</div>';
+                        banner.outerHTML = html;
+                    });
+                });
+                document.getElementById('consent-no-btn').addEventListener('click', function() {
+                    this.disabled = true;
+                    postConsent(0, function() {
+                        var banner = document.getElementById('community-consent-banner');
+                        if (banner) banner.style.display = 'none';
+                    });
+                });
+            })();
+            </script>
+            <?php endif; ?>
+
             <style>
                 .report-header-row {
                     display: flex;
@@ -1013,6 +1129,9 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                         <th scope="col">Category</th>
                         <th scope="col" title="Times this IP appeared in the submitted log">Hits</th>
                         <th scope="col">AbuseIPDB</th>
+                        <?php if ($data_consent === 1): ?>
+                        <th scope="col" title="Reports from other ip2geo users this week">Community</th>
+                        <?php endif; ?>
                     </tr>
                 </thead>
                 <tbody>
@@ -1028,6 +1147,28 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                         <td class="asn-category asn-category--<?php echo htmlspecialchars($cat, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($cat, ENT_QUOTES, 'UTF-8'); ?></td>
                         <td style="font-family:monospace"><?php echo $freq > 1 ? '<strong>' . $freq . 'x</strong>' : '1x'; ?></td>
                         <td><?php echo $score !== null ? htmlspecialchars((string)$score, ENT_QUOTES, 'UTF-8') : '<span style="opacity:0.4">—</span>'; ?></td>
+                        <?php if ($data_consent === 1):
+                            $ip = $entry['ip'] ?? '';
+                            $this_week_count = (int)($community_data['ip_stats'][$ip][$community_data['this_week']] ?? 0);
+                            $last_week_count = (int)($community_data['ip_stats'][$ip][$community_data['last_week']] ?? 0);
+                            $fs_date = $community_data['first_seen'][$ip] ?? null;
+                            $days_ago = $fs_date ? max(0, (int)floor((time() - strtotime($fs_date)) / 86400)) : null;
+                            $tooltip = $days_ago !== null ? ' title="First seen in community data: ' . $days_ago . ' day' . ($days_ago === 1 ? '' : 's') . ' ago"' : '';
+                            if ($this_week_count < 3): ?>
+                        <td><span style="opacity:0.4">—</span></td>
+                        <?php else:
+                            if ($last_week_count > 0) {
+                                if ($this_week_count > $last_week_count * 1.2) $trend = ' &#8593;';
+                                elseif ($this_week_count < $last_week_count * 0.8) $trend = ' &#8595;';
+                                else $trend = ' &#8594;';
+                            } else {
+                                $trend = '';
+                            }
+                            $beta = ($this_week_count < 20) ? ' <span style="font-size:0.75em;opacity:0.55">(beta)</span>' : '';
+                        ?>
+                        <td<?php echo $tooltip; ?>><a href="/intel.php" style="text-decoration:none;color:inherit"><?php echo $this_week_count; ?> servers<?php echo $trend; ?></a><?php echo $beta; ?></td>
+                        <?php endif; ?>
+                        <?php endif; ?>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>

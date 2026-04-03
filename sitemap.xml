@@ -20,4 +20,9 @@
   <loc>https://ip2geo.org/legal.php</loc>
   <changefreq>monthly</changefreq>
 </url>
+<url>
+  <loc>https://ip2geo.org/intel.php</loc>
+  <changefreq>weekly</changefreq>
+  <priority>0.7</priority>
+</url>
 </urlset>

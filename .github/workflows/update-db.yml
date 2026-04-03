@@ -147,3 +147,26 @@ jobs:
             --head "$BRANCH"
 
           rm -f "$PR_BODY_FILE"
+
+      - name: Prune community stats older than 52 weeks
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT }}
+          script: |
+            PROD_PATH="/var/www/ip2geo"
+            DB_HOST=$(php -r "require '$PROD_PATH/config.php'; echo \$db_host;")
+            DB_USER=$(php -r "require '$PROD_PATH/config.php'; echo \$db_user;")
+            DB_PASS=$(php -r "require '$PROD_PATH/config.php'; echo \$db_pass;")
+            DB_NAME=$(php -r "require '$PROD_PATH/config.php'; echo \$db_name;")
+            MYCNF=$(mktemp)
+            chmod 600 "$MYCNF"
+            printf '[client]\nhost=%s\nuser=%s\npassword=%s\ndatabase=%s\n' \
+              "$DB_HOST" "$DB_USER" "$DB_PASS" "$DB_NAME" > "$MYCNF"
+            mysql --defaults-extra-file="$MYCNF" <<'SQL'
+            DELETE FROM community_cidr_stats WHERE week_start < DATE_SUB(CURDATE(), INTERVAL 52 WEEK);
+            DELETE FROM community_ip_stats WHERE week_start < DATE_SUB(CURDATE(), INTERVAL 52 WEEK);
+            SQL
+            rm -f "$MYCNF"
