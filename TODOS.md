@@ -1,18 +1,22 @@
 # ip2geo — TODOs, Deferred Items & Open Questions
 
-Last updated: 2026-04-02 (post-commit audit).
+Last updated: 2026-04-02 (community intel flywheel added).
 Source of truth for what's done, what's next, and what's deferred.
 
 Plans live in: `~/.gstack/projects/febrile42-ip2geo/`
+- `ceo-plans/2026-04-02-community-intel-flywheel.md` — **ACTIVE** Phase C: community CIDR/IP aggregate, /intel.php, consent flow
 - `ceo-plans/2026-04-02-report-perceived-value.md` — report UX improvements (narrative, AbuseIPDB callout, CTA copy, effort-saved, checklist, print/share)
 - `ceo-plans/2026-03-28-incident-triage-tool.md` — Phase C+A+B architecture, Stripe flow, verdict logic, test strategy
 - `shadows-develop-design-20260328-220913.md` — full design spec (layout, interaction states, copy, a11y, responsive)
 - `designs/design-audit-20260329/` — screenshots from design audit
-- `QUESTIONS.md` (project root) — async design questions requiring owner input
 
 ---
 
-## Current Phase State (as of 2026-03-29)
+## Current Phase State (as of 2026-04-02)
+
+**v3.0.0 tagged** — Phase A complete, deployed to staging, QA clean (97/100).
+Stripe account under review; payments not yet live. Tagged `v3.0.0` on develop.
+Phase C (community intel flywheel) now in active development on develop branch.
 
 Phase A is built and deployed to staging. Revenue-gating is live behind Stripe Checkout.
 
@@ -208,6 +212,50 @@ Contact email: **support@ip2geo.org**
 - [x] **Create legal.php** — refund/cancellation/dispute policies live (commit 3c5ebb6)
 - [x] **Describe the paid product publicly** — "Full Threat Reports" section added to index.php with pricing and what's included (commit 083d54a)
 - [x] **Add Legal / Refund Policy link to footer** — "Refund Policy" link in footer alongside Privacy Policy (commit 3c5ebb6)
+
+---
+
+## Phase C: Community Threat Intelligence Flywheel
+
+Full spec: `~/.gstack/projects/febrile42-ip2geo/ceo-plans/2026-04-02-community-intel-flywheel.md`
+
+**What it is:** Opted-in reports contribute anonymized CIDR ranges and scanning/VPN IPs
+to a community aggregate. Powers a public weekly block list (/intel.php) and a "community
+context" column in paid reports ("this IP hit 31 other servers this week, escalating ↑").
+
+**Data collected (with consent only):**
+- CIDRs from `report_json['asn_ranges'][].cidrs[]`
+- IPs from `ip_list_json` where `classification IN ('scanning', 'vpn_proxy', 'cloud_exit')`
+- Residential IPs: **never collected, never stored.**
+- No token, email, or user identifier in aggregate tables.
+
+**Implementation order:**
+
+- [ ] `scripts/migrate-community.sql` — 3 new tables + ALTER reports
+  - `community_cidr_stats (cidr, asn, org, week_start, report_count, total_hits)`
+  - `community_ip_stats (ip, week_start, report_count, total_hits)`
+  - `community_ip_first_seen (ip, first_seen)` — permanent, never pruned
+  - `ALTER TABLE reports ADD COLUMN data_consent TINYINT(1) NULL`
+  - Retention: 52-week cron DELETE added to update-db.yml
+- [ ] `privacy.php` — add "Community Threat Intelligence" section before any data ships
+- [ ] `community-consent.php` — POST-only AJAX endpoint; validates token, sets data_consent,
+  ingests CIDR + IP data from stored JSON; idempotent; returns community context for inline render
+- [ ] `report.php` — consent banner (shown when data_consent IS NULL); community column in
+  top-25 table (shown when data_consent = 1); beta label < 20 reports; two-query trend load
+- [ ] `intel.php` — public block list page; 4 download formats; min 5 reports threshold;
+  ranked CIDR table with ASN org, report count, hit count; CTAs to demo + lookup
+- [ ] `sitemap.xml` — add /intel.php
+- [ ] `QA.md` — add consent flow, community column, /intel.php to test checklist
+- [ ] `update-db.yml` — add 52-week retention DELETE step to monthly cron
+
+**Revisit gate:** Once 50+ opted-in reports exist, re-evaluate beta thresholds, framing,
+and whether community column needs a total reframe. Log findings.
+
+**Deferred from this phase:**
+- API access for community data (Phase C.5 — after flywheel proves value)
+- Weekly email digest to opted-in users (Resend already integrated; defer until data is meaningful)
+- Historical trend sparklines on /intel.php (data already in weekly buckets; UI deferred)
+- Firewall automation daemon (Phase D — after API is established)
 
 ---
 
