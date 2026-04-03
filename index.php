@@ -466,7 +466,7 @@ if ($_POST || $view_token_mode)
 	echo '<div id="rules-ufw"      class="rules-block" style="display:none" aria-label="ufw deny rules"><button class="button small copy-rules" data-target="rules-ufw-pre">Copy</button><pre id="rules-ufw-pre"></pre></div>';
 	echo '<div id="rules-nginx"    class="rules-block" style="display:none" aria-label="nginx geo block"><button class="button small copy-rules" data-target="rules-nginx-pre">Copy</button><pre id="rules-nginx-pre"></pre></div>';
 
-	echo '<p style="margin:0.8em 0 0;font-size:0.85em;opacity:0.7">Block known scanners reported by the ip2geo community &mdash; <a href="/intel.php">Community Block List &rarr;</a></p>';
+	echo '<p style="margin:0.8em 0 0;font-size:0.85em;opacity:0.7">Block known scanners reported by the ip2geo community &mdash; <a href="/intel.php" target="_blank" rel="noopener noreferrer">Community Block List <i class="fas fa-external-link-alt" style="font-size:0.7em;opacity:0.6;vertical-align:middle"></i></a></p>';
 
 	echo '</div>'; // end #filter-left
 
