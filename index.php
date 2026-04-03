@@ -687,7 +687,16 @@ else
 					var newResults = doc.getElementById('results');
 					if (!newResults) throw new Error('no results section in response');
 
+					var existing = document.getElementById('results');
+					if (existing) {
+						existing.outerHTML = newResults.outerHTML;
+					} else {
+						document.getElementById('intro').insertAdjacentHTML('afterend', newResults.outerHTML);
+					}
+					var inserted = document.getElementById('results');
 					cleanup();
+					if (inserted) inserted.scrollIntoView({ behavior: 'smooth' });
+
 					var bucket = count === 1 ? '1'
 					             : count <= 10   ? '2-10'
 					             : count <= 50   ? '11-50'
@@ -696,16 +705,7 @@ else
 					             : count <= 1000 ? '501-1000'
 					             : count <= 5000 ? '1001-5000'
 					             :                 '5000+';
-					umami.track('lookup_submit', { ip_count_bucket: bucket });
-
-					var existing = document.getElementById('results');
-					if (existing) {
-						existing.outerHTML = newResults.outerHTML;
-					} else {
-						document.getElementById('intro').insertAdjacentHTML('afterend', newResults.outerHTML);
-					}
-					var inserted = document.getElementById('results');
-					if (inserted) inserted.scrollIntoView({ behavior: 'smooth' });
+					try { umami.track('lookup_submit', { ip_count_bucket: bucket }); } catch(_) {}
 
 				} catch (err) {
 					cleanup();
@@ -715,7 +715,7 @@ else
 		// CSV download (delegated — works after AJAX injection)
 		document.addEventListener('click', function(e) {
 			if (e.target.id !== 'download-csv') return;
-			umami.track('download_csv');
+			try { umami.track('download_csv'); } catch(_) {}
 			var bom = '\uFEFF';
 			var headers = ['IP','CC','State/Province','City','ASN','ASN Org','Category'];
 			var rows = [headers];
