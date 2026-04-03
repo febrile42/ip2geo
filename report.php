@@ -760,7 +760,7 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                         } else {
                             html += '<p style="margin:0.5em 0 0.3em;opacity:0.85">The community dataset is still in its early days &mdash; data will grow as more users opt in. You\'ll get richer comparisons on future reports as the dataset builds.</p>';
                         }
-                        html += '<p style="margin:0.7em 0 0"><a href="" onclick="window.location.reload();return false;" class="button small">View your community data &rarr;</a></p>';
+                        html += '<p style="margin:0.7em 0 0"><a href="" onclick="window.location.reload();return false;" class="button small">Refresh to view your community data &rarr;</a></p>';
                         html += '</div>';
                         banner.outerHTML = html;
                     });

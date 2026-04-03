@@ -27,9 +27,10 @@ asn_classification_candidates.txt
 # Composer lock — commit this if you want reproducible builds on CI
 # composer.lock
 
-# Claude Files
+# Claude & IDE Files
 .claude
 TODOS.md
 QUESTIONS.md
 QA.md
-.gstack/
+.gstack*/
+.vscode/
