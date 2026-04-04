@@ -21,43 +21,51 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-$raw_json = $_POST['ip_classified_json'] ?? '';
-if ($raw_json === '') {
+$allowed_hosts = ['ip2geo.org', 'staging.ip2geo.org'];
+$host = strtolower(explode(':', $_SERVER['HTTP_HOST'] ?? '')[0]);
+if (!in_array($host, $allowed_hosts, true)) {
+    header('Location: /');
+    exit;
+}
+
+// Extract IP + freq from client POST — classification fields are discarded and
+// recomputed server-side. Never trust browser-submitted geo/ASN/classification data.
+$raw_client_json = $_POST['ip_classified_json'] ?? '';
+if ($raw_client_json === '') {
     header('Location: /?error=no_data');
     exit;
 }
 
-$ip_data = json_decode($raw_json, true);
-if (!is_array($ip_data) || count($ip_data) === 0) {
+$client_ip_data = json_decode($raw_client_json, true);
+if (!is_array($client_ip_data) || count($client_ip_data) === 0) {
     header('Location: /?error=no_data');
     exit;
 }
 
-// Size guard: ip_list_json is MEDIUMTEXT (16MB max); enforce a practical ceiling
-if (strlen($raw_json) > 10 * 1024 * 1024) {
-    header('Location: /?error=too_large');
+// Validate IPs; preserve freq (low-risk user data: affects ranking only, not classification)
+$ip_freq_map = [];
+foreach ($client_ip_data as $entry) {
+    $ip = filter_var($entry['ip'] ?? '', FILTER_VALIDATE_IP,
+        FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE);
+    if ($ip === false) continue;
+    $freq = max(1, (int)($entry['freq'] ?? 1));
+    $ip_freq_map[$ip] = $freq;
+}
+if (empty($ip_freq_map)) {
+    header('Location: /?error=no_data');
     exit;
 }
 
-$geo_results_raw = $_POST['geo_results_json'] ?? '';
-// Validate: if provided, must be valid JSON array
-if ($geo_results_raw !== '') {
-    $geo_check = json_decode($geo_results_raw, true);
-    if (!is_array($geo_check)) $geo_results_raw = '';
-}
-// Size guard: same 10MB ceiling as ip_list_json
-if (strlen($geo_results_raw) > 10 * 1024 * 1024) $geo_results_raw = '';
+// ── Generate token ────────────────────────────────────────────────────────────
 
-// ── Generate token and submission hash ───────────────────────────────────────
-
-$token           = sprintf('%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
-    mt_rand(0, 0xffff), mt_rand(0, 0xffff),
-    mt_rand(0, 0xffff),
-    mt_rand(0, 0x0fff) | 0x4000,
-    mt_rand(0, 0x3fff) | 0x8000,
-    mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff)
-);
-$submission_hash = hash('sha256', $raw_json);
+$rand  = bin2hex(random_bytes(16));
+$token = implode('-', [
+    substr($rand, 0, 8),
+    substr($rand, 8, 4),
+    '4' . substr($rand, 13, 3),
+    dechex(hexdec(substr($rand, 16, 2)) & 0x3f | 0x80) . substr($rand, 18, 2),
+    substr($rand, 20, 12),
+]);
 
 // ── Persist to DB ─────────────────────────────────────────────────────────────
 
@@ -67,6 +75,87 @@ if (mysqli_connect_errno()) {
     header('Location: /?error=db');
     exit;
 }
+
+// ── Resolve classification: cache-first, re-classify as fallback ──────────────
+// index.php writes a 30-min cache after each lookup. A hit avoids re-running all
+// MaxMind queries. A miss (> 30 min elapsed, or attacker bypass attempt) falls back
+// to full server-side re-classification. Security holds either way.
+
+$sorted_ips = array_keys($ip_freq_map);
+sort($sorted_ips);
+$cache_key = hash('sha256', implode(',', $sorted_ips));
+
+$cache_stmt = $con->prepare(
+    'SELECT ip_list_json, geo_json FROM geo_classification_cache
+     WHERE cache_key = ? AND expires_at > NOW()'
+);
+$cache_stmt->bind_param('s', $cache_key);
+$cache_stmt->execute();
+$cache_row = $cache_stmt->get_result()->fetch_assoc();
+$cache_stmt->close();
+
+if ($cache_row) {
+    $raw_json        = $cache_row['ip_list_json'];
+    $geo_results_raw = $cache_row['geo_json'];
+} else {
+    // Cache miss: re-classify server-side (authoritative, no browser trust)
+    $ip_classified_data = [];
+    $geo_results_data   = [];
+
+    foreach ($ip_freq_map as $ip => $freq) {
+        $ip_int = sprintf('%u', ip2long($ip));
+        $query  = 'SELECT loc.country_iso_code, loc.country_name, loc.subdivision_1_name, loc.city_name,
+            asn_net.autonomous_system_number, asn_net.autonomous_system_org
+        FROM (
+            SELECT geoname_id, network_end_integer
+            FROM geoip2_network_current_int
+            WHERE ' . $ip_int . ' >= network_start_integer
+            ORDER BY network_start_integer DESC LIMIT 1
+        ) city_net
+        LEFT JOIN geoip2_location_current loc
+            ON (city_net.geoname_id = loc.geoname_id AND loc.locale_code = \'en\')
+        LEFT JOIN (
+            SELECT autonomous_system_number, autonomous_system_org
+            FROM geoip2_asn_current_int
+            WHERE ' . $ip_int . ' >= network_start_integer
+            ORDER BY network_start_integer DESC LIMIT 1
+        ) asn_net ON 1=1
+        WHERE ' . $ip_int . ' <= city_net.network_end_integer';
+
+        $result  = mysqli_query($con, $query);
+        $row     = $result ? mysqli_fetch_assoc($result) : null;
+
+        $asn_num  = $row['autonomous_system_number'] ?? '';
+        $asn_org  = $row['autonomous_system_org'] ?? '';
+        $category = classify_asn((string)$asn_num, (string)$asn_org);
+        $country  = $row['country_iso_code'] ?? '';
+
+        $ip_classified_data[] = [
+            'ip'             => $ip,
+            'asn'            => $asn_num !== '' ? 'AS' . $asn_num : '',
+            'asn_org'        => $asn_org,
+            'classification' => $category,
+            'country'        => $country,
+            'freq'           => $freq,
+        ];
+        $geo_results_data[] = [
+            'ip'             => $ip,
+            'country'        => $country,
+            'country_name'   => $row['country_name'] ?? '',
+            'region'         => $row['subdivision_1_name'] ?? '',
+            'city'           => $row['city_name'] ?? '',
+            'asn'            => $asn_num !== '' ? 'AS' . $asn_num : '',
+            'asn_org'        => $asn_org,
+            'classification' => $category,
+            'freq'           => $freq,
+        ];
+    }
+
+    $raw_json        = json_encode($ip_classified_data);
+    $geo_results_raw = json_encode($geo_results_data);
+}
+
+$submission_hash = hash('sha256', $raw_json);
 
 // Check for a cached paid/redeemed report for the same IP list
 $stmt = $con->prepare(

@@ -320,6 +320,29 @@ if ($_POST || $view_token_mode)
 	} // end foreach geo query loop
 	} // end if ($geo_loop_needed)
 
+	// Write classification to short-lived cache so get-report.php can skip re-queries.
+	// Cache key = SHA-256 of sorted classified IPs. Best-effort: never fail the page load.
+	if (!empty($ip_classified_data)) {
+		$_cache_ips = array_column($ip_classified_data, 'ip');
+		sort($_cache_ips);
+		$_geo_cache_key  = hash('sha256', implode(',', $_cache_ips));
+		$_geo_ip_json    = json_encode($ip_classified_data);
+		$_geo_res_json   = json_encode($geo_results_data);
+		$_geo_cache_stmt = $con->prepare(
+			'INSERT INTO geo_classification_cache (cache_key, ip_list_json, geo_json, expires_at)
+			 VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL 30 MINUTE))
+			 ON DUPLICATE KEY UPDATE
+			   ip_list_json = VALUES(ip_list_json),
+			   geo_json     = VALUES(geo_json),
+			   expires_at   = DATE_ADD(NOW(), INTERVAL 30 MINUTE)'
+		);
+		if ($_geo_cache_stmt) {
+			$_geo_cache_stmt->bind_param('sss', $_geo_cache_key, $_geo_ip_json, $_geo_res_json);
+			$_geo_cache_stmt->execute();
+			$_geo_cache_stmt->close();
+		}
+	}
+
 	// --- CTA threshold & verdict ---
 	// "Non-residential" = confirmed scanners/VPNs + cloud/VPS egress.
 	// Cloud IPs hitting your infrastructure at volume is itself suspicious,
