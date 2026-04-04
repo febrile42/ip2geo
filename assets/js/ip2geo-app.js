@@ -11,7 +11,7 @@
         // Remove ?cancelled=1 from the URL without a page reload
         history.replaceState(null, '', window.location.pathname);
 
-        umami && umami.track('stripe_cancel');
+        window.umami && umami.track('stripe_cancel');
 
         var pending = sessionStorage.getItem('ip2geo_pending_ips');
         if (pending) {
@@ -57,7 +57,7 @@
         if (textarea && textarea.value) {
             sessionStorage.setItem('ip2geo_pending_ips', textarea.value);
         }
-        umami && umami.track('cta_click');
+        window.umami && umami.track('cta_click');
         // Let the form submit proceed normally
     });
 
@@ -223,7 +223,7 @@
             var btn = document.getElementById(rulesButtonMap[blockId].btnId);
             if (btn) btn.textContent = rulesButtonMap[blockId].hide;
             generateRules();
-            umami && umami.track('show_rules_' + blockId.replace('rules-', ''));
+            window.umami && umami.track('show_rules_' + blockId.replace('rules-', ''));
         }
     }
 
@@ -243,7 +243,7 @@
         navigator.clipboard.writeText(pre.textContent).then(function () {
             var orig = e.target.textContent;
             e.target.textContent = 'Copied!';
-            umami && umami.track('copy_rules_' + targetId.replace('rules-', '').replace('-pre', ''));
+            window.umami && umami.track('copy_rules_' + targetId.replace('rules-', '').replace('-pre', ''));
             setTimeout(function () { e.target.textContent = orig; }, 2000);
         });
     });
@@ -279,7 +279,7 @@
                 // Exclusive select: only this country
                 all.forEach(function (i) { i.checked = false; });
                 clicked.checked = true;
-                umami && umami.track('filter_country', { country: clicked.value });
+                window.umami && umami.track('filter_country', { country: clicked.value });
             }
         }
 
@@ -303,7 +303,7 @@
     document.addEventListener('change', function (e) {
         if (!e.target) return;
         if (e.target.classList.contains('filter-category')) {
-            umami && umami.track('filter_category', { category: e.target.value, checked: e.target.checked });
+            window.umami && umami.track('filter_category', { category: e.target.value, checked: e.target.checked });
             applyFilters();
         } else if (e.target.classList.contains('filter-country')) {
             applyFilters();
