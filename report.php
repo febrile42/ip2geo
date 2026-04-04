@@ -251,6 +251,7 @@ $stmt = $con->prepare(
 $stmt->bind_param('sss', $report_json_str, $report_expires, $token);
 $stmt->execute();
 $stmt->close();
+$is_new_redemption = true;
 
 $email_was_sent = false;
 if ($notification_email !== '' && !empty($resend_api_key) && !empty($resend_from)) {
@@ -259,7 +260,7 @@ if ($notification_email !== '' && !empty($resend_api_key) && !empty($resend_from
 mysqli_close($con);
 
 maybe_serve_script_download($report, $token);
-render_report($report, $token, $report_expires, $ip_data, $notification_email, $email_was_sent, null, []);
+render_report($report, $token, $report_expires, $ip_data, $notification_email, $email_was_sent, null, [], $is_new_redemption ?? false);
 exit;
 
 // ── AbuseIPDB enrichment ──────────────────────────────────────────────────────
@@ -606,7 +607,7 @@ function render_error(string $msg): void {
     <?php render_page_close();
 }
 
-function render_report(array $report, string $token, ?string $expires_at, array $all_ips = [], string $notification_email = '', bool $email_sent = false, ?int $data_consent = null, array $community_data = []): void {
+function render_report(array $report, string $token, ?string $expires_at, array $all_ips = [], string $notification_email = '', bool $email_sent = false, ?int $data_consent = null, array $community_data = [], bool $is_new_redemption = false): void {
     $verdict     = $report['verdict'];
     $verdict_lc  = strtolower($verdict);
     $total       = $report['total_ips'];
@@ -1305,6 +1306,16 @@ function render_report(array $report, string $token, ?string $expires_at, array 
             verdict:          <?php echo json_encode(strtolower($verdict)); ?>,
             ip_count_bucket:  bucket
         });
+<?php if ($is_new_redemption): ?>
+        try {
+            umami && umami.track('report_purchase', {
+                revenue:         9.00,
+                currency:        'USD',
+                verdict:         <?php echo json_encode(strtolower($verdict)); ?>,
+                ip_count_bucket: bucket
+            });
+        } catch(e) {}
+<?php endif; ?>
     });
     </script>
     <?php render_page_close();

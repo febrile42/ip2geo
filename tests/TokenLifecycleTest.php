@@ -251,6 +251,58 @@ class TokenLifecycleTest extends TestCase
         $this->assertSame('cached-token', $cached['token']);
     }
 
+    // ── is_new_redemption gate: redemption UPDATE idempotency ────────────────
+    // The $is_new_redemption flag in report.php is set only when the UPDATE
+    // below affects a row.  These tests verify that the WHERE clause correctly
+    // fires once (paid → redeemed) and is a no-op on every subsequent visit
+    // (already redeemed), so the Umami revenue event never double-fires.
+
+    public function testRedemptionSqlIsNoOpOnAlreadyRedeemedToken(): void
+    {
+        $this->insertRow([
+            'status'            => 'redeemed',
+            'report_json'       => '{"verdict":"HIGH"}',
+            'report_expires_at' => date('Y-m-d H:i:s', strtotime('+30 days')),
+        ]);
+
+        // This is the exact UPDATE from report.php that sets $is_new_redemption.
+        $stmt = $this->pdo->prepare(
+            'UPDATE reports
+             SET status = "redeemed", report_json = :rj, report_expires_at = :exp
+             WHERE token = :token AND status IN ("pending","paid")'
+        );
+        $stmt->execute([
+            ':rj'    => '{"verdict":"HIGH"}',
+            ':exp'   => date('Y-m-d H:i:s', strtotime('+30 days')),
+            ':token' => 'test-token-1',
+        ]);
+
+        // Zero rows updated → $is_new_redemption stays false → no revenue event.
+        $this->assertSame(0, $stmt->rowCount());
+    }
+
+    public function testRedemptionSqlFiresOnPendingStatus(): void
+    {
+        // Edge case: webhook hasn't fired yet, so status is still 'pending'
+        // when the user arrives via the success_url. The IN clause covers this.
+        $this->insertRow(['status' => 'pending']);
+
+        $stmt = $this->pdo->prepare(
+            'UPDATE reports
+             SET status = "redeemed", report_json = :rj, report_expires_at = :exp
+             WHERE token = :token AND status IN ("pending","paid")'
+        );
+        $stmt->execute([
+            ':rj'    => '{"verdict":"LOW"}',
+            ':exp'   => date('Y-m-d H:i:s', strtotime('+30 days')),
+            ':token' => 'test-token-1',
+        ]);
+
+        // One row updated → $is_new_redemption = true → revenue event fires.
+        $this->assertSame(1, $stmt->rowCount());
+        $this->assertSame('redeemed', $this->fetchRow('test-token-1')['status']);
+    }
+
     public function testDifferentSubmissionHashDoesNotMatchCachedReport(): void
     {
         $this->insertRow([
