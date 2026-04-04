@@ -1,5 +1,12 @@
 <?php
 // Copy this file to config.php and fill in your credentials
+//
+// SERVER REQUIREMENT: MariaDB must be configured to use UTC.
+// Add to /etc/mysql/mariadb.conf.d/50-server.cnf under [mariadbd]:
+//   default-time-zone = '+00:00'
+// Then restart: sudo systemctl restart mariadb
+// Verify: mysql -e "SELECT @@global.time_zone;"  → must return +00:00
+// PHP runs in UTC; a timezone mismatch causes token expiry checks to fail instantly.
 $db_host = 'localhost';
 $db_user = 'your_db_user';
 $db_pass = 'your_db_password';
