@@ -296,10 +296,12 @@ $stmt = $con->prepare(
                           report_expires_at, pending_expires_at)
      VALUES (?, ?, ?, "redeemed", ?, NULL, NOW())
      ON DUPLICATE KEY UPDATE
-       ip_list_json      = VALUES(ip_list_json),
-       status            = "redeemed",
-       report_json       = VALUES(report_json),
-       report_expires_at = NULL'
+       ip_list_json       = VALUES(ip_list_json),
+       status             = "redeemed",
+       report_json        = VALUES(report_json),
+       report_expires_at  = NULL,
+       notification_email = NULL,
+       email_sent_at      = NULL'
 );
 $stmt->bind_param('ssss', $token, $hash, $ip_list_json_s, $report_json);
 $stmt->execute();
