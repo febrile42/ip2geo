@@ -39,16 +39,16 @@
 
 							<h3>Refund Policy</h3>
 							<p>Threat Reports are generated immediately upon payment. Because the report is delivered digitally at the moment of purchase, all sales are final.</p>
-							<p>If a technical failure prevents your report from generating, contact <a href="mailto:support@ip2geo.org">support@ip2geo.org</a> within 7 days of purchase and we will issue a full refund promptly.</p>
+							<p>If a technical failure prevents your report from generating, contact <a href="&#109;&#97;&#105;&#108;&#116;&#111;&#58;&#115;&#117;&#112;&#112;&#111;&#114;&#116;&#64;&#105;&#112;&#50;&#103;&#101;&#111;&#46;&#111;&#114;&#103;">&#115;&#117;&#112;&#112;&#111;&#114;&#116;&#64;&#105;&#112;&#50;&#103;&#101;&#111;&#46;&#111;&#114;&#103;</a> within 7 days of purchase and we will issue a full refund promptly.</p>
 
 							<h3>Cancellation Policy</h3>
 							<p>Threat Reports are one-time purchases. There is no subscription and nothing to cancel.</p>
 
 							<h3>Dispute Policy</h3>
-							<p>If you have a problem with your purchase, please contact <a href="mailto:support@ip2geo.org">support@ip2geo.org</a> before filing a dispute with your payment provider. Legitimate issues are resolved promptly.</p>
+							<p>If you have a problem with your purchase, please contact <a href="&#109;&#97;&#105;&#108;&#116;&#111;&#58;&#115;&#117;&#112;&#112;&#111;&#114;&#116;&#64;&#105;&#112;&#50;&#103;&#101;&#111;&#46;&#111;&#114;&#103;">&#115;&#117;&#112;&#112;&#111;&#114;&#116;&#64;&#105;&#112;&#50;&#103;&#101;&#111;&#46;&#111;&#114;&#103;</a> before filing a dispute with your payment provider. Legitimate issues are resolved promptly.</p>
 
 							<h3>Contact</h3>
-							<p>For questions about a purchase or this policy, email <a href="mailto:support@ip2geo.org">support@ip2geo.org</a>.</p>
+							<p>For questions about a purchase or this policy, email <a href="&#109;&#97;&#105;&#108;&#116;&#111;&#58;&#115;&#117;&#112;&#112;&#111;&#114;&#116;&#64;&#105;&#112;&#50;&#103;&#101;&#111;&#46;&#111;&#114;&#103;">&#115;&#117;&#112;&#112;&#111;&#114;&#116;&#64;&#105;&#112;&#50;&#103;&#101;&#111;&#46;&#111;&#114;&#103;</a>.</p>
 						</div>
 					</section>
 

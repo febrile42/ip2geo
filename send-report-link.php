@@ -122,11 +122,11 @@ $masked = $stored_email ? mask_email($stored_email) : null;
 
                     <?php elseif ($success): ?>
                     <p>Report link sent to <strong><?php echo htmlspecialchars(mask_email($stored_email), ENT_QUOTES, 'UTF-8'); ?></strong>. Check your inbox.</p>
-                    <p style="font-size:0.9em;opacity:0.7">The link expires on <?php echo htmlspecialchars($expires_fmt, ENT_QUOTES, 'UTF-8'); ?>. If it doesn't arrive within a few minutes, check your spam folder or contact <a href="mailto:support@ip2geo.org">support@ip2geo.org</a>.</p>
+                    <p style="font-size:0.9em;opacity:0.7">The link expires on <?php echo htmlspecialchars($expires_fmt, ENT_QUOTES, 'UTF-8'); ?>. If it doesn't arrive within a few minutes, check your spam folder or contact <a href="&#109;&#97;&#105;&#108;&#116;&#111;&#58;&#115;&#117;&#112;&#112;&#111;&#114;&#116;&#64;&#105;&#112;&#50;&#103;&#101;&#111;&#46;&#111;&#114;&#103;">&#115;&#117;&#112;&#112;&#111;&#114;&#116;&#64;&#105;&#112;&#50;&#103;&#101;&#111;&#46;&#111;&#114;&#103;</a>.</p>
                     <p><a href="/report.php?token=<?php echo urlencode($token); ?>" class="button small">View your report</a></p>
 
                     <?php elseif (!$resend_enabled): ?>
-                    <p>Email delivery is not configured. Contact <a href="mailto:support@ip2geo.org">support@ip2geo.org</a> with your report token and we will send you the link manually.</p>
+                    <p>Email delivery is not configured. Contact <a href="&#109;&#97;&#105;&#108;&#116;&#111;&#58;&#115;&#117;&#112;&#112;&#111;&#114;&#116;&#64;&#105;&#112;&#50;&#103;&#101;&#111;&#46;&#111;&#114;&#103;">&#115;&#117;&#112;&#112;&#111;&#114;&#116;&#64;&#105;&#112;&#50;&#103;&#101;&#111;&#46;&#111;&#114;&#103;</a> with your report token and we will send you the link manually.</p>
                     <p style="font-size:0.9em;opacity:0.7;font-family:monospace"><?php echo htmlspecialchars($token, ENT_QUOTES, 'UTF-8'); ?></p>
 
                     <?php else: ?>
