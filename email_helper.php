@@ -88,7 +88,7 @@ function send_report_email(
   <hr style="border:none;border-top:1px solid #eee;margin:1.5em 0">
   <p style="font-size:0.85em;color:#777">
     This report expires on <strong>{$expires_fmt}</strong>. After that date your data is deleted and the link will stop working.<br>
-Questions? <a href="mailto:support@ip2geo.org" style="color:#5e42a6">support@ip2geo.org</a>
+Questions? <a href="&#109;&#97;&#105;&#108;&#116;&#111;&#58;&#115;&#117;&#112;&#112;&#111;&#114;&#116;&#64;&#105;&#112;&#50;&#103;&#101;&#111;&#46;&#111;&#114;&#103;" style="color:#5e42a6">&#115;&#117;&#112;&#112;&#111;&#114;&#116;&#64;&#105;&#112;&#50;&#103;&#101;&#111;&#46;&#111;&#114;&#103;</a>
   </p>
 </body>
 </html>

@@ -36,6 +36,8 @@
 					<section id="main" class="wrapper">
 						<div class="inner">
 							<h1 class="major">Changelog</h1>
+								<h3>3.1.2 - 2026-04-03</h3>
+							<p>A few small tweaks and bugfixes. That last polish with your sleeve before guests come over.</p>
 								<h3>3.1.0 - 2026-04-03</h3>
 							<p>A rolling 7-day <a href="/intel.php">Community Block List</a> built from opted-in Threat Reports. CIDR ranges corroborated by three or more independent users — filtered by prefix size and hit density so coarse ISP blocks don't slip through — appear on the public list, downloadable as iptables, ufw, nginx, or plain CIDR format.</p>
 								<h3>3.0.0 - 2026-04-02</h3>
