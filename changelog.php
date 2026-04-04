@@ -37,7 +37,7 @@
 						<div class="inner">
 							<h1 class="major">Changelog</h1>
 								<h3>3.1.3 - 2026-04-04</h3>
-							<p>Security audit follow-up. Report tokens are now cryptographically random, classification data is recomputed server-side instead of trusted from the browser, and a timezone misconfiguration that made fresh reports appear expired has been corrected.</p>
+							<p>Security audit follow-up. No bad guys found but, just in case: report tokens are now cryptographically random, classification data is recomputed server-side instead of trusted from the browser, and a timezone misconfiguration that sometimes made fresh reports appear expired has been corrected.</p>
 								<h3>3.1.2 - 2026-04-03</h3>
 							<p>A few small tweaks and bugfixes. That last polish with your sleeve before guests come over.</p>
 								<h3>3.1.0 - 2026-04-03</h3>
