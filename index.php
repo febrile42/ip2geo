@@ -340,6 +340,7 @@ if ($_POST || $view_token_mode)
 			$_geo_cache_stmt->bind_param('sss', $_geo_cache_key, $_geo_ip_json, $_geo_res_json);
 			$_geo_cache_stmt->execute();
 			$_geo_cache_stmt->close();
+			$con->query('DELETE FROM geo_classification_cache WHERE expires_at < NOW()');
 		}
 	}
 
