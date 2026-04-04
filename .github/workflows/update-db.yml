@@ -18,7 +18,7 @@ jobs:
 
     steps:
       - name: Run update script on server
-        uses: appleboy/ssh-action@v1.0.3
+        uses: appleboy/ssh-action@029f5b4aeeeb58fdfe1410a5d17f967dacf36262 # v1.0.3
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
@@ -31,7 +31,7 @@ jobs:
               "${{ secrets.MAXMIND_LICENSE_KEY }}"
 
       - name: Sync GeoIP tables to staging DB
-        uses: appleboy/ssh-action@v1.0.3
+        uses: appleboy/ssh-action@029f5b4aeeeb58fdfe1410a5d17f967dacf36262 # v1.0.3
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
@@ -87,7 +87,7 @@ jobs:
           fi
 
       - name: Checkout repo (for Spamhaus diff step)
-        uses: actions/checkout@v5.0.1
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
 
       - name: Spamhaus ASN-DROP diff — open draft PR if gaps found
         env:
@@ -179,7 +179,7 @@ jobs:
           rm -f "$PR_BODY_FILE"
 
       - name: Prune community stats older than 52 weeks (prod + staging)
-        uses: appleboy/ssh-action@v1.0.3
+        uses: appleboy/ssh-action@029f5b4aeeeb58fdfe1410a5d17f967dacf36262 # v1.0.3
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}

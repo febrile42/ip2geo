@@ -14,6 +14,12 @@ require __DIR__ . '/vendor/autoload.php';
 
 $token = isset($_GET['token']) ? trim($_GET['token']) : '';
 
+// Demo report is publicly linked — no email delivery for it; redirect to the report directly.
+if ($token === '00000000-0000-0000-0000-000000000000') {
+    header('Location: /report.php?token=' . urlencode($token));
+    exit;
+}
+
 $error   = '';
 $success = false;
 
