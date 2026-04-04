@@ -36,6 +36,8 @@
 					<section id="main" class="wrapper">
 						<div class="inner">
 							<h1 class="major">Changelog</h1>
+								<h3>3.1.3 - 2026-04-04</h3>
+							<p>Security hardening and reliability fixes. Report tokens now use a cryptographically secure generator. Classification data submitted from the browser is discarded and recomputed server-side so it cannot be spoofed. GitHub Actions workflow pins moved from floating version tags to commit SHAs. A MariaDB timezone misconfiguration that caused newly-created reports to appear expired immediately has been corrected. An open email-relay hole — any visitor could trigger a real delivery by submitting the public demo token to the resend-link page — has been closed. The geo classification cache now prunes itself on each lookup rather than accumulating stale rows indefinitely.</p>
 								<h3>3.1.2 - 2026-04-03</h3>
 							<p>A few small tweaks and bugfixes. That last polish with your sleeve before guests come over.</p>
 								<h3>3.1.0 - 2026-04-03</h3>
