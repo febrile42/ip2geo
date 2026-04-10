@@ -216,6 +216,42 @@ $block_ips_entries = array_values(array_filter($ip_data, fn($e) => in_array($e['
 usort($block_ips_entries, fn($a, $b) => ($b['freq'] ?? 1) <=> ($a['freq'] ?? 1));
 $block_ips = array_column($block_ips_entries, 'ip');
 
+// ── Concurrency guard ─────────────────────────────────────────────────────────
+// The Stripe success_url redirect and webhook can arrive simultaneously, causing
+// two requests to reach this generation path for the same token. GET_LOCK()
+// serialises them: the second request waits, then re-reads status='redeemed'
+// and serves the cached report instead of calling AbuseIPDB again.
+$gen_lock = 'ip2geo_gen_' . preg_replace('/[^a-f0-9-]/', '', $token);
+$lock_row = $con->query('SELECT GET_LOCK("' . $gen_lock . '", 30)')->fetch_row();
+if (!$lock_row || !$lock_row[0]) {
+    // Another process held the lock for 30 s without releasing — give up.
+    mysqli_close($con);
+    render_error('Your report is being prepared. Please refresh this page in a moment.');
+    exit;
+}
+
+// Re-read status after acquiring the lock: a concurrent request may have
+// already finished generation while we were waiting.
+$recheck_stmt = $con->prepare(
+    'SELECT status, report_json, report_expires_at, notification_email, email_sent_at
+     FROM reports WHERE token = ?'
+);
+$recheck_stmt->bind_param('s', $token);
+$recheck_stmt->execute();
+$recheck = $recheck_stmt->get_result()->fetch_assoc();
+$recheck_stmt->close();
+if ($recheck && $recheck['status'] === 'redeemed' && $recheck['report_json']) {
+    $con->query('SELECT RELEASE_LOCK("' . $gen_lock . '")');
+    $report             = json_decode($recheck['report_json'], true);
+    $cached_email       = $recheck['notification_email'] ?? '';
+    $cached_email_sent  = $recheck['email_sent_at'] !== null;
+    $data_consent_gen   = null;
+    mysqli_close($con);
+    maybe_serve_script_download($report, $token);
+    render_report($report, $token, $recheck['report_expires_at'], $ip_data, $cached_email, $cached_email_sent, $data_consent_gen, []);
+    exit;
+}
+
 // AbuseIPDB enrichment
 $top25   = enrich_abuseipdb($top25, $con, $abuseipdb_api_key ?? '');
 $verdict = maybe_upgrade_verdict($verdict, $top25);
@@ -257,6 +293,7 @@ $email_was_sent = false;
 if ($notification_email !== '' && !empty($resend_api_key) && !empty($resend_from)) {
     $email_was_sent = send_report_email($con, $token, $notification_email, $report_expires, $resend_api_key, $resend_from, $report['total_ips'] ?? 0);
 }
+$con->query('SELECT RELEASE_LOCK("' . $gen_lock . '")');
 mysqli_close($con);
 
 maybe_serve_script_download($report, $token);
