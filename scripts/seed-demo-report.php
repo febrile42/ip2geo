@@ -188,62 +188,113 @@ if ($api_key === '') {
     foreach ($top25 as &$e) $e['abuse_score'] = null;
     unset($e);
 } else {
-    $multi   = curl_multi_init();
-    $handles = [];
-    foreach ($top25 as $entry) {
-        $ch = curl_init();
-        curl_setopt_array($ch, [
-            CURLOPT_URL            => 'https://api.abuseipdb.com/api/v2/check?ipAddress=' . urlencode($entry['ip']) . '&maxAgeInDays=90',
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => 15,
-            CURLOPT_HTTPHEADER     => ['Key: ' . $api_key, 'Accept: application/json'],
-        ]);
-        curl_multi_add_handle($multi, $ch);
-        $handles[$entry['ip']] = $ch;
-    }
-    $running = null;
-    do { curl_multi_exec($multi, $running); curl_multi_select($multi); } while ($running > 0);
+    $today = date('Y-m-d');
 
-    $scores = [];
-    foreach ($handles as $ip => $ch) {
-        $body = curl_multi_getcontent($ch);
-        $data = json_decode($body, true);
-        $score = (int)($data['data']['abuseConfidenceScore'] ?? 0);
-        $reports = (int)($data['data']['totalReports'] ?? 0);
-        $scores[$ip] = ['score' => $score, 'reports' => $reports];
-        $http = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        echo "  $ip → score=$score, reports=$reports (HTTP $http)\n";
-        curl_multi_remove_handle($multi, $ch);
-        curl_close($ch);
+    // Quota guard — respect the 1000/day limit
+    $usage_row = $con->query(
+        'SELECT calls_made FROM abuseipdb_daily_usage WHERE usage_date = "' . $today . '"'
+    )->fetch_assoc();
+    $calls_so_far = $usage_row ? (int)$usage_row['calls_made'] : 0;
+
+    // Cache check — skip IPs already queried within 7 days
+    $ip_list_str = implode('","', array_map(fn($e) => $e['ip'], $top25));
+    $cached_rows = [];
+    if ($ip_list_str !== '') {
+        $res = $con->query(
+            'SELECT ip, confidence_score, total_reports FROM abuseipdb_cache
+             WHERE ip IN ("' . $ip_list_str . '")
+               AND queried_at > DATE_SUB(NOW(), INTERVAL 7 DAY)'
+        );
+        while ($r = $res->fetch_assoc()) {
+            $cached_rows[$r['ip']] = ['score' => (int)$r['confidence_score'], 'reports' => (int)$r['total_reports']];
+        }
     }
-    curl_multi_close($multi);
+
+    $need_api = array_values(array_filter(
+        array_column($top25, 'ip'),
+        fn($ip) => !isset($cached_rows[$ip])
+    ));
+    $cached_count = count($cached_rows);
+    echo "  Cache hits: $cached_count / " . count($top25) . " IPs (skipping API calls for cached)\n";
+
+    $scores = $cached_rows;
+
+    if (!empty($need_api)) {
+        if ($calls_so_far + count($need_api) > 1000) {
+            echo "WARNING: daily quota would be exceeded ($calls_so_far used + " . count($need_api) . " needed > 1000) — skipping API calls\n";
+            foreach ($top25 as &$entry) {
+                $entry['abuse_score']        = $cached_rows[$entry['ip']]['score'] ?? null;
+                $entry['abuse_total_reports'] = $cached_rows[$entry['ip']]['reports'] ?? null;
+            }
+            unset($entry);
+            goto build_report;
+        }
+
+        $multi   = curl_multi_init();
+        $handles = [];
+        foreach ($need_api as $ip) {
+            $ch = curl_init();
+            curl_setopt_array($ch, [
+                CURLOPT_URL            => 'https://api.abuseipdb.com/api/v2/check?ipAddress=' . urlencode($ip) . '&maxAgeInDays=90',
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT        => 15,
+                CURLOPT_HTTPHEADER     => ['Key: ' . $api_key, 'Accept: application/json'],
+            ]);
+            curl_multi_add_handle($multi, $ch);
+            $handles[$ip] = $ch;
+        }
+        $running = null;
+        do { curl_multi_exec($multi, $running); curl_multi_select($multi); } while ($running > 0);
+
+        $actual = 0;
+        foreach ($handles as $ip => $ch) {
+            $body = curl_multi_getcontent($ch);
+            $data = json_decode($body, true);
+            $http = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_multi_remove_handle($multi, $ch);
+            curl_close($ch);
+            if ($http === 200 && $body) {
+                $score   = (int)($data['data']['abuseConfidenceScore'] ?? 0);
+                $reports = (int)($data['data']['totalReports'] ?? 0);
+                $scores[$ip] = ['score' => $score, 'reports' => $reports];
+                echo "  $ip → score=$score, reports=$reports (HTTP $http)\n";
+                $actual++;
+            } else {
+                echo "  $ip → skipped (HTTP $http)\n";
+            }
+        }
+        curl_multi_close($multi);
+
+        // Cache new results and record quota usage
+        foreach ($need_api as $ip) {
+            if (!isset($scores[$ip])) continue;
+            $s = $scores[$ip];
+            $stmt = $con->prepare(
+                'INSERT INTO abuseipdb_cache (ip, confidence_score, total_reports, queried_at)
+                 VALUES (?, ?, ?, NOW())
+                 ON DUPLICATE KEY UPDATE
+                   confidence_score = VALUES(confidence_score),
+                   total_reports    = VALUES(total_reports),
+                   queried_at       = NOW()'
+            );
+            $stmt->bind_param('sii', $ip, $s['score'], $s['reports']);
+            $stmt->execute();
+            $stmt->close();
+        }
+        if ($actual > 0) {
+            $con->query("INSERT INTO abuseipdb_daily_usage (usage_date, calls_made) VALUES ('$today', $actual)
+                         ON DUPLICATE KEY UPDATE calls_made = calls_made + $actual");
+        }
+    }
 
     foreach ($top25 as &$entry) {
         $entry['abuse_score']        = $scores[$entry['ip']]['score'] ?? null;
         $entry['abuse_total_reports'] = $scores[$entry['ip']]['reports'] ?? null;
     }
     unset($entry);
-
-    // Cache scores so they appear in view_token mode too
-    $today = date('Y-m-d');
-    foreach ($scores as $ip => $s) {
-        $stmt = $con->prepare(
-            'INSERT INTO abuseipdb_cache (ip, confidence_score, total_reports, queried_at)
-             VALUES (?, ?, ?, NOW())
-             ON DUPLICATE KEY UPDATE
-               confidence_score = VALUES(confidence_score),
-               total_reports    = VALUES(total_reports),
-               queried_at       = NOW()'
-        );
-        $stmt->bind_param('sii', $ip, $s['score'], $s['reports']);
-        $stmt->execute();
-        $stmt->close();
-    }
-    $actual = count($scores);
-    $con->query("INSERT INTO abuseipdb_daily_usage (usage_date, calls_made) VALUES ('$today', $actual)
-                 ON DUPLICATE KEY UPDATE calls_made = calls_made + $actual");
 }
 
+build_report:
 $verdict = maybe_upgrade_verdict($verdict, $top25);
 echo "Final verdict (post-AbuseIPDB upgrade): $verdict\n";
 
