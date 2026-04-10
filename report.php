@@ -232,10 +232,14 @@ if (!$lock_row || !$lock_row[0]) {
 
 // Re-read status after acquiring the lock: a concurrent request may have
 // already finished generation while we were waiting.
-$recheck = $con->query(
+$recheck_stmt = $con->prepare(
     'SELECT status, report_json, report_expires_at, notification_email, email_sent_at
-     FROM reports WHERE token = "' . $con->real_escape_string($token) . '"'
-)->fetch_assoc();
+     FROM reports WHERE token = ?'
+);
+$recheck_stmt->bind_param('s', $token);
+$recheck_stmt->execute();
+$recheck = $recheck_stmt->get_result()->fetch_assoc();
+$recheck_stmt->close();
 if ($recheck && $recheck['status'] === 'redeemed' && $recheck['report_json']) {
     $con->query('SELECT RELEASE_LOCK("' . $gen_lock . '")');
     $report             = json_decode($recheck['report_json'], true);

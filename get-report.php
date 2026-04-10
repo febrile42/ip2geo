@@ -35,6 +35,11 @@ if ($raw_client_json === '') {
     header('Location: /?error=no_data');
     exit;
 }
+// Size guard: reject oversized payloads before hitting json_decode
+if (strlen($raw_client_json) > 10 * 1024 * 1024) {
+    header('Location: /?error=too_large');
+    exit;
+}
 
 $client_ip_data = json_decode($raw_client_json, true);
 if (!is_array($client_ip_data) || count($client_ip_data) === 0) {
