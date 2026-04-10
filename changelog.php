@@ -36,6 +36,8 @@
 					<section id="main" class="wrapper">
 						<div class="inner">
 							<h1 class="major">Changelog</h1>
+								<h3>3.1.4 - 2026-04-10</h3>
+							<p>Squished some bugs. The kind that mostly just lurk — a concurrency edge case where Stripe could trigger two report generations at once, a quota guard to stop the seed script draining the AbuseIPDB daily allowance, a couple of small security tightenings. Nothing you would have noticed, and now you won't have to.</p>
 								<h3>3.1.3 - 2026-04-04</h3>
 							<p>Security audit follow-up. No bad guys found but, just in case: report tokens are now cryptographically random, classification data is recomputed server-side instead of trusted from the browser, and a timezone misconfiguration that sometimes made fresh reports appear expired has been corrected.</p>
 								<h3>3.1.2 - 2026-04-03</h3>
