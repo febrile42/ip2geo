@@ -320,7 +320,7 @@ function render_free_report(array $report, string $token, ?string $expires_at, a
                             <?php if ($org_safe !== ''): ?><span style="opacity:0.6"> <?php echo $org_safe; ?></span><?php endif; ?>
                             <?php else: ?>—<?php endif; ?>
                         </td>
-                        <td style="padding:0.3em 0.6em"><span class="cat-chip cat-<?php echo $cat_safe; ?>"><?php echo ucfirst($cat_safe); ?></span></td>
+                        <td class="asn-category asn-category--<?php echo $cat_safe; ?>" style="padding:0.3em 0.6em"><?php echo $cat_safe; ?></td>
                         <td style="padding:0.3em 0.6em;text-align:right"><?php echo number_format($freq); ?></td>
                         <td style="padding:0.3em 0.6em;text-align:right;opacity:0.35">—</td>
                     </tr>
