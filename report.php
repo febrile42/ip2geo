@@ -30,7 +30,7 @@ if (mysqli_connect_errno()) {
 }
 
 $stmt = $con->prepare(
-    'SELECT token, submission_hash, ip_list_json, status,
+    'SELECT token, submission_hash, ip_list_json, geo_results_json, status,
             pending_expires_at, report_expires_at, report_json,
             notification_email, email_sent_at, stripe_payment_intent,
             data_consent
@@ -118,11 +118,88 @@ if ($status === 'pending') {
     $notification_email = trim($stripe_session->customer_details->email ?? '');
 }
 
-if ($status === 'redeemed') {
-    // Check 30-day expiry
+if ($status === 'free') {
     if ($row['report_expires_at'] && strtotime($row['report_expires_at']) < time()) {
         mysqli_close($con);
-        render_error('This report has expired (30-day access window). Your data is no longer stored. If you need a fresh analysis, visit ip2geo.org and submit your IP list again.');
+        render_error('This free report expired after 7 days. Submit your logs again — it takes under 10 seconds.', true);
+        exit;
+    }
+
+    // Lazy generation: generate report_json on first visit (no AbuseIPDB for free tier)
+    if ($row['report_json'] === null) {
+        $mutex_key = 'gen_lock_free:' . preg_replace('/[^a-f0-9\-]/', '', $token);
+        $got_lock  = !function_exists('apcu_add') || apcu_add($mutex_key, 1, 30);
+
+        if ($got_lock) {
+            $ip_data_free = json_decode($row['ip_list_json'], true) ?? [];
+            $total_free   = count($ip_data_free);
+            $cat_counts_free = ['scanning' => 0, 'cloud' => 0, 'vpn' => 0, 'residential' => 0, 'unknown' => 0];
+            $country_counts_free = [];
+            foreach ($ip_data_free as $e) {
+                $cat = $e['classification'] ?? 'unknown';
+                $cat_counts_free[$cat] = ($cat_counts_free[$cat] ?? 0) + 1;
+                $cc = $e['country'] ?? '';
+                if ($cc !== '') $country_counts_free[$cc] = ($country_counts_free[$cc] ?? 0) + 1;
+            }
+            $scanning_proxy_free = $cat_counts_free['scanning'] + $cat_counts_free['vpn'];
+            $verdict_free        = compute_verdict($scanning_proxy_free, $total_free, $cat_counts_free['cloud']);
+            $top25_free          = rank_ips($ip_data_free, 25);
+
+            arsort($country_counts_free);
+            $top_countries_free = array_slice($country_counts_free, 0, 5, true);
+
+            $free_report = [
+                'verdict'        => $verdict_free,
+                'total_ips'      => $total_free,
+                'scanning_pct'   => $total_free > 0 ? round(($scanning_proxy_free / $total_free) * 100) : 0,
+                'scanning_count' => $scanning_proxy_free,
+                'cat_counts'     => $cat_counts_free,
+                'top_countries'  => $top_countries_free,
+                'top25'          => $top25_free,
+                'block_ips'      => [],
+                'asn_ranges'     => [],
+                'generated_at'   => date('Y-m-d H:i:s'),
+                'abuseipdb_note' => null,
+            ];
+            $free_report_json = json_encode($free_report);
+
+            $stmt_upd = $con->prepare(
+                'UPDATE reports SET report_json = ? WHERE token = ? AND status = "free" AND report_json IS NULL'
+            );
+            $stmt_upd->bind_param('ss', $free_report_json, $token);
+            $stmt_upd->execute();
+            $stmt_upd->close();
+
+            if (function_exists('apcu_delete')) {
+                apcu_delete($mutex_key);
+            }
+
+            $row['report_json'] = $free_report_json;
+        } else {
+            // Another request is generating — brief wait then reload
+            mysqli_close($con);
+            header('Refresh: 1; url=' . $_SERVER['REQUEST_URI']);
+            echo '<!DOCTYPE html><html><head><meta http-equiv="refresh" content="1"></head><body>Generating report...</body></html>';
+            exit;
+        }
+    }
+
+    // Increment anonymous view counter
+    $con->query('UPDATE reports SET view_count = view_count + 1 WHERE token = "' . mysqli_real_escape_string($con, $token) . '"');
+
+    $report           = json_decode($row['report_json'], true);
+    $all_ips_free     = json_decode($row['ip_list_json'], true) ?? [];
+    $expires_at_free  = $row['report_expires_at'];
+    mysqli_close($con);
+    render_free_report($report, $token, $expires_at_free, $all_ips_free);
+    exit;
+}
+
+if ($status === 'redeemed') {
+    // Check expiry (NULL = permanent paid report)
+    if ($row['report_expires_at'] && strtotime($row['report_expires_at']) < time()) {
+        mysqli_close($con);
+        render_error('This report link has expired. Your data is no longer stored. Submit your logs again at ip2geo.org for a fresh analysis.');
         exit;
     }
     // Serve cached report
@@ -276,15 +353,15 @@ $report = [
     'abuseipdb_note'  => null,
 ];
 
-// Store report + mark redeemed in one UPDATE
+// Store report + mark redeemed in one UPDATE (report_expires_at = NULL = permanent)
 $report_json_str  = json_encode($report);
-$report_expires   = date('Y-m-d H:i:s', strtotime('+30 days'));
+$report_expires   = null;
 $stmt = $con->prepare(
     'UPDATE reports
-     SET status = "redeemed", report_json = ?, report_expires_at = ?, geo_results_json = NULL
+     SET status = "redeemed", report_json = ?, report_expires_at = NULL, geo_results_json = NULL
      WHERE token = ? AND status IN ("pending","paid")'
 );
-$stmt->bind_param('sss', $report_json_str, $report_expires, $token);
+$stmt->bind_param('ss', $report_json_str, $token);
 $stmt->execute();
 $stmt->close();
 $is_new_redemption = true;
@@ -631,14 +708,18 @@ function fetch_community_data($con, array $ips): array {
     ];
 }
 
-function render_error(string $msg): void {
+function render_error(string $msg, bool $show_new_analysis_link = false): void {
     $title = 'Report Unavailable — ip2geo.org';
     render_page_open($title); ?>
     <section id="report" class="wrapper style4 fade-up">
         <div class="inner">
             <h2>Report Unavailable</h2>
             <p><?php echo htmlspecialchars($msg, ENT_QUOTES, 'UTF-8'); ?></p>
+            <?php if ($show_new_analysis_link): ?>
+            <p><a href="/" class="button small">Analyze new logs →</a></p>
+            <?php else: ?>
             <p><a href="/" class="button small">← Back to ip2geo</a></p>
+            <?php endif; ?>
         </div>
     </section>
     <?php render_page_close();
@@ -1360,7 +1441,7 @@ function render_report(array $report, string $token, ?string $expires_at, array 
 
 // ── Shared page layout ────────────────────────────────────────────────────────
 
-function render_page_open(string $title, string $meta_desc = ''): void {
+function render_page_open(string $title, string $meta_desc = '', array $og = []): void {
     $safe_title = htmlspecialchars($title, ENT_QUOTES, 'UTF-8');
     $safe_desc  = $meta_desc
         ? htmlspecialchars($meta_desc, ENT_QUOTES, 'UTF-8')
@@ -1376,6 +1457,13 @@ function render_page_open(string $title, string $meta_desc = ''): void {
     <meta charset="utf-8" />
     <meta name="description" content="<?php echo $safe_desc; ?>" />
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+    <?php if (!empty($og)): ?>
+    <meta property="og:title" content="<?php echo htmlspecialchars($og['title'] ?? $title, ENT_QUOTES, 'UTF-8'); ?>">
+    <meta property="og:description" content="<?php echo htmlspecialchars($og['description'] ?? $safe_desc, ENT_QUOTES, 'UTF-8'); ?>">
+    <meta property="og:url" content="<?php echo htmlspecialchars($og['url'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
+    <meta property="og:image" content="https://ip2geo.org/assets/images/og-card.webp">
+    <meta property="og:type" content="website">
+    <?php endif; ?>
     <link rel="stylesheet" href="/assets/css/main.css" />
     <link rel="stylesheet" href="/assets/css/ip2geo-app.css" />
     <link rel="stylesheet" href="/assets/css/ip2geo-print.css" media="print" />
