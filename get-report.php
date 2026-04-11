@@ -28,6 +28,132 @@ if (!in_array($host, $allowed_hosts, true)) {
     exit;
 }
 
+// ── Upgrade path (free report → paid) ────────────────────────────────────────
+// NOTE: explicit parens required — ?? has lower precedence than ===
+if (($_POST['action'] ?? '') === 'upgrade' && isset($_POST['upgrade_token'])) {
+    $free_token = preg_replace('/[^a-f0-9\-]/', '', trim($_POST['upgrade_token']));
+    if ($free_token === '') {
+        header('Location: /?error=no_data'); exit;
+    }
+
+    $con = mysqli_connect($db_host, $db_user, $db_pass, $db_name);
+    if (mysqli_connect_errno()) {
+        error_log('ip2geo get-report.php upgrade: DB connect failed: ' . mysqli_connect_error());
+        header('Location: /?error=db'); exit;
+    }
+
+    $stmt = $con->prepare(
+        'SELECT ip_list_json, geo_results_json FROM reports
+         WHERE token = ? AND status = "free" AND report_expires_at > NOW()'
+    );
+    $stmt->bind_param('s', $free_token);
+    $stmt->execute();
+    $free_row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if (!$free_row) {
+        mysqli_close($con);
+        header('Location: /?error=no_data'); exit;
+    }
+
+    $raw_json        = $free_row['ip_list_json'];
+    $geo_results_raw = $free_row['geo_results_json'];
+    $submission_hash = hash('sha256', $raw_json);
+
+    // Check if a paid report for this IP list already exists
+    $stmt = $con->prepare(
+        'SELECT token, status FROM reports
+         WHERE submission_hash = ? AND status IN ("paid","redeemed")
+           AND (report_expires_at IS NULL OR report_expires_at > NOW())
+         ORDER BY created_at DESC LIMIT 1'
+    );
+    $stmt->bind_param('s', $submission_hash);
+    $stmt->execute();
+    $cached = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if ($cached) {
+        mysqli_close($con);
+        header('Location: /report.php?token=' . urlencode($cached['token'])); exit;
+    }
+
+    // Generate new paid token
+    $rand  = bin2hex(random_bytes(16));
+    $token = implode('-', [
+        substr($rand, 0, 8),
+        substr($rand, 8, 4),
+        '4' . substr($rand, 13, 3),
+        dechex(hexdec(substr($rand, 16, 2)) & 0x3f | 0x80) . substr($rand, 18, 2),
+        substr($rand, 20, 12),
+    ]);
+
+    $stmt = $con->prepare(
+        'INSERT INTO reports
+           (token, submission_hash, ip_list_json, geo_results_json, status, pending_expires_at, created_at)
+         VALUES (?, ?, ?, ?, "pending", DATE_ADD(NOW(), INTERVAL 1 HOUR), NOW())'
+    );
+    $stmt->bind_param('ssss', $token, $submission_hash, $raw_json, $geo_results_raw);
+    if (!$stmt->execute()) {
+        error_log('ip2geo get-report.php upgrade INSERT failed: ' . $stmt->error);
+        $stmt->close();
+        mysqli_close($con);
+        header('Location: /?error=db'); exit;
+    }
+    $stmt->close();
+    mysqli_close($con);
+
+    \Stripe\Stripe::setApiKey($stripe_secret_key);
+    $base_url = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http')
+              . '://' . $_SERVER['HTTP_HOST'];
+    try {
+        $session = \Stripe\Checkout\Session::create([
+            'payment_method_types' => ['card'],
+            'line_items'           => [[
+                'price_data' => [
+                    'currency'     => 'usd',
+                    'unit_amount'  => 900,
+                    'product_data' => [
+                        'name'        => 'ip2geo Threat Report + Block Script',
+                        'description' => 'Rule-based threat summary, AbuseIPDB reputation data, and ready-to-run firewall block script for your IP list.',
+                    ],
+                ],
+                'quantity' => 1,
+            ]],
+            'mode'                 => 'payment',
+            'client_reference_id'  => $token,
+            'success_url'          => $base_url . '/report.php?token=' . urlencode($token) . '&session_id={CHECKOUT_SESSION_ID}',
+            'cancel_url'           => $base_url . '/report.php?token=' . urlencode($free_token),
+        ]);
+    } catch (\Stripe\Exception\ApiErrorException $e) {
+        error_log('ip2geo Stripe session create failed (upgrade): ' . $e->getMessage());
+        header('Location: /report.php?token=' . urlencode($free_token) . '&error=payment'); exit;
+    }
+    header('Location: ' . $session->url);
+    exit;
+}
+
+// ── Determine request tier ────────────────────────────────────────────────────
+$tier = $_POST['tier'] ?? 'paid';
+if (!in_array($tier, ['free', 'paid'], true)) {
+    $tier = 'paid';
+}
+
+// ── Rate limiting (free tier only, pre-DB) ────────────────────────────────────
+// Increment first, then check — avoids race where two concurrent requests both
+// read count=9, both pass, both increment to 10+.
+if ($tier === 'free' && function_exists('apcu_inc')) {
+    $rate_key  = 'free_rate:' . md5($_SERVER['REMOTE_ADDR'] ?? '');
+    $new_count = apcu_inc($rate_key, 1, $success);
+    if (!$success) {
+        // Key didn't exist yet — initialize with TTL
+        apcu_store($rate_key, 1, 3600);
+        $new_count = 1;
+    }
+    if ($new_count > 10) {
+        header('Location: /?error=rate_limit'); exit;
+    }
+}
+
 // Extract IP + freq from client POST — classification fields are discarded and
 // recomputed server-side. Never trust browser-submitted geo/ASN/classification data.
 $raw_client_json = $_POST['ip_classified_json'] ?? '';
@@ -161,6 +287,54 @@ if ($cache_row) {
 }
 
 $submission_hash = hash('sha256', $raw_json);
+
+// ── Free report path ─────────────────────────────────────────────────────────
+if ($tier === 'free') {
+    // Dedup: if a valid free report already exists for this IP list, reuse it.
+    // Prevents duplicate rows when the user clicks the CTA more than once.
+    $dedup = $con->prepare(
+        'SELECT token FROM reports
+         WHERE submission_hash = ? AND status = "free" AND report_expires_at > NOW()
+         ORDER BY created_at DESC LIMIT 1'
+    );
+    $dedup->bind_param('s', $submission_hash);
+    $dedup->execute();
+    $existing = $dedup->get_result()->fetch_assoc();
+    $dedup->close();
+    if ($existing) {
+        mysqli_close($con);
+        header('Location: /report.php?token=' . urlencode($existing['token'])); exit;
+    }
+
+    // Generate free report token (same UUID4 format as paid)
+    $rand  = bin2hex(random_bytes(16));
+    $token = implode('-', [
+        substr($rand, 0, 8),
+        substr($rand, 8, 4),
+        '4' . substr($rand, 13, 3),
+        dechex(hexdec(substr($rand, 16, 2)) & 0x3f | 0x80) . substr($rand, 18, 2),
+        substr($rand, 20, 12),
+    ]);
+
+    $stmt = $con->prepare(
+        'INSERT INTO reports
+           (token, submission_hash, ip_list_json, geo_results_json,
+            status, pending_expires_at, report_expires_at, created_at)
+         VALUES (?, ?, ?, ?, "free",
+                 DATE_ADD(NOW(), INTERVAL 7 DAY),
+                 DATE_ADD(NOW(), INTERVAL 7 DAY), NOW())'
+    );
+    $stmt->bind_param('ssss', $token, $submission_hash, $raw_json, $geo_results_raw);
+    if (!$stmt->execute()) {
+        error_log('ip2geo get-report.php free INSERT failed: ' . $stmt->error);
+        $stmt->close();
+        mysqli_close($con);
+        header('Location: /?error=db'); exit;
+    }
+    $stmt->close();
+    mysqli_close($con);
+    header('Location: /report.php?token=' . urlencode($token)); exit;
+}
 
 // Check for a cached paid/redeemed report for the same IP list
 $stmt = $con->prepare(

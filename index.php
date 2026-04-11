@@ -441,15 +441,17 @@ if ($_POST || $view_token_mode)
 			<form method="POST" action="/get-report.php" id="cta-form">
 				<input type="hidden" name="ip_classified_json" id="ip-classified-json"
 					value="<?php echo htmlspecialchars(json_encode($ip_classified_data), ENT_QUOTES, 'UTF-8'); ?>" />
-				<input type="hidden" name="geo_results_json" id="geo-results-json"
-					value="<?php echo htmlspecialchars(json_encode($geo_results_data), ENT_QUOTES, 'UTF-8'); ?>" />
+				<input type="hidden" name="tier" value="free">
+				<?php if (($_GET['error'] ?? '') === 'rate_limit'): ?>
+				<p class="threat-cta-error" style="color:#e07070;margin:0 0 0.6em;font-size:0.9em">Too many free reports generated. Try again in an hour.</p>
+				<?php endif; ?>
 				<ul class="threat-cta-features">
-					<li>AbuseIPDB reputation scores for your top 25 IPs</li>
-					<li>ASN CIDR ranges for resilient blocking</li>
-					<li>Report saved 30 days &mdash; shareable link</li>
+					<li>Geo + ASN breakdown of your top 25 IPs</li>
+					<li>Shareable link &mdash; send to your team now</li>
+					<li>Saved 7 days free &nbsp;&middot;&nbsp; $9 for full threat scores + permanent link</li>
 				</ul>
-				<button type="submit" id="cta-button" class="button">Get Threat Report + Block Scripts &mdash; $9</button>
-				<p class="threat-cta-fine">One-time payment. No account required.
+				<button type="submit" id="cta-button" class="button">Get Free Threat Report</button>
+				<p class="threat-cta-fine">No account. No payment. Takes 5 seconds.
 					&nbsp;&middot;&nbsp;<a href="/report.php?token=00000000-0000-0000-0000-000000000000" target="_blank">See sample report &rarr;</a></p>
 			</form>
 		</div>
