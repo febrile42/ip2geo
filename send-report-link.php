@@ -52,8 +52,8 @@ if ($row && $row['report_expires_at'] && strtotime($row['report_expires_at']) < 
 }
 
 $stored_email  = $row['notification_email'] ?? null;
-$expires_at    = $row['report_expires_at'] ?? date('Y-m-d H:i:s', strtotime('+30 days'));
-$expires_fmt   = date('F j, Y', strtotime($expires_at));
+$expires_at    = $row ? $row['report_expires_at'] : null;
+$expires_fmt   = $expires_at !== null ? date('F j, Y', strtotime($expires_at)) : null;
 $resend_enabled = !empty($resend_api_key) && !empty($resend_from);
 
 // ── POST handler ──────────────────────────────────────────────────────────────
@@ -128,7 +128,7 @@ $masked = $stored_email ? mask_email($stored_email) : null;
 
                     <?php elseif ($success): ?>
                     <p>Report link sent to <strong><?php echo htmlspecialchars(mask_email($stored_email), ENT_QUOTES, 'UTF-8'); ?></strong>. Check your inbox.</p>
-                    <p style="font-size:0.9em;opacity:0.7">The link expires on <?php echo htmlspecialchars($expires_fmt, ENT_QUOTES, 'UTF-8'); ?>. If it doesn't arrive within a few minutes, check your spam folder or contact <a href="&#109;&#97;&#105;&#108;&#116;&#111;&#58;&#115;&#117;&#112;&#112;&#111;&#114;&#116;&#64;&#105;&#112;&#50;&#103;&#101;&#111;&#46;&#111;&#114;&#103;">&#115;&#117;&#112;&#112;&#111;&#114;&#116;&#64;&#105;&#112;&#50;&#103;&#101;&#111;&#46;&#111;&#114;&#103;</a>.</p>
+                    <p style="font-size:0.9em;opacity:0.7"><?php echo $expires_fmt !== null ? 'The link expires on ' . htmlspecialchars($expires_fmt, ENT_QUOTES, 'UTF-8') . '.' : 'This report does not expire.'; ?> If it doesn't arrive within a few minutes, check your spam folder or contact <a href="&#109;&#97;&#105;&#108;&#116;&#111;&#58;&#115;&#117;&#112;&#112;&#111;&#114;&#116;&#64;&#105;&#112;&#50;&#103;&#101;&#111;&#46;&#111;&#114;&#103;">&#115;&#117;&#112;&#112;&#111;&#114;&#116;&#64;&#105;&#112;&#50;&#103;&#101;&#111;&#46;&#111;&#114;&#103;</a>.</p>
                     <p><a href="/report.php?token=<?php echo urlencode($token); ?>" class="button small">View your report</a></p>
 
                     <?php elseif (!$resend_enabled): ?>
@@ -140,7 +140,7 @@ $masked = $stored_email ? mask_email($stored_email) : null;
                     <p>We have an address on file for this report. Enter the same address to resend the link.</p>
                     <p style="font-size:0.9em;opacity:0.7">On file: <strong><?php echo htmlspecialchars($masked, ENT_QUOTES, 'UTF-8'); ?></strong></p>
                     <?php else: ?>
-                    <p>Enter your email address and we'll send you the link to your report. It expires on <strong><?php echo htmlspecialchars($expires_fmt, ENT_QUOTES, 'UTF-8'); ?></strong>.</p>
+                    <p>Enter your email address and we'll send you the link to your report<?php echo $expires_fmt !== null ? '. It expires on <strong>' . htmlspecialchars($expires_fmt, ENT_QUOTES, 'UTF-8') . '</strong>' : ''; ?>.</p>
                     <?php endif; ?>
 
                     <form method="post" action="/send-report-link.php?token=<?php echo urlencode($token); ?>" style="max-width:420px">
