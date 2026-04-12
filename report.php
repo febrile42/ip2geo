@@ -785,29 +785,12 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                 <span>&#10003; Report link sent to <strong><?php echo htmlspecialchars(mask_email($notification_email), ENT_QUOTES, 'UTF-8'); ?></strong>.
                 <a href="<?php echo htmlspecialchars($resend_link, ENT_QUOTES, 'UTF-8'); ?>" style="margin-left:0.5em">Resend</a></span>
             </div>
-            <?php elseif ($token !== DEMO_TOKEN): ?>
-            <?php
-                $report_url   = 'https://ip2geo.org/report.php?token=' . urlencode($token);
-                $resend_link  = '/send-report-link.php?token=' . urlencode($token);
-            ?>
-            <div class="report-email-notice save">
-                <div style="width:100%">
-                    <strong>Save your report link</strong> &mdash; it expires on <?php echo htmlspecialchars($expires_fmt ?? 'in 30 days', ENT_QUOTES, 'UTF-8'); ?>.
-                    Bookmark it or <a href="<?php echo htmlspecialchars($resend_link, ENT_QUOTES, 'UTF-8'); ?>">email it to yourself</a>.
-                    <div class="report-link-row">
-                        <input class="report-link-input" id="rpt-link" type="text" readonly
-                               value="<?php echo htmlspecialchars($report_url, ENT_QUOTES, 'UTF-8'); ?>">
-                        <button class="button small alt" style="white-space:nowrap;padding:0.3em 0.8em"
-                                onclick="var i=document.getElementById('rpt-link');i.select();document.execCommand('copy');this.textContent='Copied!'">Copy link</button>
-                    </div>
-                </div>
-            </div>
             <?php endif; ?>
 
             <?php if ($is_demo): ?>
             <div style="background:rgba(108,184,122,0.12);border-left:3px solid #6cb87a;padding:0.8em 1em;margin-bottom:1.5em;font-size:0.9em">
                 <strong>Community Intel</strong> <span style="opacity:0.6;font-size:0.85em;margin-left:0.3em">Preview</span>
-                <p style="margin:0.4em 0 0.7em">When you generate your own report and opt in, ip2geo cross-references your IPs against anonymized data from other users this week. The Community column shows how many other ip2geo reports contained the same IP &mdash; corroborating active threats and flagging escalating campaigns.</p>
+                <p style="margin:0.4em 0 0.7em">Community Intel is available on paid reports. When you opt in, ip2geo cross-references your IPs against anonymized data from other users this week. The Community column shows how many other ip2geo reports contained the same IP &mdash; corroborating active threats and flagging escalating campaigns.</p>
                 <p style="margin:0 0 0.4em;opacity:0.85;font-size:0.9em">This is what the Community column looks like in the Top Threat Sources table:</p>
                 <table style="width:100%;font-size:0.85em;border-collapse:collapse">
                     <thead><tr style="opacity:0.6"><th style="text-align:left;padding:0.2em 0.6em 0.2em 0;font-weight:normal">IP</th><th style="text-align:left;padding:0.2em 0.6em;font-weight:normal">Category</th><th style="text-align:left;padding:0.2em 0;font-weight:normal">Community</th></tr></thead>
@@ -984,12 +967,15 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                 </p>
             </div>
 
-            <!-- Row 2: Verdict badge + Print button -->
+            <!-- Row 2: Verdict badge + Print/Copy buttons -->
             <div class="report-header-row report-verdict-row">
                 <p class="asn-verdict asn-verdict--<?php echo $verdict_lc; ?>">
                     <?php echo $verdict; ?> THREAT
                 </p>
-                <button onclick="window.print()" class="button small alt print-report-btn">Print / Save as PDF</button>
+                <div style="display:flex;gap:0.5em;align-items:center">
+                    <button onclick="window.print()" class="button small alt print-report-btn" style="white-space:nowrap">Print / Save as PDF</button>
+                    <button id="copy-link-header-btn" class="button small alt" style="white-space:nowrap">Copy link</button>
+                </div>
             </div>
 
             <?php if ($verdict === 'LOW'): ?>
@@ -1385,13 +1371,6 @@ function render_report(array $report, string $token, ?string $expires_at, array 
             <p>
                 <button id="share-link-btn" class="button small">&#128279; Share this report</button>
             </p>
-            <?php if ($expires_fmt && !$is_demo): ?>
-            <p style="font-size:0.85em;opacity:0.6">
-                Report expires: <?php echo htmlspecialchars($expires_fmt, ENT_QUOTES, 'UTF-8'); ?>.
-                Save this link to access your report.
-            </p>
-            <?php endif; ?>
-
             <p style="margin-top:1em">
                 <a href="/?view_token=<?php echo urlencode($token); ?>#results" class="button small alt">
                     View all <?php echo number_format($total); ?> IPs
@@ -1402,16 +1381,20 @@ function render_report(array $report, string $token, ?string $expires_at, array 
         </div>
     </section>
     <script>
-    document.getElementById('share-link-btn').addEventListener('click', function() {
+    function copyReportLink(btn) {
         var cleanUrl = window.location.origin + window.location.pathname + '?token=' + <?php echo json_encode($token); ?>;
         navigator.clipboard.writeText(cleanUrl).then(function() {
-            var btn = document.getElementById('share-link-btn');
             var orig = btn.innerHTML;
-            btn.innerHTML = 'Link copied!';
+            btn.innerHTML = 'Copied!';
             setTimeout(function() { btn.innerHTML = orig; }, 2000);
         });
         window.umami && umami.track('report_copy_link');
+    }
+    document.getElementById('share-link-btn').addEventListener('click', function() {
+        copyReportLink(this);
     });
+    var headerCopyBtn = document.getElementById('copy-link-header-btn');
+    if (headerCopyBtn) headerCopyBtn.addEventListener('click', function() { copyReportLink(this); });
     document.querySelectorAll('a[href*="view_token="]').forEach(function(a) {
         a.addEventListener('click', function() {
             window.umami && umami.track('report_view_all_ips');
