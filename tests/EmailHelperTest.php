@@ -334,4 +334,31 @@ class EmailHelperTest extends TestCase
         $stmt->execute(['tok_resend_ok']);
         $this->assertSame(1, $stmt->rowCount(), 'After guard reset, resend path must claim the slot');
     }
+
+    // ── report.php paid upgrade path: null expires_at regression ──────────────
+    // Regression (2026-04-12): when a free report was upgraded to paid,
+    // report.php set $report_expires = null (permanent — no DB expiry) and passed
+    // it directly to send_report_email(..., $report_expires, ...).
+    // send_report_email() declared `string $expires_at` (non-nullable), so PHP
+    // threw a fatal TypeError before the email was sent.
+    //
+    // Fix: changed the parameter to `?string $expires_at` and conditionally render
+    // "Your paid report is permanently stored" when null, instead of formatting
+    // a date. The DB-layer SQL tests above cannot call send_report_email() directly
+    // (requires a real mysqli), so the regression guard is the ?string type
+    // declaration itself — PHP enforces it at call sites with strict_types=1.
+
+    public function testReportEmailSubjectIsStillCorrectAfterNullableChange(): void
+    {
+        // Sanity: the pure report_email_subject() function is unaffected by the
+        // $expires_at change and continues to return the expected strings.
+        $this->assertSame(
+            'Threat Intelligence Report (42 IPs) - ip2geo',
+            report_email_subject(42)
+        );
+        $this->assertSame(
+            'Threat Intelligence Report - ip2geo',
+            report_email_subject(0)
+        );
+    }
 }

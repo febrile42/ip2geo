@@ -26,7 +26,7 @@ function report_email_subject(int $ip_count): string {
  * @param mysqli  $con         Open DB connection (caller keeps ownership)
  * @param string  $token       Report token
  * @param string  $email       Recipient email address
- * @param string  $expires_at  Report expiry datetime string (Y-m-d H:i:s)
+ * @param string|null $expires_at  Report expiry datetime string (Y-m-d H:i:s), or null for permanent paid reports
  * @param string  $api_key     Resend API key
  * @param string  $from        Resend from address e.g. "ip2geo <reports@ip2geo.org>"
  * @param int     $ip_count    Number of IPs analyzed (0 = unknown, omits count from subject)
@@ -36,7 +36,7 @@ function send_report_email(
     mysqli $con,
     string $token,
     string $email,
-    string $expires_at,
+    ?string $expires_at,
     string $api_key,
     string $from,
     int $ip_count = 0
@@ -66,7 +66,9 @@ function send_report_email(
     }
 
     $report_url  = 'https://ip2geo.org/report.php?token=' . urlencode($token);
-    $expires_fmt = date('F j, Y', strtotime($expires_at));
+    $expires_line = $expires_at !== null
+        ? 'This report expires on <strong>' . date('F j, Y', strtotime($expires_at)) . '</strong>. After that date your data is deleted and the link will stop working.'
+        : 'Your paid report is permanently stored — this link will not expire.';
 
     $html = <<<HTML
 <!DOCTYPE html>
@@ -87,7 +89,7 @@ function send_report_email(
   </p>
   <hr style="border:none;border-top:1px solid #eee;margin:1.5em 0">
   <p style="font-size:0.85em;color:#777">
-    This report expires on <strong>{$expires_fmt}</strong>. After that date your data is deleted and the link will stop working.<br>
+    {$expires_line}<br>
 Questions? <a href="&#109;&#97;&#105;&#108;&#116;&#111;&#58;&#115;&#117;&#112;&#112;&#111;&#114;&#116;&#64;&#105;&#112;&#50;&#103;&#101;&#111;&#46;&#111;&#114;&#103;" style="color:#5e42a6">&#115;&#117;&#112;&#112;&#111;&#114;&#116;&#64;&#105;&#112;&#50;&#103;&#101;&#111;&#46;&#111;&#114;&#103;</a>
   </p>
 </body>

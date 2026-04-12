@@ -427,32 +427,38 @@ if ($_POST || $view_token_mode)
 	// --- Threat CTA (above filter + table) ---
 	if ($show_cta && !$view_token_mode): ?>
 	<div id="threat-cta" class="threat-cta-box threat-cta-box--<?php echo htmlspecialchars(strtolower($verdict_level), ENT_QUOTES, 'UTF-8'); ?>" role="region" aria-label="Threat Assessment">
-		<div class="threat-cta-left">
-			<p class="asn-verdict asn-verdict--<?php echo htmlspecialchars(strtolower($verdict_level), ENT_QUOTES, 'UTF-8'); ?>">
-				<?php echo htmlspecialchars($verdict_level, ENT_QUOTES, 'UTF-8'); ?> THREAT
-			</p>
-			<?php if ($verdict_reason !== ''): ?>
-			<p class="threat-cta-reason"><?php echo htmlspecialchars($verdict_reason, ENT_QUOTES, 'UTF-8'); ?></p>
-			<?php endif; ?>
-			<p class="threat-cta-stats"><?php echo round($non_residential_pct * 100); ?>% of IPs from cloud, scanning, or proxy infrastructure
-				(<?php echo $non_residential_count; ?> of <?php echo $matches_total; ?> IPs)</p>
-		</div>
-		<div class="threat-cta-right">
-			<form method="POST" action="/get-report.php" id="cta-form">
-				<input type="hidden" name="ip_classified_json" id="ip-classified-json"
-					value="<?php echo htmlspecialchars(json_encode($ip_classified_data), ENT_QUOTES, 'UTF-8'); ?>" />
-				<input type="hidden" name="geo_results_json" id="geo-results-json"
-					value="<?php echo htmlspecialchars(json_encode($geo_results_data), ENT_QUOTES, 'UTF-8'); ?>" />
-				<ul class="threat-cta-features">
-					<li>AbuseIPDB reputation scores for your top 25 IPs</li>
-					<li>ASN CIDR ranges for resilient blocking</li>
-					<li>Report saved 30 days &mdash; shareable link</li>
-				</ul>
-				<button type="submit" id="cta-button" class="button">Get Threat Report + Block Scripts &mdash; $9</button>
-				<p class="threat-cta-fine">One-time payment. No account required.
-					&nbsp;&middot;&nbsp;<a href="/report.php?token=00000000-0000-0000-0000-000000000000" target="_blank">See sample report &rarr;</a></p>
-			</form>
-		</div>
+		<form method="POST" action="/get-report.php" id="cta-form">
+			<input type="hidden" name="ip_classified_json" id="ip-classified-json"
+				value="<?php echo htmlspecialchars(json_encode($ip_classified_data), ENT_QUOTES, 'UTF-8'); ?>" />
+			<input type="hidden" name="tier" value="free">
+			<div class="threat-cta-top">
+				<div class="threat-cta-left">
+					<p class="asn-verdict asn-verdict--<?php echo htmlspecialchars(strtolower($verdict_level), ENT_QUOTES, 'UTF-8'); ?>">
+						<?php echo htmlspecialchars($verdict_level, ENT_QUOTES, 'UTF-8'); ?> THREAT
+					</p>
+					<?php if ($verdict_reason !== ''): ?>
+					<p class="threat-cta-reason"><?php echo htmlspecialchars($verdict_reason, ENT_QUOTES, 'UTF-8'); ?></p>
+					<?php endif; ?>
+					<p class="threat-cta-stats"><?php echo round($non_residential_pct * 100); ?>% of IPs from cloud, scanning, or proxy infrastructure
+						(<?php echo $non_residential_count; ?> of <?php echo $matches_total; ?> IPs)</p>
+				</div>
+				<div class="threat-cta-right">
+					<?php if (($_GET['error'] ?? '') === 'rate_limit'): ?>
+					<p class="threat-cta-error" style="color:#e07070;margin:0 0 0.6em;font-size:0.9em">Too many free reports generated. Try again in an hour.</p>
+					<?php endif; ?>
+					<ul class="threat-cta-features">
+						<li>Geo + ASN breakdown of your top 25 IPs</li>
+						<li>Shareable link &mdash; send to your team now</li>
+						<li>Saved 7 days free</li>
+					</ul>
+				</div>
+			</div>
+			<div class="threat-cta-bottom">
+				<p class="threat-cta-fine">No account. No payment. 5 seconds.<br>
+					$9 unlocks full threat scores + permalink.</p>
+				<button type="submit" id="cta-button" class="button">Get Free Threat Report</button>
+			</div>
+		</form>
 	</div>
 	<?php elseif ($view_token_mode): ?>
 	<p style="margin:0 0 1.5em">
@@ -581,25 +587,29 @@ else
 				<section id="reports" class="wrapper style1 fade-up">
 					<div class="inner">
 						<h2>Threat Reports</h2>
-						<p>When a lookup reveals a high proportion of scanning, cloud, or proxy infrastructure, ip2geo offers a one-time paid report that goes deeper — giving you the data and ready-to-paste rules you need to actually block the traffic.</p>
+						<p>When a lookup reveals a high proportion of scanning, cloud, or proxy infrastructure, ip2geo generates a threat report — free instantly, or with full AbuseIPDB threat scores and firewall scripts for $9.</p>
 						<div class="row">
 							<div class="col-6 col-12-medium">
-								<h3>What's included</h3>
+								<h3>Free report</h3>
+								<ul>
+									<li><strong>Geo + ASN breakdown</strong> of your top 25 IPs</li>
+									<li><strong>Shareable link</strong> — send to your team, saved for 7 days</li>
+								</ul>
+								<h3>Full report — $9 one-time</h3>
 								<ul>
 									<li><strong>AbuseIPDB reputation scores</strong> for your top 25 IPs: see which ones are confirmed attackers</li>
 									<li><strong>ASN CIDR ranges</strong> for resilient blocking: block entire scanning networks, not just individual IPs that rotate</li>
 									<li><strong>Ready-to-run firewall scripts</strong> for iptables, ufw, and nginx</li>
 									<li><strong>Community intel</strong> (opt-in): see how many other ip2geo users reported the same IPs this week, with trend indicators showing whether activity is escalating</li>
-									<li><strong>Shareable link</strong> saved for 30 days: send it to your team or come back later</li>
+									<li><strong>Permanent link</strong> — no expiry, come back any time</li>
 								</ul>
 							</div>
 							<div class="col-6 col-12-medium">
 								<h3>See it in action</h3>
-								<p>The sample report uses real Tor exit node data with live AbuseIPDB enrichment. Opt in to community sharing and you'll also see how many other ip2geo reports contained the same IPs this week &mdash; corroborating active threats across users.</p>
-								<p style="text-align:right"><a href="/report.php?token=00000000-0000-0000-0000-000000000000" target="_blank" class="button">See a sample report &rarr;</a></p>
+								<p>The sample below is a full $9 report using real Tor exit node data with live AbuseIPDB enrichment — so you can see exactly what you get before deciding to upgrade.</p>
+								<p style="text-align:right"><a href="/report.php?token=00000000-0000-0000-0000-000000000000" target="_blank" class="button">See a sample full report &rarr;</a></p>
 							</div>
 						</div>
-						<p style="text-align:right;margin-top:1.5em"><strong>$9 one-time. No account required.</strong></p>
 					</div>
 				</section>
 
@@ -651,7 +661,7 @@ else
 							<p>I was maintaining an aging email system with no password policies and no support — a perfect storm for account compromises. With no time or budget to overhaul it, I built this tool instead.</p>
 							<p>ip2geo.org lets you paste raw output from tools like <code>netstat</code>, <code>fail2ban</code>, or anything else that spits out IPs. It automatically extracts valid IPv4 addresses, runs a fast geolocation lookup, and gives you clean, actionable data — instantly. With one glance, I could see login attempts from every corner of the globe and quickly block entire botnets.</p>
 							<h3>What It's Grown Into</h3>
-							<p>The free lookup is still here. But over time, ip2geo.org has grown into something more complete. When a lookup shows a high concentration of scanning or proxy infrastructure, you can now generate a full <strong>Threat Report</strong> — AbuseIPDB verification for your top IPs, ASN CIDR ranges for resilient blocking, and ready-to-run scripts for iptables, ufw, and nginx.</p>
+							<p>The free lookup is still here. But over time, ip2geo.org has grown into something more complete. When a lookup shows a high concentration of scanning or proxy infrastructure, you can now generate a <strong>Threat Report</strong> — free instantly (geo and ASN breakdown, 7-day shareable link), or upgrade for $9 to add AbuseIPDB threat scores, ASN CIDR ranges, and ready-to-run firewall scripts for iptables, ufw, and nginx.</p>
 							<p>There's also a <a href="/intel.php">Community Block List</a> — a rolling 7-day feed of CIDR ranges reported by opted-in ip2geo users. If you contribute your report, your data joins the aggregate anonymously. If you just want the list, download it and apply it directly to your firewall.</p>
 							<h3>How It Works</h3>
 							<p>Paste any block of text. ip2geo.org scans it for IPv4 addresses, checks them against a geolocation database, and returns results you can filter by country or infrastructure category — scanning ranges, cloud exit nodes, VPN and proxy infrastructure, or residential traffic. Want to only see scanning infrastructure hits from outside the US? Done. Focus only on what matters.</p>

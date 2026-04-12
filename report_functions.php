@@ -220,6 +220,175 @@ function generate_threat_narrative(string $verdict, array $asn_ranges, int $scan
 }
 
 /**
+ * Render a free (7-day) threat report page.
+ *
+ * Layout (in order — hierarchy matters):
+ *   1. Verdict banner + stats
+ *   2. Top-25 table with locked AbuseIPDB column
+ *   3. Upgrade CTA
+ *   4. Expiry banner
+ *   5. Sharing links
+ *   6. Footer attribution
+ *
+ * No block scripts, no community consent banner.
+ *
+ * @param array       $report      Generated report data (verdict, top25, etc.)
+ * @param string      $token       Free report token (UUID4)
+ * @param string|null $expires_at  DATETIME string from DB, or null
+ * @param array       $all_ips     Full ip_list_json for country/cat chips (unused in free render but kept for parity)
+ */
+function render_free_report(array $report, string $token, ?string $expires_at, array $all_ips): void
+{
+    $verdict    = $report['verdict'];
+    $verdict_lc = strtolower($verdict);
+    $total      = $report['total_ips'];
+    $scan_pct   = $report['scanning_pct'];
+    $scan_count = $report['scanning_count'];
+    $top25      = $report['top25'];
+
+    $https      = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on')
+                  || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
+    $scheme     = $https ? 'https' : 'http';
+    $host       = $_SERVER['HTTP_HOST'] ?? 'ip2geo.org';
+    $report_url = $scheme . '://' . $host . '/report.php?token=' . urlencode($token);
+
+    // Expiry countdown
+    $expires_ts      = $expires_at ? strtotime($expires_at) : null;
+    $seconds_left    = $expires_ts ? ($expires_ts - time()) : null;
+    $days_left       = $seconds_left !== null ? (int)ceil($seconds_left / 86400) : null;
+    $expiry_text     = null;
+    if ($days_left !== null) {
+        if ($days_left <= 0) {
+            $expiry_text = 'This report has expired.';
+        } elseif ($days_left === 1 || $seconds_left < 86400) {
+            $expiry_text = 'This free report expires today.';
+        } else {
+            $expiry_text = 'This free report expires in <strong>' . $days_left . ' day' . ($days_left === 1 ? '' : 's') . '</strong>.';
+        }
+    }
+
+    $og = [
+        'title'       => 'IP Threat Report — ip2geo.org',
+        'description' => $total . ' IPs analyzed · ' . $verdict . ' · ' . $scan_pct . '% scanning infrastructure',
+        'url'         => $report_url,
+    ];
+
+    $free_nav = [
+        ['label' => 'Summary',      'href' => '#report'],
+        ['label' => 'Top Sources',  'href' => '#top-sources'],
+        ['label' => '← New Lookup', 'href' => '/'],
+    ];
+    render_page_open('IP Threat Report — ip2geo.org', '', $og, $free_nav);
+    ?>
+    <section id="report" class="wrapper style4 fade-up">
+        <div class="inner">
+
+            <!-- 1. Verdict banner -->
+            <div class="threat-cta-box threat-cta-box--<?php echo htmlspecialchars($verdict_lc, ENT_QUOTES, 'UTF-8'); ?>" style="margin-bottom:1.5em" role="region" aria-label="Threat Assessment">
+                <div class="threat-cta-left" style="padding:1.4em 1.6em">
+                    <p class="asn-verdict asn-verdict--<?php echo htmlspecialchars($verdict_lc, ENT_QUOTES, 'UTF-8'); ?>">
+                        <?php echo htmlspecialchars($verdict, ENT_QUOTES, 'UTF-8'); ?> THREAT
+                    </p>
+                    <p class="threat-cta-stats"><?php echo $scan_pct; ?>% of IPs from scanning or proxy infrastructure
+                        (<?php echo $scan_count; ?> of <?php echo $total; ?> IPs)</p>
+                </div>
+            </div>
+
+            <!-- 2. Upgrade CTA -->
+            <div class="free-report-upgrade">
+                <p class="free-report-upgrade__headline">Confirm which of these IPs are active attackers &mdash; $9</p>
+                <ul class="free-report-upgrade__features">
+                    <li><strong>Threat confidence scores</strong> for all <?php echo count($top25); ?> IPs &mdash; verified against recent attack reports</li>
+                    <li><strong>ASN CIDR ranges</strong> &mdash; block entire scanning networks, not just individual IPs that rotate</li>
+                    <li><strong>Firewall scripts</strong> &mdash; ready-to-run rules for iptables, ufw, and nginx</li>
+                    <li><strong>Permanent link</strong> &mdash; save this report before it expires</li>
+                </ul>
+                <form method="POST" action="/get-report.php">
+                    <input type="hidden" name="action" value="upgrade">
+                    <input type="hidden" name="upgrade_token" value="<?php echo htmlspecialchars($token, ENT_QUOTES, 'UTF-8'); ?>">
+                    <button type="submit" class="button" onclick="window.umami && umami.track('upgrade_cta_click')">Unlock Threat Scores &mdash; $9</button>
+                </form>
+                <p class="free-report-upgrade__fine">One-time payment. No re-upload needed.</p>
+            </div>
+
+            <!-- 3. Top-25 table with locked Threat Score column -->
+            <h2 id="top-sources">Top Threat Sources</h2>
+            <p style="font-size:0.85em;opacity:0.65">Ranked by threat weight (scanning/VPN IPs weighted 2×).</p>
+            <div class="report-table-wrap" style="overflow-x:auto">
+            <table class="report-table" style="width:100%;border-collapse:collapse;font-size:0.9em">
+                <thead>
+                    <tr>
+                        <th style="text-align:left;padding:0.4em 0.6em">#</th>
+                        <th style="text-align:left;padding:0.4em 0.6em">IP</th>
+                        <th style="text-align:left;padding:0.4em 0.6em">Country</th>
+                        <th style="text-align:left;padding:0.4em 0.6em">ASN</th>
+                        <th style="text-align:left;padding:0.4em 0.6em">Category</th>
+                        <th style="text-align:right;padding:0.4em 0.6em">Hits</th>
+                        <th style="text-align:right;padding:0.4em 0.6em" title="Upgrade to unlock">Threat Score &#128274;</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($top25 as $i => $entry):
+                        $ip_safe    = htmlspecialchars($entry['ip'] ?? '', ENT_QUOTES, 'UTF-8');
+                        $cc_safe    = htmlspecialchars($entry['country'] ?? '', ENT_QUOTES, 'UTF-8');
+                        $asn_safe   = htmlspecialchars($entry['asn'] ?? '', ENT_QUOTES, 'UTF-8');
+                        $org_safe   = htmlspecialchars($entry['asn_org'] ?? '', ENT_QUOTES, 'UTF-8');
+                        $cat_safe   = htmlspecialchars($entry['classification'] ?? 'unknown', ENT_QUOTES, 'UTF-8');
+                        $freq       = (int)($entry['freq'] ?? 1);
+                    ?>
+                    <tr>
+                        <td style="padding:0.3em 0.6em;opacity:0.5"><?php echo $i + 1; ?></td>
+                        <td style="padding:0.3em 0.6em;font-family:monospace"><?php echo $ip_safe; ?></td>
+                        <td style="padding:0.3em 0.6em"><?php echo $cc_safe ?: '—'; ?></td>
+                        <td style="padding:0.3em 0.6em;font-size:0.85em">
+                            <?php if ($asn_safe !== ''): ?>
+                            <span><?php echo $asn_safe; ?></span>
+                            <?php if ($org_safe !== ''): ?><span style="opacity:0.6"> <?php echo $org_safe; ?></span><?php endif; ?>
+                            <?php else: ?>—<?php endif; ?>
+                        </td>
+                        <td class="asn-category asn-category--<?php echo $cat_safe; ?>" style="padding:0.3em 0.6em"><?php echo $cat_safe; ?></td>
+                        <td style="padding:0.3em 0.6em;text-align:right"><?php echo number_format($freq); ?></td>
+                        <td style="padding:0.3em 0.6em;text-align:right;opacity:0.35">—</td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+            </div>
+
+            <!-- 4. Expiry banner -->
+            <?php if ($expiry_text !== null): ?>
+            <div class="free-report-expiry" style="margin:1.5em 0;padding:0.7em 1em;background:rgba(100,100,100,0.08);border-radius:4px;font-size:0.9em">
+                <?php echo $expiry_text; ?> <a href="/" style="margin-left:0.4em;opacity:0.75">Analyze new logs →</a>
+            </div>
+            <?php endif; ?>
+
+            <!-- 5. Sharing links -->
+            <div class="free-report-share" style="margin:1.5em 0">
+                <p style="margin:0 0 0.5em;font-size:0.9em;opacity:0.75">Share this report</p>
+                <div style="display:flex;gap:0.5em;align-items:center;flex-wrap:wrap">
+                    <button class="button small alt" id="free-copy-btn"
+                        onclick="(function(btn){navigator.clipboard?navigator.clipboard.writeText(<?php echo json_encode($report_url); ?>).then(function(){btn.textContent='Copied!';setTimeout(function(){btn.textContent='Copy link'},2000)}):btn.textContent='Copy link';})(this)">Copy link</button>
+                    <input type="text" readonly
+                        value="<?php echo htmlspecialchars($report_url, ENT_QUOTES, 'UTF-8'); ?>"
+                        onclick="this.select()"
+                        style="font-family:monospace;font-size:0.85em;padding:0.3em 0.6em;flex:1;min-width:0;max-width:36em">
+                </div>
+            </div>
+
+            <!-- 6. Footer attribution -->
+            <p style="margin-top:2em;font-size:0.82em;opacity:0.5;border-top:1px solid rgba(255,255,255,0.08);padding-top:1em">
+                Generated with <a href="/" style="opacity:0.75">ip2geo.org</a> &mdash; paste your logs, get instant threat intel.
+            </p>
+
+        </div>
+    </section>
+    <script>
+    window.umami && umami.track('free_report_view', {verdict: <?php echo json_encode(strtolower($verdict)); ?>});
+    </script>
+    <?php render_page_close();
+}
+
+/**
  * Compute data for the AbuseIPDB verification callout.
  *
  * Returns null if the callout should not be shown (all scores null, or none > 80).

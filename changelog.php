@@ -36,6 +36,8 @@
 					<section id="main" class="wrapper">
 						<div class="inner">
 							<h1 class="major">Changelog</h1>
+									<h3>3.2.0 - 2026-04-12</h3>
+							<p>The paywall moved. Paste your IPs, get a free geo and ASN breakdown of your top 25 &mdash; shareable link, no account, no payment. It expires in 7 days, which is probably long enough to do something about the IPs in it. If you want AbuseIPDB confidence scores for the worst offenders, ready-to-run firewall scripts, and a permanent link, that&rsquo;s still $9. Speaking of permanent: paid reports no longer expire. The 30-day window is gone. You paid for it, it&rsquo;s yours.</p>
 								<h3>3.1.4 - 2026-04-10</h3>
 							<p>Squished some bugs. The kind that mostly just lurk — a concurrency edge case where Stripe could trigger two report generations at once, a quota guard to stop the seed script draining the AbuseIPDB daily allowance, a couple of small security tightenings. Nothing you would have noticed, and now you won't have to.</p>
 								<h3>3.1.3 - 2026-04-04</h3>

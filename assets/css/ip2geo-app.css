@@ -562,20 +562,68 @@
     margin: 0.75em 0;
 }
 
+/* --- Free report upgrade CTA --- */
+.free-report-upgrade {
+    margin: 1.5em 0 2em;
+    padding: 1.2em 1.4em;
+    border: 1px solid rgba(224,168,90,0.25);
+    border-left-width: 3px;
+    border-left-color: #e0a85a;
+    border-radius: 4px;
+    background: rgba(224,168,90,0.07);
+}
+.free-report-upgrade__headline {
+    margin: 0 0 0.5em;
+    font-weight: bold;
+}
+.free-report-upgrade__sub {
+    margin: 0 0 0.9em;
+    font-size: 0.9em;
+    opacity: 0.8;
+}
+.free-report-upgrade__features {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 1em;
+    font-size: 0.88em;
+}
+.free-report-upgrade__features li {
+    padding: 0.2em 0;
+}
+.free-report-upgrade__features li::before {
+    content: '✓  ';
+    opacity: 0.45;
+}
+.free-report-upgrade__fine {
+    margin: 0.6em 0 0;
+    font-size: 0.82em;
+    opacity: 0.55;
+}
+
 /* --- Threat CTA box --- */
 .threat-cta-box {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 2em;
+    display: flex;
+    flex-direction: column;
     border: 1px solid rgba(255,255,255,0.1);
     border-left-width: 4px;
     border-radius: 6px;
-    padding: 1.4em 1.6em;
     margin: 1.5em 0 2em;
+    overflow: hidden;
 }
 .threat-cta-box--high     { border-left-color: #e06c9f; background: rgba(224,108,159,0.06); }
 .threat-cta-box--moderate { border-left-color: #e0a85a; background: rgba(224,168,90,0.06); }
 .threat-cta-box--low      { border-left-color: #6cb87a; background: rgba(108,184,122,0.06); }
+
+.threat-cta-box form {
+    display: contents;
+}
+
+.threat-cta-top {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2em;
+    padding: 1.4em 1.6em;
+}
 
 .threat-cta-left {
     display: flex;
@@ -602,16 +650,11 @@
     flex-direction: column;
     justify-content: center;
 }
-.threat-cta-right form {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-}
 
 .threat-cta-features {
     list-style: none;
     padding: 0;
-    margin: 0 0 1em;
+    margin: 0;
     font-size: 0.82em;
     opacity: 0.8;
 }
@@ -623,12 +666,20 @@
     opacity: 0.55;
 }
 
+/* Bottom band: button + fine print side by side */
+.threat-cta-bottom {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 1.4em;
+    padding: 0.85em 1.6em;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    background: rgba(0,0,0,0.15);
+}
+
 /* Prominent CTA button — verdict-color fill */
 #cta-button {
-    display: block;
-    width: 100%;
-    box-sizing: border-box;
-    text-align: center;
+    flex-shrink: 0;
     font-weight: bold;
     letter-spacing: 0.04em;
     border-color: transparent !important;
@@ -641,19 +692,19 @@
 
 .threat-cta-fine {
     font-size: 0.75em;
-    opacity: 0.55;
-    margin: 0.6em 0 0;
-    text-align: center;
-}
-.threat-cta-fine a {
-    color: inherit;
-    border-bottom: 1px dotted rgba(255,255,255,0.3);
-    padding-bottom: 1px;
+    opacity: 0.5;
+    margin: 0;
+    line-height: 1.55;
 }
 
 @media (max-width: 767px) {
-    .threat-cta-box {
+    .threat-cta-top {
         grid-template-columns: 1fr;
         gap: 1.2em;
+    }
+    .threat-cta-bottom {
+        flex-direction: column-reverse;
+        align-items: flex-start;
+        gap: 0.6em;
     }
 }
