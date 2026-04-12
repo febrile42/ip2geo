@@ -285,7 +285,7 @@ function render_free_report(array $report, string $token, ?string $expires_at, a
 
             <!-- 1. Verdict banner -->
             <div class="threat-cta-box threat-cta-box--<?php echo htmlspecialchars($verdict_lc, ENT_QUOTES, 'UTF-8'); ?>" style="margin-bottom:1.5em" role="region" aria-label="Threat Assessment">
-                <div class="threat-cta-left">
+                <div class="threat-cta-left" style="padding:1.4em 1.6em">
                     <p class="asn-verdict asn-verdict--<?php echo htmlspecialchars($verdict_lc, ENT_QUOTES, 'UTF-8'); ?>">
                         <?php echo htmlspecialchars($verdict, ENT_QUOTES, 'UTF-8'); ?> THREAT
                     </p>
