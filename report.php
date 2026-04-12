@@ -178,14 +178,17 @@ if ($status === 'free') {
         } else {
             // Another request is generating — brief wait then reload
             mysqli_close($con);
-            header('Refresh: 1; url=' . $_SERVER['REQUEST_URI']);
+            header('Refresh: 1; url=/report.php?token=' . urlencode($token));
             echo '<!DOCTYPE html><html><head><meta http-equiv="refresh" content="1"></head><body>Generating report...</body></html>';
             exit;
         }
     }
 
     // Increment anonymous view counter
-    $con->query('UPDATE reports SET view_count = view_count + 1 WHERE token = "' . mysqli_real_escape_string($con, $token) . '"');
+    $stmt_vc = $con->prepare('UPDATE reports SET view_count = view_count + 1 WHERE token = ?');
+    $stmt_vc->bind_param('s', $token);
+    $stmt_vc->execute();
+    $stmt_vc->close();
 
     $report           = json_decode($row['report_json'], true);
     $all_ips_free     = json_decode($row['ip_list_json'], true) ?? [];

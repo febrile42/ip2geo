@@ -20,3 +20,10 @@ ALTER TABLE reports
 ALTER TABLE reports
   ADD COLUMN IF NOT EXISTS view_count INT UNSIGNED NOT NULL DEFAULT 0
   COMMENT 'Total page views for this report URL (anonymous, no PII)';
+
+-- Covering index for free-report dedup, upgrade paid-dedup, and cleanup queries.
+-- All three filter on (submission_hash, status, report_expires_at).
+-- IF NOT EXISTS is MariaDB 10.1.4+ syntax; safe to re-run.
+ALTER TABLE reports
+  ADD INDEX IF NOT EXISTS idx_submission_hash_status
+    (submission_hash, status, report_expires_at);

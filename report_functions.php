@@ -312,7 +312,7 @@ function render_free_report(array $report, string $token, ?string $expires_at, a
             </div>
 
             <!-- 3. Top-25 table with locked Threat Score column -->
-            <h3 id="top-sources">Top Threat Sources</h3>
+            <h2 id="top-sources">Top Threat Sources</h2>
             <p style="font-size:0.85em;opacity:0.65">Ranked by threat weight (scanning/VPN IPs weighted 2×).</p>
             <div class="report-table-wrap" style="overflow-x:auto">
             <table class="report-table" style="width:100%;border-collapse:collapse;font-size:0.9em">
