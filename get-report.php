@@ -36,6 +36,23 @@ if (($_POST['action'] ?? '') === 'upgrade' && isset($_POST['upgrade_token'])) {
         header('Location: /?error=no_data'); exit;
     }
 
+    // Rate-limit upgrade attempts per free token (10/hour) to prevent pending-row
+    // and Stripe session spam. Keyed on the free token, not IP, so it survives proxies.
+    if (function_exists('apcu_inc')) {
+        $upg_key   = 'upg_rate:' . $free_token;
+        $upg_count = apcu_inc($upg_key, 1, $upg_success);
+        if (!$upg_success) {
+            if (!apcu_add($upg_key, 1, 3600)) {
+                $upg_count = apcu_inc($upg_key) ?: 1;
+            } else {
+                $upg_count = 1;
+            }
+        }
+        if ($upg_count > 10) {
+            header('Location: /?error=rate_limit'); exit;
+        }
+    }
+
     $con = mysqli_connect($db_host, $db_user, $db_pass, $db_name);
     if (mysqli_connect_errno()) {
         error_log('ip2geo get-report.php upgrade: DB connect failed: ' . mysqli_connect_error());
@@ -78,6 +95,9 @@ if (($_POST['action'] ?? '') === 'upgrade' && isset($_POST['upgrade_token'])) {
     }
 
     // Generate new paid token
+    // TODO (low priority): UUID4 generation and Stripe session creation are
+    // duplicated three times in this file. Extract generate_token() and
+    // create_stripe_session() helpers when next touching this file.
     $rand  = bin2hex(random_bytes(16));
     $token = implode('-', [
         substr($rand, 0, 8),
@@ -104,7 +124,7 @@ if (($_POST['action'] ?? '') === 'upgrade' && isset($_POST['upgrade_token'])) {
 
     \Stripe\Stripe::setApiKey($stripe_secret_key);
     $base_url = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http')
-              . '://' . $_SERVER['HTTP_HOST'];
+              . '://' . $host;
     try {
         $session = \Stripe\Checkout\Session::create([
             'payment_method_types' => ['card'],
@@ -141,13 +161,19 @@ if (!in_array($tier, ['free', 'paid'], true)) {
 // ── Rate limiting (free tier only, pre-DB) ────────────────────────────────────
 // Increment first, then check — avoids race where two concurrent requests both
 // read count=9, both pass, both increment to 10+.
+// apcu_add is atomic (set-if-not-exists); avoids the race where two concurrent
+// "first" requests both see !$success and both reset the counter to 1.
 if ($tier === 'free' && function_exists('apcu_inc')) {
     $rate_key  = 'free_rate:' . md5($_SERVER['REMOTE_ADDR'] ?? '');
     $new_count = apcu_inc($rate_key, 1, $success);
     if (!$success) {
-        // Key didn't exist yet — initialize with TTL
-        apcu_store($rate_key, 1, 3600);
-        $new_count = 1;
+        // Key didn't exist yet — use apcu_add for atomic set-if-not-exists
+        if (!apcu_add($rate_key, 1, 3600)) {
+            // Lost the race: another request just created it, increment theirs
+            $new_count = apcu_inc($rate_key) ?: 1;
+        } else {
+            $new_count = 1;
+        }
     }
     if ($new_count > 10) {
         header('Location: /?error=rate_limit'); exit;
@@ -376,7 +402,7 @@ mysqli_close($con);
 \Stripe\Stripe::setApiKey($stripe_secret_key);
 
 $base_url = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http')
-          . '://' . $_SERVER['HTTP_HOST'];
+          . '://' . $host;
 
 try {
     $session = \Stripe\Checkout\Session::create([
