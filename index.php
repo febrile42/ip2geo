@@ -451,7 +451,7 @@ if ($_POST || $view_token_mode)
 					<li>Saved 7 days free &nbsp;&middot;&nbsp; $9 for full threat scores + permanent link</li>
 				</ul>
 				<button type="submit" id="cta-button" class="button">Get Free Threat Report</button>
-				<p class="threat-cta-fine">No account. No payment. Takes 5 seconds.
+			<p class="threat-cta-fine">No account. No payment. 5 seconds.
 					&nbsp;&middot;&nbsp;<a href="/report.php?token=00000000-0000-0000-0000-000000000000" target="_blank">See what $9 unlocks &rarr;</a></p>
 			</form>
 		</div>
