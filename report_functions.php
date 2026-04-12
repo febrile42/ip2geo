@@ -367,7 +367,7 @@ function render_free_report(array $report, string $token, ?string $expires_at, a
                 <p style="margin:0 0 0.5em;font-size:0.9em;opacity:0.75">Share this report</p>
                 <div style="display:flex;gap:0.5em;align-items:center;flex-wrap:wrap">
                     <button class="button small alt" id="free-copy-btn"
-                        onclick="(function(btn){navigator.clipboard?navigator.clipboard.writeText('<?php echo htmlspecialchars($report_url, ENT_QUOTES, 'UTF-8'); ?>').then(function(){btn.textContent='Copied!';setTimeout(function(){btn.textContent='Copy link'},2000)}):btn.textContent='Copy link';})(this)">Copy link</button>
+                        onclick="(function(btn){navigator.clipboard?navigator.clipboard.writeText(<?php echo json_encode($report_url); ?>).then(function(){btn.textContent='Copied!';setTimeout(function(){btn.textContent='Copy link'},2000)}):btn.textContent='Copy link';})(this)">Copy link</button>
                     <input type="text" readonly
                         value="<?php echo htmlspecialchars($report_url, ENT_QUOTES, 'UTF-8'); ?>"
                         onclick="this.select()"
