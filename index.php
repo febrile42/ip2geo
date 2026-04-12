@@ -427,34 +427,38 @@ if ($_POST || $view_token_mode)
 	// --- Threat CTA (above filter + table) ---
 	if ($show_cta && !$view_token_mode): ?>
 	<div id="threat-cta" class="threat-cta-box threat-cta-box--<?php echo htmlspecialchars(strtolower($verdict_level), ENT_QUOTES, 'UTF-8'); ?>" role="region" aria-label="Threat Assessment">
-		<div class="threat-cta-left">
-			<p class="asn-verdict asn-verdict--<?php echo htmlspecialchars(strtolower($verdict_level), ENT_QUOTES, 'UTF-8'); ?>">
-				<?php echo htmlspecialchars($verdict_level, ENT_QUOTES, 'UTF-8'); ?> THREAT
-			</p>
-			<?php if ($verdict_reason !== ''): ?>
-			<p class="threat-cta-reason"><?php echo htmlspecialchars($verdict_reason, ENT_QUOTES, 'UTF-8'); ?></p>
-			<?php endif; ?>
-			<p class="threat-cta-stats"><?php echo round($non_residential_pct * 100); ?>% of IPs from cloud, scanning, or proxy infrastructure
-				(<?php echo $non_residential_count; ?> of <?php echo $matches_total; ?> IPs)</p>
-		</div>
-		<div class="threat-cta-right">
-			<form method="POST" action="/get-report.php" id="cta-form">
-				<input type="hidden" name="ip_classified_json" id="ip-classified-json"
-					value="<?php echo htmlspecialchars(json_encode($ip_classified_data), ENT_QUOTES, 'UTF-8'); ?>" />
-				<input type="hidden" name="tier" value="free">
-				<?php if (($_GET['error'] ?? '') === 'rate_limit'): ?>
-				<p class="threat-cta-error" style="color:#e07070;margin:0 0 0.6em;font-size:0.9em">Too many free reports generated. Try again in an hour.</p>
-				<?php endif; ?>
-				<ul class="threat-cta-features">
-					<li>Geo + ASN breakdown of your top 25 IPs</li>
-					<li>Shareable link &mdash; send to your team now</li>
-					<li>Saved 7 days free &nbsp;&middot;&nbsp; $9 for full threat scores + permanent link</li>
-				</ul>
+		<form method="POST" action="/get-report.php" id="cta-form">
+			<input type="hidden" name="ip_classified_json" id="ip-classified-json"
+				value="<?php echo htmlspecialchars(json_encode($ip_classified_data), ENT_QUOTES, 'UTF-8'); ?>" />
+			<input type="hidden" name="tier" value="free">
+			<div class="threat-cta-top">
+				<div class="threat-cta-left">
+					<p class="asn-verdict asn-verdict--<?php echo htmlspecialchars(strtolower($verdict_level), ENT_QUOTES, 'UTF-8'); ?>">
+						<?php echo htmlspecialchars($verdict_level, ENT_QUOTES, 'UTF-8'); ?> THREAT
+					</p>
+					<?php if ($verdict_reason !== ''): ?>
+					<p class="threat-cta-reason"><?php echo htmlspecialchars($verdict_reason, ENT_QUOTES, 'UTF-8'); ?></p>
+					<?php endif; ?>
+					<p class="threat-cta-stats"><?php echo round($non_residential_pct * 100); ?>% of IPs from cloud, scanning, or proxy infrastructure
+						(<?php echo $non_residential_count; ?> of <?php echo $matches_total; ?> IPs)</p>
+				</div>
+				<div class="threat-cta-right">
+					<?php if (($_GET['error'] ?? '') === 'rate_limit'): ?>
+					<p class="threat-cta-error" style="color:#e07070;margin:0 0 0.6em;font-size:0.9em">Too many free reports generated. Try again in an hour.</p>
+					<?php endif; ?>
+					<ul class="threat-cta-features">
+						<li>Geo + ASN breakdown of your top 25 IPs</li>
+						<li>Shareable link &mdash; send to your team now</li>
+						<li>Saved 7 days free</li>
+					</ul>
+				</div>
+			</div>
+			<div class="threat-cta-bottom">
 				<button type="submit" id="cta-button" class="button">Get Free Threat Report</button>
-			<p class="threat-cta-fine">No account. No payment. 5 seconds.
-					&nbsp;&middot;&nbsp;<a href="/report.php?token=00000000-0000-0000-0000-000000000000" target="_blank">See what $9 unlocks &rarr;</a></p>
-			</form>
-		</div>
+				<p class="threat-cta-fine">No account. No payment. 5 seconds.<br>
+					$9 unlocks full threat scores + permalink.</p>
+			</div>
+		</form>
 	</div>
 	<?php elseif ($view_token_mode): ?>
 	<p style="margin:0 0 1.5em">
