@@ -269,7 +269,12 @@ function render_free_report(array $report, string $token, ?string $expires_at, a
         'url'         => $report_url,
     ];
 
-    render_page_open('IP Threat Report — ip2geo.org', '', $og);
+    $free_nav = [
+        ['label' => 'Summary',      'href' => '#report'],
+        ['label' => 'Top Sources',  'href' => '#top-sources'],
+        ['label' => '← New Lookup', 'href' => '/'],
+    ];
+    render_page_open('IP Threat Report — ip2geo.org', '', $og, $free_nav);
     ?>
     <section id="report" class="wrapper style4 fade-up">
         <div class="inner">
@@ -288,7 +293,12 @@ function render_free_report(array $report, string $token, ?string $expires_at, a
             <!-- 2. Upgrade CTA -->
             <div class="free-report-upgrade">
                 <p class="free-report-upgrade__headline">Confirm which of these IPs are active attackers &mdash; $9</p>
-                <p class="free-report-upgrade__sub">Unlock threat confidence scores for all <?php echo count($top25); ?> IPs &mdash; independently verified against recent attack reports &mdash; plus a permanent link you can share.</p>
+                <ul class="free-report-upgrade__features">
+                    <li><strong>Threat confidence scores</strong> for all <?php echo count($top25); ?> IPs &mdash; verified against recent attack reports</li>
+                    <li><strong>ASN CIDR ranges</strong> &mdash; block entire scanning networks, not just individual IPs that rotate</li>
+                    <li><strong>Firewall scripts</strong> &mdash; ready-to-run rules for iptables, ufw, and nginx</li>
+                    <li><strong>Permanent link</strong> &mdash; save this report before it expires</li>
+                </ul>
                 <form method="POST" action="/get-report.php">
                     <input type="hidden" name="action" value="upgrade">
                     <input type="hidden" name="upgrade_token" value="<?php echo htmlspecialchars($token, ENT_QUOTES, 'UTF-8'); ?>">
