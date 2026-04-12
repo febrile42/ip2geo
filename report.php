@@ -1441,7 +1441,10 @@ function render_report(array $report, string $token, ?string $expires_at, array 
 
 // ── Shared page layout ────────────────────────────────────────────────────────
 
-function render_page_open(string $title, string $meta_desc = '', array $og = []): void {
+/**
+ * @param array $nav_items  Optional custom nav. Each entry: ['label' => '...', 'href' => '...']. Defaults to the full paid-report nav.
+ */
+function render_page_open(string $title, string $meta_desc = '', array $og = [], array $nav_items = []): void {
     $safe_title = htmlspecialchars($title, ENT_QUOTES, 'UTF-8');
     $safe_desc  = $meta_desc
         ? htmlspecialchars($meta_desc, ENT_QUOTES, 'UTF-8')
@@ -1475,10 +1478,19 @@ function render_page_open(string $title, string $meta_desc = '', array $og = [])
         <div class="inner">
             <nav>
                 <ul>
-                    <li><a href="#report">Summary</a></li>
-                    <li><a href="#block-rules">Block Rules</a></li>
-                    <li><a href="#top-sources">Top Sources</a></li>
-                    <li><a href="/">← New Lookup</a></li>
+                    <?php
+                    $default_nav = [
+                        ['label' => 'Summary',      'href' => '#report'],
+                        ['label' => 'Block Rules',   'href' => '#block-rules'],
+                        ['label' => 'Top Sources',   'href' => '#top-sources'],
+                        ['label' => '← New Lookup', 'href' => '/'],
+                    ];
+                    foreach (($nav_items ?: $default_nav) as $item):
+                        $label = htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8');
+                        $href  = htmlspecialchars($item['href'],  ENT_QUOTES, 'UTF-8');
+                    ?>
+                    <li><a href="<?php echo $href; ?>"><?php echo $label; ?></a></li>
+                    <?php endforeach; ?>
                 </ul>
             </nav>
         </div>

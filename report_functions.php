@@ -269,7 +269,12 @@ function render_free_report(array $report, string $token, ?string $expires_at, a
         'url'         => $report_url,
     ];
 
-    render_page_open('IP Threat Report — ip2geo.org', '', $og);
+    $free_nav = [
+        ['label' => 'Summary',      'href' => '#report'],
+        ['label' => 'Top Sources',  'href' => '#top-sources'],
+        ['label' => '← New Lookup', 'href' => '/'],
+    ];
+    render_page_open('IP Threat Report — ip2geo.org', '', $og, $free_nav);
     ?>
     <section id="report" class="wrapper style4 fade-up">
         <div class="inner">
@@ -285,7 +290,24 @@ function render_free_report(array $report, string $token, ?string $expires_at, a
                 </div>
             </div>
 
-            <!-- 2. Top-25 table with locked AbuseIPDB column -->
+            <!-- 2. Upgrade CTA -->
+            <div class="free-report-upgrade">
+                <p class="free-report-upgrade__headline">Confirm which of these IPs are active attackers &mdash; $9</p>
+                <ul class="free-report-upgrade__features">
+                    <li><strong>Threat confidence scores</strong> for all <?php echo count($top25); ?> IPs &mdash; verified against recent attack reports</li>
+                    <li><strong>ASN CIDR ranges</strong> &mdash; block entire scanning networks, not just individual IPs that rotate</li>
+                    <li><strong>Firewall scripts</strong> &mdash; ready-to-run rules for iptables, ufw, and nginx</li>
+                    <li><strong>Permanent link</strong> &mdash; save this report before it expires</li>
+                </ul>
+                <form method="POST" action="/get-report.php">
+                    <input type="hidden" name="action" value="upgrade">
+                    <input type="hidden" name="upgrade_token" value="<?php echo htmlspecialchars($token, ENT_QUOTES, 'UTF-8'); ?>">
+                    <button type="submit" class="button" onclick="window.umami && umami.track('upgrade_cta_click')">Unlock Threat Scores &mdash; $9</button>
+                </form>
+                <p class="free-report-upgrade__fine">One-time payment. No re-upload needed.</p>
+            </div>
+
+            <!-- 3. Top-25 table with locked Threat Score column -->
             <h3 id="top-sources">Top Threat Sources</h3>
             <p style="font-size:0.85em;opacity:0.65">Ranked by threat weight (scanning/VPN IPs weighted 2×).</p>
             <div class="report-table-wrap" style="overflow-x:auto">
@@ -326,23 +348,7 @@ function render_free_report(array $report, string $token, ?string $expires_at, a
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
-                <tfoot>
-                    <tr>
-                        <td colspan="7" style="padding:0.4em 0.6em;font-size:0.82em;opacity:0.55">Threat scores require upgrade</td>
-                    </tr>
-                </tfoot>
             </table>
-            </div>
-
-            <!-- 3. Upgrade CTA -->
-            <div class="free-report-upgrade" style="margin:2em 0;padding:1.2em 1.4em;border-left:3px solid #e0a85a;background:rgba(224,168,90,0.08)">
-                <p style="margin:0 0 0.8em;font-weight:bold">Unlock AbuseIPDB threat scores for all <?php echo count($top25); ?> IPs + permanent link &mdash; $9</p>
-                <form method="POST" action="/get-report.php">
-                    <input type="hidden" name="action" value="upgrade">
-                    <input type="hidden" name="upgrade_token" value="<?php echo htmlspecialchars($token, ENT_QUOTES, 'UTF-8'); ?>">
-                    <button type="submit" class="button" onclick="window.umami && umami.track('upgrade_cta_click')">Get Full Threat Report &mdash; $9</button>
-                </form>
-                <p style="margin:0.6em 0 0;font-size:0.82em;opacity:0.65">One-time payment. This report's IPs are saved &mdash; no re-upload needed.</p>
             </div>
 
             <!-- 4. Expiry banner -->

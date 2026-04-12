@@ -562,6 +562,44 @@
     margin: 0.75em 0;
 }
 
+/* --- Free report upgrade CTA --- */
+.free-report-upgrade {
+    margin: 1.5em 0 2em;
+    padding: 1.2em 1.4em;
+    border: 1px solid rgba(224,168,90,0.25);
+    border-left-width: 3px;
+    border-left-color: #e0a85a;
+    border-radius: 4px;
+    background: rgba(224,168,90,0.07);
+}
+.free-report-upgrade__headline {
+    margin: 0 0 0.5em;
+    font-weight: bold;
+}
+.free-report-upgrade__sub {
+    margin: 0 0 0.9em;
+    font-size: 0.9em;
+    opacity: 0.8;
+}
+.free-report-upgrade__features {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 1em;
+    font-size: 0.88em;
+}
+.free-report-upgrade__features li {
+    padding: 0.2em 0;
+}
+.free-report-upgrade__features li::before {
+    content: '✓  ';
+    opacity: 0.45;
+}
+.free-report-upgrade__fine {
+    margin: 0.6em 0 0;
+    font-size: 0.82em;
+    opacity: 0.55;
+}
+
 /* --- Threat CTA box --- */
 .threat-cta-box {
     display: grid;
