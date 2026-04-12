@@ -246,7 +246,9 @@ function render_free_report(array $report, string $token, ?string $expires_at, a
     $scan_count = $report['scanning_count'];
     $top25      = $report['top25'];
 
-    $scheme     = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? 'https' : 'http';
+    $https      = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on')
+                  || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
+    $scheme     = $https ? 'https' : 'http';
     $host       = $_SERVER['HTTP_HOST'] ?? 'ip2geo.org';
     $report_url = $scheme . '://' . $host . '/report.php?token=' . urlencode($token);
 
