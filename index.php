@@ -454,9 +454,9 @@ if ($_POST || $view_token_mode)
 				</div>
 			</div>
 			<div class="threat-cta-bottom">
-				<button type="submit" id="cta-button" class="button">Get Free Threat Report</button>
 				<p class="threat-cta-fine">No account. No payment. 5 seconds.<br>
 					$9 unlocks full threat scores + permalink.</p>
+				<button type="submit" id="cta-button" class="button">Get Free Threat Report</button>
 			</div>
 		</form>
 	</div>
