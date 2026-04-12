@@ -246,7 +246,9 @@ function render_free_report(array $report, string $token, ?string $expires_at, a
     $scan_count = $report['scanning_count'];
     $top25      = $report['top25'];
 
-    $report_url = 'https://ip2geo.org/report.php?token=' . urlencode($token);
+    $scheme     = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? 'https' : 'http';
+    $host       = $_SERVER['HTTP_HOST'] ?? 'ip2geo.org';
+    $report_url = $scheme . '://' . $host . '/report.php?token=' . urlencode($token);
 
     // Expiry countdown
     $expires_ts      = $expires_at ? strtotime($expires_at) : null;
