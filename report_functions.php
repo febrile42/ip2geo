@@ -383,7 +383,9 @@ function render_free_report(array $report, string $token, ?string $expires_at, a
         </div>
     </section>
     <script>
-    window.umami && umami.track('free_report_view', {verdict: <?php echo json_encode(strtolower($verdict)); ?>});
+    window.addEventListener('load', function() {
+        window.umami && umami.track('free_report_view', {verdict: <?php echo json_encode(strtolower($verdict)); ?>});
+    });
     </script>
     <?php render_page_close();
 }
