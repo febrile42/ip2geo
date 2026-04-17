@@ -252,6 +252,21 @@ function render_free_report(array $report, string $token, ?string $expires_at, a
     $host       = $_SERVER['HTTP_HOST'] ?? 'ip2geo.org';
     $report_url = $scheme . '://' . $host . '/report.php?token=' . urlencode($token);
 
+    // Phase 3 — session_id for behavioral tracking (must be set before any output)
+    $sid_cookie = 'report_sid_' . $token;
+    if (!empty($_COOKIE[$sid_cookie]) && preg_match('/^[0-9a-f]{32}$/', $_COOKIE[$sid_cookie])) {
+        $session_id = $_COOKIE[$sid_cookie];
+    } else {
+        $session_id = bin2hex(random_bytes(16)); // 32-char hex
+        setcookie($sid_cookie, $session_id, [
+            'expires'  => time() + 1800,
+            'path'     => '/',
+            'samesite' => 'Strict',
+            'httponly' => false,
+            'secure'   => $https,
+        ]);
+    }
+
     // Expiry countdown
     $expires_ts      = $expires_at ? strtotime($expires_at) : null;
     $seconds_left    = $expires_ts ? ($expires_ts - time()) : null;
@@ -383,9 +398,81 @@ function render_free_report(array $report, string $token, ?string $expires_at, a
         </div>
     </section>
     <script>
-    window.addEventListener('load', function() {
-        window.umami && umami.track('free_report_view', {verdict: <?php echo json_encode(strtolower($verdict)); ?>});
-    });
+    (function() {
+        var REPORT_SID = <?php echo json_encode($session_id); ?>;
+        var VERDICT    = <?php echo json_encode($verdict_lc); ?>;
+        var TOKEN      = <?php echo json_encode($token); ?>;
+        var TOTAL      = <?php echo (int)$total; ?>;
+        var BUCKET     = TOTAL <= 10 ? '1-10' : TOTAL <= 50 ? '11-50' : TOTAL <= 200 ? '51-200'
+                       : TOTAL <= 1000 ? '201-1000' : TOTAL <= 5000 ? '1001-5000' : '5000+';
+        var startTime  = Math.floor(Date.now() / 1000);
+        var exitFired  = false;
+
+        function sendEvent(type) {
+            if (!navigator.sendBeacon) return;
+            navigator.sendBeacon('/api/report-event.php', JSON.stringify(
+                {token: TOKEN, event_type: type, session_id: REPORT_SID}
+            ));
+        }
+
+        // Phase 1 (existing Umami event, kept on load for deferred script compat)
+        window.addEventListener('load', function() {
+            window.umami && umami.track('free_report_view', {verdict: VERDICT});
+        });
+
+        // Phase 3: page_viewed on entry
+        sendEvent('page_viewed');
+
+        // Phase 1a + Phase 3: exit handlers share exitFired flag
+        function onExit() {
+            if (exitFired) return;
+            exitFired = true;
+            var secs = Math.min(600, Math.floor(Date.now() / 1000) - startTime);
+            window.umami && umami.track('report_dwell', {
+                seconds_on_page: secs, verdict: VERDICT, ip_count_bucket: BUCKET
+            });
+            sendEvent('page_viewed'); // marks session end for MAX(event_at) dwell calc
+        }
+
+        document.addEventListener('visibilitychange', function() {
+            if (document.visibilityState === 'hidden') {
+                onExit();
+            } else {
+                exitFired = false; // reset for next exit cycle
+                startTime = Math.floor(Date.now() / 1000);
+                sendEvent('page_viewed'); // return-to-tab
+            }
+        });
+        window.addEventListener('pagehide', onExit);     // iOS Safari fallback
+        window.addEventListener('beforeunload', onExit); // desktop last-resort
+
+        // Phase 1b + Phase 3: cta_visible — single shared observer
+        var ctaEl = document.querySelector('.free-report-upgrade');
+        if (ctaEl && 'IntersectionObserver' in window) {
+            var ctaTimer = null;
+            var obs = new IntersectionObserver(function(entries) {
+                entries.forEach(function(entry) {
+                    if (entry.isIntersecting) {
+                        ctaTimer = ctaTimer || setTimeout(function() {
+                            window.umami && umami.track('cta_visible', {verdict: VERDICT});
+                            sendEvent('cta_visible');
+                            obs.disconnect();
+                        }, 500);
+                    } else {
+                        clearTimeout(ctaTimer);
+                        ctaTimer = null;
+                    }
+                });
+            }, {threshold: 0.5});
+            obs.observe(ctaEl);
+        }
+
+        // Phase 3: cta_clicked beacon (upgrade_cta_click Umami event is on the button already)
+        var upgradeBtn = document.querySelector('.free-report-upgrade button[type="submit"]');
+        if (upgradeBtn) {
+            upgradeBtn.addEventListener('click', function() { sendEvent('cta_clicked'); });
+        }
+    })();
     </script>
     <?php render_page_close();
 }

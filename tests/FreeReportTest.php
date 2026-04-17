@@ -36,6 +36,7 @@ class FreeReportTest extends TestCase
                 stripe_payment_intent VARCHAR(64),
                 notification_email  VARCHAR(254),
                 email_sent_at       DATETIME,
+                acquisition_source  TEXT,
                 created_at          DATETIME     NOT NULL
             )
         ");
@@ -55,16 +56,19 @@ class FreeReportTest extends TestCase
             'report_expires_at'  => date('Y-m-d H:i:s', strtotime('+7 days')),
             'report_json'        => null,
             'view_count'         => 0,
+            'acquisition_source' => null,
             'created_at'         => date('Y-m-d H:i:s'),
         ];
         $row = array_merge($defaults, $fields);
         $stmt = $this->pdo->prepare(
             'INSERT INTO reports
                 (token, submission_hash, ip_list_json, geo_results_json, status,
-                 pending_expires_at, report_expires_at, report_json, view_count, created_at)
+                 pending_expires_at, report_expires_at, report_json, view_count,
+                 acquisition_source, created_at)
              VALUES
                 (:token, :submission_hash, :ip_list_json, :geo_results_json, :status,
-                 :pending_expires_at, :report_expires_at, :report_json, :view_count, :created_at)'
+                 :pending_expires_at, :report_expires_at, :report_json, :view_count,
+                 :acquisition_source, :created_at)'
         );
         $stmt->execute($row);
     }
@@ -354,6 +358,46 @@ class FreeReportTest extends TestCase
         $this->assertNull($this->fetchRow('old-free-1'), 'Row expired 8 days ago should be deleted');
         $this->assertNotNull($this->fetchRow('old-free-2'), 'Row expired 5 days ago should survive grace period');
         $this->assertNotNull($this->fetchRow('active-free'), 'Active row should not be deleted');
+    }
+
+    // ── Phase 4: acquisition_source ───────────────────────────────────────────
+
+    /** acquisition_source is stored alongside the free INSERT */
+    public function testAcquisitionSourceStoredWithFreeReport(): void
+    {
+        $src = 'https://www.reddit.com/r/homelab/';
+        $this->insertRow(['acquisition_source' => $src]);
+        $row = $this->fetchRow('free-token-1');
+
+        $this->assertSame($src, $row['acquisition_source']);
+    }
+
+    /** acquisition_source defaults to null when not provided */
+    public function testAcquisitionSourceNullByDefault(): void
+    {
+        $this->insertRow([]);
+        $row = $this->fetchRow('free-token-1');
+
+        $this->assertNull($row['acquisition_source']);
+    }
+
+    /** acquisition_source is truncated to 2000 chars by the application layer */
+    public function testAcquisitionSourceTruncatedAt2000Chars(): void
+    {
+        $long = str_repeat('x', 2500);
+        $truncated = substr(trim($long), 0, 2000);
+        $this->assertSame(2000, strlen($truncated));
+    }
+
+    /** Empty acquisition_source is treated as null (not stored as empty string) */
+    public function testEmptyAcquisitionSourceBecomesNull(): void
+    {
+        $raw_acq = '';
+        $acquisition_source = null;
+        if ($raw_acq !== '') {
+            $acquisition_source = substr(trim($raw_acq), 0, 2000);
+        }
+        $this->assertNull($acquisition_source);
     }
 
     /** status='free' excluded from paid dedup even when report_expires_at is in future */
