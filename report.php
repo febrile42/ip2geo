@@ -1382,6 +1382,9 @@ function render_report(array $report, string $token, ?string $expires_at, array 
             document.getElementById('show-all-rows-btn').addEventListener('click', function() {
                 document.querySelectorAll('.report-row-hidden').forEach(function(r) { r.classList.remove('report-row-hidden'); });
                 this.style.display = 'none';
+                var countEl = document.getElementById('report-table-count');
+                var totalEl = document.getElementById('report-table-total');
+                if (countEl && totalEl) countEl.textContent = totalEl.textContent;
             });
             </script>
             <?php endif; ?>
