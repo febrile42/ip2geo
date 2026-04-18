@@ -517,112 +517,26 @@ function enrich_abuseipdb(array $ips, $con, string $api_key): array {
 // ── Script download helper ────────────────────────────────────────────────────
 // Called from both the redeemed (cached) and newly-generated paths so that
 // ?format= requests work regardless of how the token was resolved.
+// get_script_lines() lives in report_functions.php (testable pure function).
 
 function maybe_serve_script_download(array $report, string $token): void {
     if (!isset($_GET['format'])) return;
     $fmt = $_GET['format'];
-    $valid = ['sh-iptables', 'sh-ufw', 'sh-iptables-ranges', 'sh-ufw-ranges', 'nginx-ips', 'nginx-ranges', 'txt-ranges'];
-    if (!in_array($fmt, $valid, true)) return;
 
-    $ips = !empty($report['block_ips']) ? $report['block_ips'] : array_column($report['top25'], 'ip');
+    $meta = [
+        'sh-iptables'        => ['block-iptables.sh',        'text/x-sh'],
+        'sh-ufw'             => ['block-ufw.sh',             'text/x-sh'],
+        'sh-iptables-ranges' => ['block-iptables-ranges.sh', 'text/x-sh'],
+        'sh-ufw-ranges'      => ['block-ufw-ranges.sh',      'text/x-sh'],
+        'nginx-ips'          => ['block-nginx-ips.conf',     'text/plain'],
+        'nginx-ranges'       => ['block-nginx-ranges.conf',  'text/plain'],
+        'txt-ranges'         => ['cidr-ranges.txt',          'text/plain'],
+    ];
+    if (!isset($meta[$fmt])) return;
 
-    // Flatten all CIDR ranges from asn_ranges groups
-    $cidrs = [];
-    foreach ($report['asn_ranges'] ?? [] as $group) {
-        foreach ($group['cidrs'] as $cidr) {
-            $cidrs[] = $cidr;
-        }
-    }
-
-    if ($fmt === 'sh-iptables') {
-        $lines    = array_map(fn($ip) => 'iptables -A INPUT -s ' . $ip . ' -j DROP', $ips);
-        $preamble = '#!/bin/bash
-# ip2geo threat report — iptables block rules
-# Generated: ' . date('Y-m-d') . '
-# Token: ' . $token . '
-# Block ' . count($ips) . ' IPs flagged as scanning / proxy infrastructure
-
-set -euo pipefail
-';
-        $filename    = 'block-iptables.sh';
-        $content_type = 'text/x-sh';
-        $body = $preamble . implode("\n", $lines) . "\n";
-    } elseif ($fmt === 'sh-ufw') {
-        $lines    = array_map(fn($ip) => 'ufw deny from ' . $ip . ' to any', $ips);
-        $preamble = '#!/bin/bash
-# ip2geo threat report — ufw block rules
-# Generated: ' . date('Y-m-d') . '
-# Token: ' . $token . '
-# Block ' . count($ips) . ' IPs flagged as scanning / proxy infrastructure
-
-set -euo pipefail
-';
-        $filename    = 'block-ufw.sh';
-        $content_type = 'text/x-sh';
-        $body = $preamble . implode("\n", $lines) . "\n";
-    } elseif ($fmt === 'sh-iptables-ranges') {
-        $lines    = array_map(fn($cidr) => 'iptables -A INPUT -s ' . $cidr . ' -j DROP', $cidrs);
-        $preamble = '#!/bin/bash
-# ip2geo threat report — iptables block rules (ASN ranges)
-# Generated: ' . date('Y-m-d') . '
-# Token: ' . $token . '
-# Block ' . count($cidrs) . ' CIDR ranges covering scanning/VPN ASN prefixes
-
-set -euo pipefail
-';
-        $filename    = 'block-iptables-ranges.sh';
-        $content_type = 'text/x-sh';
-        $body = $preamble . implode("\n", $lines) . "\n";
-    } elseif ($fmt === 'sh-ufw-ranges') {
-        $lines    = array_map(fn($cidr) => 'ufw deny from ' . $cidr . ' to any', $cidrs);
-        $preamble = '#!/bin/bash
-# ip2geo threat report — ufw block rules (ASN ranges)
-# Generated: ' . date('Y-m-d') . '
-# Token: ' . $token . '
-# Block ' . count($cidrs) . ' CIDR ranges covering scanning/VPN ASN prefixes
-
-set -euo pipefail
-';
-        $filename    = 'block-ufw-ranges.sh';
-        $content_type = 'text/x-sh';
-        $body = $preamble . implode("\n", $lines) . "\n";
-    } elseif ($fmt === 'nginx-ips') {
-        $lines = array_map(fn($ip) => $ip . ' 1;', $ips);
-        $preamble = '# ip2geo threat report — nginx geo block (individual IPs)
-# Generated: ' . date('Y-m-d') . '
-# Token: ' . $token . '
-# Block ' . count($ips) . ' IPs flagged as scanning / proxy infrastructure
-# Usage: include this file inside a geo $blocked_ip { } block in nginx.conf
-
-default 0;
-';
-        $filename    = 'block-nginx-ips.conf';
-        $content_type = 'text/plain';
-        $body = $preamble . implode("\n", $lines) . "\n";
-    } elseif ($fmt === 'nginx-ranges') {
-        $lines = array_map(fn($cidr) => $cidr . ' 1;', $cidrs);
-        $preamble = '# ip2geo threat report — nginx geo block (ASN ranges)
-# Generated: ' . date('Y-m-d') . '
-# Token: ' . $token . '
-# Block ' . count($cidrs) . ' CIDR ranges covering scanning/VPN ASN prefixes
-# Usage: include this file inside a geo $blocked_ip { } block in nginx.conf
-
-default 0;
-';
-        $filename    = 'block-nginx-ranges.conf';
-        $content_type = 'text/plain';
-        $body = $preamble . implode("\n", $lines) . "\n";
-    } else { // txt-ranges
-        $preamble = '# ip2geo threat report — CIDR ranges (plain list)
-# Generated: ' . date('Y-m-d') . '
-# Token: ' . $token . '
-# ' . count($cidrs) . ' CIDR ranges covering scanning/VPN ASN prefixes
-# One range per line — paste into ipset, web firewall, or any blocklist tool
-';
-        $filename    = 'cidr-ranges.txt';
-        $content_type = 'text/plain';
-        $body = $preamble . implode("\n", $cidrs) . "\n";
-    }
+    $lines = get_script_lines($fmt, $report, $token);
+    $body  = implode("\n", $lines) . "\n";
+    [$filename, $content_type] = $meta[$fmt];
 
     header('Content-Type: ' . $content_type . '; charset=utf-8');
     header('Content-Disposition: attachment; filename="' . $filename . '"');
@@ -633,33 +547,51 @@ default 0;
 
 // ── Rendering ─────────────────────────────────────────────────────────────────
 
-function include_block_rules_tabs(string $token, bool $has_ranges): void { ?>
+function include_block_rules_tabs(string $token, bool $has_ranges, array $report): void {
+    $format_labels = [
+        'sh-iptables-ranges' => 'block-iptables-ranges.sh',
+        'sh-ufw-ranges'      => 'block-ufw-ranges.sh',
+        'nginx-ranges'       => 'block-nginx-ranges.conf',
+        'txt-ranges'         => 'cidr-ranges.txt',
+        'sh-iptables'        => 'block-iptables.sh',
+        'sh-ufw'             => 'block-ufw.sh',
+        'nginx-ips'          => 'block-nginx-ips.conf',
+    ];
+    $render = function(string $fmt) use ($token, $report, $format_labels): void {
+        $label   = $format_labels[$fmt];
+        $content = htmlspecialchars(implode("\n", get_script_lines($fmt, $report, $token)), ENT_QUOTES, 'UTF-8');
+        $href    = '/report.php?token=' . urlencode($token) . '&amp;format=' . urlencode($fmt);
+        $fid     = 'fmt-' . $fmt;
+        $label_e = htmlspecialchars($label, ENT_QUOTES, 'UTF-8');
+        ?>
+                    <div class="format-entry">
+                        <button class="format-toggle button small" data-target="<?php echo $fid; ?>" data-label="<?php echo $label_e; ?>" aria-expanded="false">&#9656; <?php echo $label_e; ?></button>
+                        <div id="<?php echo $fid; ?>" class="format-block" hidden>
+                            <pre class="block-script-preview"><code><?php echo $content; ?></code></pre>
+                            <div class="format-actions">
+                                <button class="copy-btn">Copy</button>
+                                <a href="<?php echo $href; ?>" class="button small">&#8595; Download</a>
+                            </div>
+                        </div>
+                    </div>
+        <?php
+    };
+    ?>
             <div class="block-rules-tabs">
                 <div class="block-rules-tablist" role="tablist" aria-label="Block by IP or by range">
                     <div class="block-rules-tab<?php echo $has_ranges ? ' active' : ''; ?>" id="tab-by-range" role="tab" tabindex="<?php echo $has_ranges ? '0' : '-1'; ?>" aria-selected="<?php echo $has_ranges ? 'true' : 'false'; ?>" aria-controls="panel-by-range"<?php echo $has_ranges ? '' : ' aria-disabled="true" title="No ASN ranges available for this report"'; ?>>Block by Range</div>
                     <div class="block-rules-tab<?php echo $has_ranges ? '' : ' active'; ?>" id="tab-by-ip" role="tab" tabindex="0" aria-selected="<?php echo $has_ranges ? 'false' : 'true'; ?>" aria-controls="panel-by-ip">Block by IP</div>
                 </div>
                 <div id="panel-by-range" class="block-rules-panel" role="tabpanel" aria-labelledby="tab-by-range"<?php echo $has_ranges ? '' : ' style="display:none"'; ?>>
-                    <?php if ($has_ranges): ?>
-                    <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=sh-iptables-ranges"
-                       class="button small">&#8595; block-iptables-ranges.sh</a>
-                    <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=sh-ufw-ranges"
-                       class="button small">&#8595; block-ufw-ranges.sh</a>
-                    <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=nginx-ranges"
-                       class="button small">&#8595; block-nginx-ranges.conf</a>
-                    <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=txt-ranges"
-                       class="button small alt">&#8595; cidr-ranges.txt</a>
-                    <?php else: ?>
+                    <p class="cidr-explainer">Ranges cover all current and future IPs from this network &mdash; attackers rotate IPs, ranges don&rsquo;t.</p>
+                    <?php if ($has_ranges):
+                        foreach (['sh-iptables-ranges', 'sh-ufw-ranges', 'nginx-ranges', 'txt-ranges'] as $fmt) $render($fmt);
+                    else: ?>
                     <p style="font-size:0.9em;opacity:0.5;margin:0.6em 0">No ASN ranges available for this report.</p>
                     <?php endif; ?>
                 </div>
                 <div id="panel-by-ip" class="block-rules-panel" role="tabpanel" aria-labelledby="tab-by-ip"<?php echo $has_ranges ? ' style="display:none"' : ''; ?>>
-                    <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=sh-iptables"
-                       class="button small" data-format="sh-iptables">&#8595; block-iptables.sh</a>
-                    <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=sh-ufw"
-                       class="button small" data-format="sh-ufw">&#8595; block-ufw.sh</a>
-                    <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=nginx-ips"
-                       class="button small" data-format="nginx-ips">&#8595; block-nginx-ips.conf</a>
+                    <?php foreach (['sh-iptables', 'sh-ufw', 'nginx-ips'] as $fmt) $render($fmt); ?>
                 </div>
             </div>
 <?php }
@@ -1011,13 +943,9 @@ function render_report(array $report, string $token, ?string $expires_at, array 
             <div class="next-steps">
                 <h3>What to do next</h3>
                 <ol>
-                    <?php if ($has_ranges): ?>
-                    <li>Download a block script below, or copy the CIDR ranges and add them to your firewall directly — blocking by range is more resilient as IPs rotate.</li>
-                    <?php else: ?>
-                    <li>Download a block script below and run it on your server.</li>
-                    <?php endif; ?>
-                    <li>Verify in your firewall logs that traffic from these sources drops within a few minutes.</li>
-                    <li>Check back in 48 hours: <a href="/">submit new logs</a> to confirm the blocking worked.</li>
+                    <li>Click a script name below to preview it, then copy or download.</li>
+                    <li>In your terminal: paste and run, or <code>chmod +x block-ufw.sh &amp;&amp; sudo bash block-ufw.sh</code></li>
+                    <li>Using iptables or nginx? Switch to that tab and repeat.</li>
                 </ol>
             </div>
 
@@ -1056,13 +984,22 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                     <p style="font-size:0.9em;opacity:0.7;margin-bottom:1em">
                         Range-based rules stay valid as IPs rotate. Download a ready-to-run script, or plain text for paste-in to a web firewall or ipset.
                     </p>
-                    <?php include_block_rules_tabs($token, $has_ranges); ?>
+                    <?php include_block_rules_tabs($token, $has_ranges, $report); ?>
                 </div>
             </div>
             <?php else: ?>
             <h3 class="block-rules-heading">Block Rules</h3>
-            <?php include_block_rules_tabs($token, $has_ranges); ?>
+            <?php include_block_rules_tabs($token, $has_ranges, $report); ?>
             <?php endif; ?>
+            <details class="hosting-fallback">
+                <summary>Using shared hosting or a control panel?</summary>
+                <p>If you don&rsquo;t have SSH access, your hosting control panel can block IPs directly:</p>
+                <ul>
+                    <li><a href="https://docs.cpanel.net/cpanel/security/ip-blocker/" target="_blank" rel="noopener">cPanel &mdash; IP Blocker</a></li>
+                    <li><a href="https://docs.digitalocean.com/products/networking/firewalls/" target="_blank" rel="noopener">DigitalOcean &mdash; Cloud Firewall</a></li>
+                </ul>
+                <p>Paste the IPs from the table above into your control panel&rsquo;s block list.</p>
+            </details>
             <script>
             function switchBlockTab(name) {
                 document.querySelectorAll('.block-rules-tab').forEach(function(t) {
@@ -1081,11 +1018,48 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); switchBlockTab(this.id.replace('tab-', '')); }
                 });
             });
-            // Track range-panel downloads (plain <a> tags, no JS intercept)
-            document.querySelectorAll('#panel-by-range a.button[href]').forEach(function(a) {
+            // Track downloads via format-actions links
+            document.querySelectorAll('.format-actions a.button[href]').forEach(function(a) {
                 a.addEventListener('click', function() {
                     var fmt = (this.getAttribute('href') || '').replace(/.*format=/, '');
-                    window.umami && umami.track('report_download', { format: fmt, scope: 'by-range' });
+                    var scope = this.closest('#panel-by-range') ? 'by-range' : 'by-ip';
+                    window.umami && umami.track('report_download', { format: fmt, scope: scope });
+                });
+            });
+            // Format-toggle: reveal/hide inline script preview
+            document.querySelectorAll('.format-toggle').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    var target = document.getElementById(btn.dataset.target);
+                    var showing = target.hidden;
+                    target.hidden = !showing;
+                    btn.setAttribute('aria-expanded', showing ? 'true' : 'false');
+                    btn.innerHTML = (showing ? '&#9662; ' : '&#9656; ') + btn.dataset.label;
+                    if (showing) {
+                        window.umami && umami.track('report_script_preview', { format: btn.dataset.target.replace('fmt-', '') });
+                    }
+                });
+            });
+            // Copy button: copy script content to clipboard
+            document.querySelectorAll('.copy-btn').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    var pre = btn.closest('.format-block').querySelector('pre');
+                    var text = pre.textContent;
+                    if (navigator.clipboard && window.isSecureContext) {
+                        navigator.clipboard.writeText(text).then(function() {
+                            btn.textContent = 'Copied!';
+                            setTimeout(function() { btn.textContent = 'Copy'; }, 2000);
+                        });
+                    } else {
+                        var sel = window.getSelection();
+                        var range = document.createRange();
+                        range.selectNodeContents(pre);
+                        sel.removeAllRanges();
+                        sel.addRange(range);
+                        document.execCommand('copy');
+                        sel.removeAllRanges();
+                        btn.textContent = 'Copied!';
+                        setTimeout(function() { btn.textContent = 'Copy'; }, 2000);
+                    }
                 });
             });
             </script>

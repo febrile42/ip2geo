@@ -708,3 +708,84 @@
         gap: 0.6em;
     }
 }
+
+/* --- Block guidance: inline script preview --- */
+.format-entry {
+    width: 100%;
+    margin-bottom: 0.5em;
+}
+.format-toggle {
+    font-family: var(--mono, monospace);
+    font-size: 0.82em;
+    text-align: left;
+    width: 100%;
+}
+.format-block {
+    margin-top: 0.4em;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 4px;
+    overflow: hidden;
+}
+.block-script-preview {
+    margin: 0;
+    padding: 0.75em 1em;
+    background: rgba(0,0,0,0.25);
+    font-size: 0.78em;
+    line-height: 1.55;
+    max-height: 280px;
+    overflow-y: auto;
+    white-space: pre;
+}
+.block-script-preview code {
+    font-family: var(--mono, monospace);
+    background: none;
+    padding: 0;
+    color: inherit;
+}
+.format-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    padding: 0.5em 0.75em;
+    background: rgba(255,255,255,0.04);
+    border-top: 1px solid rgba(255,255,255,0.08);
+}
+.copy-btn {
+    font-size: 0.82em;
+    padding: 0.3em 0.8em;
+    cursor: pointer;
+    background: rgba(255,255,255,0.1);
+    color: inherit;
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 4px;
+    transition: background 0.15s, color 0.15s;
+}
+.copy-btn:hover {
+    background: rgba(255,255,255,0.18);
+}
+.copy-btn.copied {
+    color: #6cb87a;
+    border-color: #6cb87a;
+}
+.cidr-explainer {
+    font-size: 0.82em;
+    opacity: 0.7;
+    margin: 0 0 0.75em;
+    font-style: italic;
+}
+.hosting-fallback {
+    margin: 1em 0;
+    font-size: 0.88em;
+    opacity: 0.85;
+}
+.hosting-fallback > summary {
+    cursor: pointer;
+    padding: 0.3em 0;
+    list-style: none;
+}
+.hosting-fallback > summary::-webkit-details-marker { display: none; }
+.hosting-fallback > summary::before { content: '▸ '; font-size: 0.85em; }
+.hosting-fallback[open] > summary::before { content: '▾ '; }
+.hosting-fallback p { margin: 0.5em 0; }
+.hosting-fallback ul { margin: 0.4em 0; padding-left: 1.4em; }
+.hosting-fallback li { margin-bottom: 0.25em; }

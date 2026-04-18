@@ -507,3 +507,101 @@ function compute_abuseipdb_callout(array $top25): ?array
         'avg'   => $avg,
     ];
 }
+
+/**
+ * Build script content lines for a given block-rule format.
+ *
+ * Returns one string per line, no trailing newlines. Used for both
+ * the inline preview (<pre> blocks) and the file download path.
+ *
+ * @param string $format  One of: sh-iptables, sh-ufw, sh-iptables-ranges,
+ *                        sh-ufw-ranges, nginx-ips, nginx-ranges, txt-ranges
+ * @param array  $report  Report data array (block_ips, top25, asn_ranges)
+ * @param string $token   Report token (included in script preamble comment)
+ * @return string[]  Lines of the script, or [] for an unknown format
+ */
+function get_script_lines(string $format, array $report, string $token): array
+{
+    $valid = ['sh-iptables', 'sh-ufw', 'sh-iptables-ranges', 'sh-ufw-ranges', 'nginx-ips', 'nginx-ranges', 'txt-ranges'];
+    if (!in_array($format, $valid, true)) return [];
+
+    $ips   = !empty($report['block_ips']) ? $report['block_ips'] : array_column($report['top25'] ?? [], 'ip');
+    $cidrs = [];
+    foreach ($report['asn_ranges'] ?? [] as $group) {
+        foreach ($group['cidrs'] as $cidr) {
+            $cidrs[] = $cidr;
+        }
+    }
+
+    if ($format === 'sh-iptables') {
+        $preamble = '#!/bin/bash
+# ip2geo threat report — iptables block rules
+# Generated: ' . date('Y-m-d') . '
+# Token: ' . $token . '
+# Block ' . count($ips) . ' IPs flagged as scanning / proxy infrastructure
+
+set -euo pipefail
+';
+        $body = $preamble . implode("\n", array_map(fn($ip) => 'iptables -A INPUT -s ' . $ip . ' -j DROP', $ips)) . "\n";
+    } elseif ($format === 'sh-ufw') {
+        $preamble = '#!/bin/bash
+# ip2geo threat report — ufw block rules
+# Generated: ' . date('Y-m-d') . '
+# Token: ' . $token . '
+# Block ' . count($ips) . ' IPs flagged as scanning / proxy infrastructure
+
+set -euo pipefail
+';
+        $body = $preamble . implode("\n", array_map(fn($ip) => 'ufw deny from ' . $ip . ' to any', $ips)) . "\n";
+    } elseif ($format === 'sh-iptables-ranges') {
+        $preamble = '#!/bin/bash
+# ip2geo threat report — iptables block rules (ASN ranges)
+# Generated: ' . date('Y-m-d') . '
+# Token: ' . $token . '
+# Block ' . count($cidrs) . ' CIDR ranges covering scanning/VPN ASN prefixes
+
+set -euo pipefail
+';
+        $body = $preamble . implode("\n", array_map(fn($cidr) => 'iptables -A INPUT -s ' . $cidr . ' -j DROP', $cidrs)) . "\n";
+    } elseif ($format === 'sh-ufw-ranges') {
+        $preamble = '#!/bin/bash
+# ip2geo threat report — ufw block rules (ASN ranges)
+# Generated: ' . date('Y-m-d') . '
+# Token: ' . $token . '
+# Block ' . count($cidrs) . ' CIDR ranges covering scanning/VPN ASN prefixes
+
+set -euo pipefail
+';
+        $body = $preamble . implode("\n", array_map(fn($cidr) => 'ufw deny from ' . $cidr . ' to any', $cidrs)) . "\n";
+    } elseif ($format === 'nginx-ips') {
+        $preamble = '# ip2geo threat report — nginx geo block (individual IPs)
+# Generated: ' . date('Y-m-d') . '
+# Token: ' . $token . '
+# Block ' . count($ips) . ' IPs flagged as scanning / proxy infrastructure
+# Usage: include this file inside a geo $blocked_ip { } block in nginx.conf
+
+default 0;
+';
+        $body = $preamble . implode("\n", array_map(fn($ip) => $ip . ' 1;', $ips)) . "\n";
+    } elseif ($format === 'nginx-ranges') {
+        $preamble = '# ip2geo threat report — nginx geo block (ASN ranges)
+# Generated: ' . date('Y-m-d') . '
+# Token: ' . $token . '
+# Block ' . count($cidrs) . ' CIDR ranges covering scanning/VPN ASN prefixes
+# Usage: include this file inside a geo $blocked_ip { } block in nginx.conf
+
+default 0;
+';
+        $body = $preamble . implode("\n", array_map(fn($cidr) => $cidr . ' 1;', $cidrs)) . "\n";
+    } else { // txt-ranges
+        $preamble = '# ip2geo threat report — CIDR ranges (plain list)
+# Generated: ' . date('Y-m-d') . '
+# Token: ' . $token . '
+# ' . count($cidrs) . ' CIDR ranges covering scanning/VPN ASN prefixes
+# One range per line — paste into ipset, web firewall, or any blocklist tool
+';
+        $body = $preamble . implode("\n", $cidrs) . "\n";
+    }
+
+    return explode("\n", rtrim($body));
+}
