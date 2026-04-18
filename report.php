@@ -789,6 +789,10 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                 }
                 .report-row-hidden { display: none; }
                 #show-all-rows-btn { margin-top: 0.75em; }
+                @media print {
+                    .report-row-hidden { display: table-row !important; }
+                    #show-all-rows-btn { display: none; }
+                }
             </style>
 
             <?php
