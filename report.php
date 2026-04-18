@@ -1025,7 +1025,8 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                     <p style="font-size:0.9em;opacity:0.7;margin-bottom:0.5em">
                         Click a format to preview, then copy or download.
                     </p>
-                    <div class="hosting-callout">
+                    <?php include_block_rules_tabs($token, $has_ranges, $report); ?>
+                    <div class="hosting-callout" style="margin-top:1.25em">
                         <strong>No console/SSH access?</strong> Block IPs directly from your hosting panel instead:
                         <ul class="hosting-callout-links">
                             <li><a href="https://docs.cpanel.net/cpanel/security/ip-blocker/" target="_blank" rel="noopener">cPanel IP Blocker</a> <span class="hosting-note">(Namecheap, GoDaddy, Bluehost, most shared hosts)</span></li>
@@ -1037,13 +1038,12 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                         <p class="hosting-note" style="margin:0.6em 0 0">
                             <strong>What to paste:</strong>
                             <?php if ($has_ranges): ?>
-                            Expand <strong>cidr-ranges.txt</strong> below and copy the list &mdash; one range per line, works with all panels above. If your panel only accepts single IPs, copy them from the Top Threat Sources table instead.
+                            Expand <strong>cidr-ranges.txt</strong> above and copy the list &mdash; one range per line, works with all panels above. If your panel only accepts single IPs, copy them from the Top Threat Sources table instead.
                             <?php else: ?>
                             Copy the IPs you want to block from the Top Threat Sources table below and paste them one per line into your panel.
                             <?php endif; ?>
                         </p>
                     </div>
-                    <?php include_block_rules_tabs($token, $has_ranges, $report); ?>
             <?php if ($use_columns): ?>
                 </div>
             </div>
