@@ -583,7 +583,7 @@ function include_block_rules_tabs(string $token, bool $has_ranges, array $report
                     <div class="block-rules-tab<?php echo $has_ranges ? '' : ' active'; ?>" id="tab-by-ip" role="tab" tabindex="0" aria-selected="<?php echo $has_ranges ? 'false' : 'true'; ?>" aria-controls="panel-by-ip">Block by IP</div>
                 </div>
                 <div id="panel-by-range" class="block-rules-panel" role="tabpanel" aria-labelledby="tab-by-range"<?php echo $has_ranges ? '' : ' style="display:none"'; ?>>
-                    <p class="cidr-explainer">Ranges cover all current and future IPs from this network &mdash; attackers rotate IPs, ranges don&rsquo;t.</p>
+                    <p class="cidr-explainer">Ranges cover all current and future IPs from these networks &mdash; attackers rotate IPs, ranges don&rsquo;t.</p>
                     <?php if ($has_ranges):
                         foreach (['sh-iptables-ranges', 'sh-ufw-ranges', 'nginx-ranges', 'txt-ranges'] as $fmt) $render($fmt);
                     else: ?>
