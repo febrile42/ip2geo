@@ -985,10 +985,10 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                         Download a ready-to-run script, or grab plain text for paste-in to a web firewall or ipset.
                     </p>
                     <div class="hosting-callout">
-                        <strong>No SSH access?</strong> Block IPs directly from your hosting panel instead:
+                        <strong>No console/SSH access?</strong> Block IPs directly from your hosting panel instead:
                         <ul class="hosting-callout-links">
                             <li><a href="https://docs.cpanel.net/cpanel/security/ip-blocker/" target="_blank" rel="noopener">cPanel IP Blocker</a> <span class="hosting-note">(Namecheap, GoDaddy, Bluehost, most shared hosts)</span></li>
-                            <li><a href="https://docs.plesk.com/en-US/obsidian/administrator-guide/server-administration/restricting-access-to-server-with-fail2ban/banning-ip-addresses-manually.80125/" target="_blank" rel="noopener">Plesk IP Ban</a> <span class="hosting-note">(another common shared host panel)</span></li>
+                            <li><a href="https://www.plesk.com/kb/support/how-to-block-an-ip-address-in-plesk-firewall/" target="_blank" rel="noopener">Plesk IP Ban</a> <span class="hosting-note">(another common shared host panel)</span></li>
                             <li><a href="https://developers.cloudflare.com/waf/tools/ip-access-rules/" target="_blank" rel="noopener">Cloudflare IP Access Rules</a> <span class="hosting-note">(if your site is proxied through Cloudflare)</span></li>
                             <li><a href="https://docs.digitalocean.com/products/networking/firewalls/" target="_blank" rel="noopener">DigitalOcean Cloud Firewall</a></li>
                             <li><a href="https://docs.hetzner.com/cloud/firewalls/overview/" target="_blank" rel="noopener">Hetzner Cloud Firewall</a></li>
