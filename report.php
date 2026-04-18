@@ -855,6 +855,105 @@ function render_report(array $report, string $token, ?string $expires_at, array 
             </p>
             <?php endif; ?>
 
+            <!-- Community Intel CTA (paid reports only — demo preview stays at bottom) -->
+            <?php if (!$is_demo && ($data_consent === null || $data_consent === 0)): ?>
+            <div id="community-consent-banner" class="community-intel-banner" style="background:rgba(108,184,122,0.12);border-left:3px solid #6cb87a;padding:0.8em 1em;margin-bottom:1.5em;font-size:0.9em">
+                <?php if ($data_consent === 0): ?>
+                <div id="consent-full" style="display:none">
+                <?php else: ?>
+                <div id="consent-full">
+                <?php endif; ?>
+                    <strong>Community Intel &mdash; opt in</strong>
+                    <p style="margin:0.4em 0 0.8em">Share anonymized network and IP data to see how your traffic compares to this week's global attack trends. <a href="/privacy.php" target="_blank" rel="noopener noreferrer" style="opacity:0.7;font-size:0.9em">Privacy policy</a></p>
+                    <div style="display:flex;gap:0.5em;flex-wrap:wrap">
+                        <button class="button small" id="consent-yes-btn">Opt in &mdash; show me the comparison</button>
+                        <button class="button small alt" id="consent-no-btn">No thanks</button>
+                    </div>
+                    <p style="margin:0.6em 0 0;font-size:0.82em;opacity:0.55">Community data is currently limited as this feature grows &mdash; your opt-in helps build it.</p>
+                </div>
+                <div id="consent-collapsed" style="<?php echo $data_consent === 0 ? '' : 'display:none;'; ?>font-size:0.9em;opacity:0.75">
+                    Community Intel &mdash; you opted out.
+                    <a id="consent-reconsider-btn" tabindex="0" style="color:inherit;text-decoration:underline;cursor:pointer;margin-left:0.2em">Change your mind?</a>
+                </div>
+            </div>
+            <script>
+            (function() {
+                var token = <?php echo json_encode($token); ?>;
+                function postConsent(consent, callback) {
+                    var fd = new FormData();
+                    fd.append('token', token);
+                    fd.append('consent', String(consent));
+                    fetch('/community-consent.php', { method: 'POST', body: fd })
+                        .then(function(r) { return r.json(); })
+                        .then(callback)
+                        .catch(function() {});
+                }
+                function showCollapsed() {
+                    document.getElementById('consent-full').style.display = 'none';
+                    document.getElementById('consent-collapsed').style.display = '';
+                }
+                function showFull() {
+                    document.getElementById('consent-collapsed').style.display = 'none';
+                    document.getElementById('consent-full').style.display = '';
+                    document.getElementById('consent-no-btn').disabled = false;
+                }
+                document.getElementById('consent-yes-btn').addEventListener('click', function() {
+                    var btn = this;
+                    btn.disabled = true;
+                    btn.textContent = 'Saving\u2026';
+                    postConsent(1, function(data) {
+                        if (!data.ok) return;
+                        var banner = document.getElementById('community-consent-banner');
+                        var html = '<div class="community-intel-banner" style="background:rgba(108,184,122,0.12);border-left:3px solid #6cb87a;padding:0.8em 1em;margin-bottom:1.5em;font-size:0.9em">';
+                        html += '<strong>&#10003; Thanks for contributing!</strong>';
+                        if (data.top_cidrs && data.top_cidrs.length) {
+                            html += '<p style="margin:0.5em 0 0.3em;opacity:0.85">Top reported ranges in the past 7 days:</p>';
+                            html += '<ul style="margin:0;padding-left:1.5em">';
+                            data.top_cidrs.slice(0, 3).forEach(function(c) {
+                                html += '<li><code>' + c.cidr + '</code> &mdash; ' + c.org + ' (' + c.report_count + ' report' + (c.report_count === 1 ? '' : 's') + ')</li>';
+                            });
+                            html += '</ul>';
+                        } else {
+                            html += '<p style="margin:0.5em 0 0.3em;opacity:0.85">The community dataset is still in its early days &mdash; data will grow as more users opt in. You\'ll get richer comparisons on future reports as the dataset builds.</p>';
+                        }
+                        html += '<p style="margin:0.7em 0 0"><a href="" onclick="window.location.reload();return false;" class="button small">Refresh to view your community data &rarr;</a></p>';
+                        html += '</div>';
+                        banner.outerHTML = html;
+                    });
+                });
+                document.getElementById('consent-no-btn').addEventListener('click', function() {
+                    this.disabled = true;
+                    postConsent(0, function() { showCollapsed(); });
+                });
+                document.getElementById('consent-reconsider-btn').addEventListener('click', function(e) {
+                    e.preventDefault();
+                    showFull();
+                });
+            })();
+            </script>
+            <?php endif; ?>
+
+            <?php if (!$is_demo && $data_consent === 1):
+                $community_has_data = false;
+                if (!empty($community_data['ip_stats'])) {
+                    foreach ($community_data['ip_stats'] as $ip_count) {
+                        if ($ip_count >= 3) {
+                            $community_has_data = true;
+                            break;
+                        }
+                    }
+                }
+            ?>
+            <div class="community-intel-banner" style="background:rgba(108,184,122,0.12);border-left:3px solid #6cb87a;padding:0.8em 1em;margin-bottom:1.5em;font-size:0.9em">
+                <strong>&#10003; Thank you for contributing to Community Intel</strong>
+                <?php if (!$community_has_data): ?>
+                <p style="margin:0.4em 0 0;opacity:0.8">The community dataset is still in its early days &mdash; data will grow as more users opt in. Check back on future reports for richer comparisons.</p>
+                <?php else: ?>
+                <p style="margin:0.4em 0 0;opacity:0.8">Your data is contributing to the community feed. See the Community column in the Top Threat Sources table below.</p>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
+
             <!-- ASN Ranges + Block Rules layout:
                  ≥3 ASNs → two-column grid (sticky right col floats alongside long list)
                  <3 ASNs → full-width stack (avoids empty space next to short list)
@@ -1302,7 +1401,7 @@ function render_report(array $report, string $token, ?string $expires_at, array 
             <?php endif; ?>
             <?php endif; ?>
 
-            <!-- Community Intel (demo preview / consent / opted-in) -->
+            <!-- Community Intel demo preview (paid CTA moved above block rules) -->
             <?php if ($is_demo): ?>
             <div style="background:rgba(108,184,122,0.12);border-left:3px solid #6cb87a;padding:0.8em 1em;margin-bottom:1.5em;font-size:0.9em">
                 <strong>Community Intel</strong> <span style="opacity:0.6;font-size:0.85em;margin-left:0.3em">Preview</span>
@@ -1318,104 +1417,6 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                 </table>
                 <p style="font-size:0.85em;opacity:0.6;margin:0.6em 0 0.75em">Residential IPs are never collected. 52-week retention. <a href="/privacy.php" target="_blank" rel="noopener noreferrer">Privacy policy</a></p>
                 <a href="/" class="button small">Try with your own IPs &rarr;</a>
-            </div>
-            <?php endif; ?>
-
-            <?php if (!$is_demo && ($data_consent === null || $data_consent === 0)): ?>
-            <div id="community-consent-banner" class="community-intel-banner" style="background:rgba(108,184,122,0.12);border-left:3px solid #6cb87a;padding:0.8em 1em;margin-bottom:1.5em;font-size:0.9em">
-                <?php if ($data_consent === 0): ?>
-                <div id="consent-full" style="display:none">
-                <?php else: ?>
-                <div id="consent-full">
-                <?php endif; ?>
-                    <strong>Community Intel &mdash; opt in</strong>
-                    <p style="margin:0.4em 0 0.8em">Share anonymized network and IP data to see how your traffic compares to this week's global attack trends. <a href="/privacy.php" target="_blank" rel="noopener noreferrer" style="opacity:0.7;font-size:0.9em">Privacy policy</a></p>
-                    <div style="display:flex;gap:0.5em;flex-wrap:wrap">
-                        <button class="button small" id="consent-yes-btn">Opt in &mdash; show me the comparison</button>
-                        <button class="button small alt" id="consent-no-btn">No thanks</button>
-                    </div>
-                    <p style="margin:0.6em 0 0;font-size:0.82em;opacity:0.55">Community data is currently limited as this feature grows &mdash; your opt-in helps build it.</p>
-                </div>
-                <div id="consent-collapsed" style="<?php echo $data_consent === 0 ? '' : 'display:none;'; ?>font-size:0.9em;opacity:0.75">
-                    Community Intel &mdash; you opted out.
-                    <a id="consent-reconsider-btn" tabindex="0" style="color:inherit;text-decoration:underline;cursor:pointer;margin-left:0.2em">Change your mind?</a>
-                </div>
-            </div>
-            <script>
-            (function() {
-                var token = <?php echo json_encode($token); ?>;
-                function postConsent(consent, callback) {
-                    var fd = new FormData();
-                    fd.append('token', token);
-                    fd.append('consent', String(consent));
-                    fetch('/community-consent.php', { method: 'POST', body: fd })
-                        .then(function(r) { return r.json(); })
-                        .then(callback)
-                        .catch(function() {});
-                }
-                function showCollapsed() {
-                    document.getElementById('consent-full').style.display = 'none';
-                    document.getElementById('consent-collapsed').style.display = '';
-                }
-                function showFull() {
-                    document.getElementById('consent-collapsed').style.display = 'none';
-                    document.getElementById('consent-full').style.display = '';
-                    document.getElementById('consent-no-btn').disabled = false;
-                }
-                document.getElementById('consent-yes-btn').addEventListener('click', function() {
-                    var btn = this;
-                    btn.disabled = true;
-                    btn.textContent = 'Saving\u2026';
-                    postConsent(1, function(data) {
-                        if (!data.ok) return;
-                        var banner = document.getElementById('community-consent-banner');
-                        var html = '<div class="community-intel-banner" style="background:rgba(108,184,122,0.12);border-left:3px solid #6cb87a;padding:0.8em 1em;margin-bottom:1.5em;font-size:0.9em">';
-                        html += '<strong>&#10003; Thanks for contributing!</strong>';
-                        if (data.top_cidrs && data.top_cidrs.length) {
-                            html += '<p style="margin:0.5em 0 0.3em;opacity:0.85">Top reported ranges in the past 7 days:</p>';
-                            html += '<ul style="margin:0;padding-left:1.5em">';
-                            data.top_cidrs.slice(0, 3).forEach(function(c) {
-                                html += '<li><code>' + c.cidr + '</code> &mdash; ' + c.org + ' (' + c.report_count + ' report' + (c.report_count === 1 ? '' : 's') + ')</li>';
-                            });
-                            html += '</ul>';
-                        } else {
-                            html += '<p style="margin:0.5em 0 0.3em;opacity:0.85">The community dataset is still in its early days &mdash; data will grow as more users opt in. You\'ll get richer comparisons on future reports as the dataset builds.</p>';
-                        }
-                        html += '<p style="margin:0.7em 0 0"><a href="" onclick="window.location.reload();return false;" class="button small">Refresh to view your community data &rarr;</a></p>';
-                        html += '</div>';
-                        banner.outerHTML = html;
-                    });
-                });
-                document.getElementById('consent-no-btn').addEventListener('click', function() {
-                    this.disabled = true;
-                    postConsent(0, function() { showCollapsed(); });
-                });
-                document.getElementById('consent-reconsider-btn').addEventListener('click', function(e) {
-                    e.preventDefault();
-                    showFull();
-                });
-            })();
-            </script>
-            <?php endif; ?>
-
-            <?php if (!$is_demo && $data_consent === 1):
-                $community_has_data = false;
-                if (!empty($community_data['ip_stats'])) {
-                    foreach ($community_data['ip_stats'] as $ip_count) {
-                        if ($ip_count >= 3) {
-                            $community_has_data = true;
-                            break;
-                        }
-                    }
-                }
-            ?>
-            <div class="community-intel-banner" style="background:rgba(108,184,122,0.12);border-left:3px solid #6cb87a;padding:0.8em 1em;margin-bottom:1.5em;font-size:0.9em">
-                <strong>&#10003; Thank you for contributing to Community Intel</strong>
-                <?php if (!$community_has_data): ?>
-                <p style="margin:0.4em 0 0;opacity:0.8">The community dataset is still in its early days &mdash; data will grow as more users opt in. Check back on future reports for richer comparisons.</p>
-                <?php else: ?>
-                <p style="margin:0.4em 0 0;opacity:0.8">Your data is contributing to the community feed. See the Community column in the Top Threat Sources table above.</p>
-                <?php endif; ?>
             </div>
             <?php endif; ?>
 
