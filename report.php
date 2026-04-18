@@ -984,22 +984,33 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                     <p style="font-size:0.9em;opacity:0.7;margin-bottom:1em">
                         Download a ready-to-run script, or grab plain text for paste-in to a web firewall or ipset.
                     </p>
+                    <div class="hosting-callout">
+                        <strong>No SSH access?</strong> Block IPs directly from your hosting panel instead:
+                        <ul class="hosting-callout-links">
+                            <li><a href="https://docs.cpanel.net/cpanel/security/ip-blocker/" target="_blank" rel="noopener">cPanel IP Blocker</a> <span class="hosting-note">(Namecheap, GoDaddy, Bluehost, most shared hosts)</span></li>
+                            <li><a href="https://docs.plesk.com/en-US/obsidian/administrator-guide/server-administration/restricting-access-to-server-with-fail2ban/banning-ip-addresses-manually.80125/" target="_blank" rel="noopener">Plesk IP Ban</a> <span class="hosting-note">(another common shared host panel)</span></li>
+                            <li><a href="https://developers.cloudflare.com/waf/tools/ip-access-rules/" target="_blank" rel="noopener">Cloudflare IP Access Rules</a> <span class="hosting-note">(if your site is proxied through Cloudflare)</span></li>
+                            <li><a href="https://docs.digitalocean.com/products/networking/firewalls/" target="_blank" rel="noopener">DigitalOcean Cloud Firewall</a></li>
+                            <li><a href="https://docs.hetzner.com/cloud/firewalls/overview/" target="_blank" rel="noopener">Hetzner Cloud Firewall</a></li>
+                        </ul>
+                    </div>
                     <?php include_block_rules_tabs($token, $has_ranges, $report); ?>
                 </div>
             </div>
             <?php else: ?>
             <h3 class="block-rules-heading">Block Rules</h3>
+            <div class="hosting-callout">
+                <strong>No SSH access?</strong> Block IPs directly from your hosting panel instead:
+                <ul class="hosting-callout-links">
+                    <li><a href="https://docs.cpanel.net/cpanel/security/ip-blocker/" target="_blank" rel="noopener">cPanel IP Blocker</a> <span class="hosting-note">(Namecheap, GoDaddy, Bluehost, most shared hosts)</span></li>
+                    <li><a href="https://docs.plesk.com/en-US/obsidian/administrator-guide/server-administration/restricting-access-to-server-with-fail2ban/banning-ip-addresses-manually.80125/" target="_blank" rel="noopener">Plesk IP Ban</a> <span class="hosting-note">(another common shared host panel)</span></li>
+                    <li><a href="https://developers.cloudflare.com/waf/tools/ip-access-rules/" target="_blank" rel="noopener">Cloudflare IP Access Rules</a> <span class="hosting-note">(if your site is proxied through Cloudflare)</span></li>
+                    <li><a href="https://docs.digitalocean.com/products/networking/firewalls/" target="_blank" rel="noopener">DigitalOcean Cloud Firewall</a></li>
+                    <li><a href="https://docs.hetzner.com/cloud/firewalls/overview/" target="_blank" rel="noopener">Hetzner Cloud Firewall</a></li>
+                </ul>
+            </div>
             <?php include_block_rules_tabs($token, $has_ranges, $report); ?>
             <?php endif; ?>
-            <details class="hosting-fallback">
-                <summary>Using shared hosting or a control panel?</summary>
-                <p>If you don&rsquo;t have SSH access, your hosting control panel can block IPs directly:</p>
-                <ul>
-                    <li><a href="https://docs.cpanel.net/cpanel/security/ip-blocker/" target="_blank" rel="noopener">cPanel &mdash; IP Blocker</a></li>
-                    <li><a href="https://docs.digitalocean.com/products/networking/firewalls/" target="_blank" rel="noopener">DigitalOcean &mdash; Cloud Firewall</a></li>
-                </ul>
-                <p>Paste the IPs from the table above into your control panel&rsquo;s block list.</p>
-            </details>
             <script>
             function switchBlockTab(name) {
                 document.querySelectorAll('.block-rules-tab').forEach(function(t) {
