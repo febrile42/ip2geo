@@ -949,9 +949,16 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                 </ol>
             </div>
 
-            <!-- ASN Ranges + Block Rules: side-by-side when ranges exist, Block Rules full-width otherwise -->
+            <!-- ASN Ranges + Block Rules layout:
+                 ≥3 ASNs → two-column grid (sticky right col floats alongside long list)
+                 <3 ASNs → full-width stack (avoids empty space next to short list)
+                 no ranges → block rules full-width only -->
             <div id="block-rules"></div>
-            <?php if ($has_ranges): ?>
+            <?php
+            $asn_count = count($report['asn_ranges']);
+            $use_columns = $has_ranges && $asn_count >= 3;
+            ?>
+            <?php if ($use_columns): ?>
             <div class="ranges-rules-grid">
                 <div class="ranges-col">
                     <h3>ASN Ranges to Block</h3>
@@ -980,7 +987,38 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                     <?php endforeach; ?>
                 </div>
                 <div class="rules-col">
-                    <h3>Block Rules</h3>
+            <?php else: ?>
+            <?php if ($has_ranges): ?>
+            <div class="ranges-stack">
+                <h3>ASN Ranges to Block</h3>
+                <?php foreach ($report['asn_ranges'] as $group):
+                    $shown = count($group['cidrs']);
+                    $total_ranges = $group['total'];
+                ?>
+                <div class="asn-range-group">
+                    <div class="asn-range-header">
+                        <strong><?php echo htmlspecialchars($group['asn'], ENT_QUOTES, 'UTF-8'); ?></strong>
+                        <?php if ($group['org']): ?>
+                        <span class="asn-range-org"><?php echo htmlspecialchars($group['org'], ENT_QUOTES, 'UTF-8'); ?></span>
+                        <?php endif; ?>
+                        <?php if ($total_ranges > $shown): ?>
+                        <span class="asn-range-count"><?php echo $shown; ?> of <?php echo number_format($total_ranges); ?> &mdash; all in download</span>
+                        <?php else: ?>
+                        <span class="asn-range-count"><?php echo $total_ranges; ?> range<?php echo $total_ranges === 1 ? '' : 's'; ?></span>
+                        <?php endif; ?>
+                    </div>
+                    <div class="cidr-chips">
+                        <?php foreach ($group['cidrs'] as $cidr): ?>
+                        <span class="cidr-chip"><?php echo htmlspecialchars($cidr, ENT_QUOTES, 'UTF-8'); ?></span>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+                <?php endforeach; ?>
+            </div>
+            <?php endif; ?>
+            <div class="block-rules-fullwidth">
+            <?php endif; ?>
+                    <h3 class="block-rules-heading">Block Rules</h3>
                     <p style="font-size:0.9em;opacity:0.7;margin-bottom:1em">
                         Download a ready-to-run script, or grab plain text for paste-in to a web firewall or ipset.
                     </p>
@@ -995,21 +1033,11 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                         </ul>
                     </div>
                     <?php include_block_rules_tabs($token, $has_ranges, $report); ?>
+            <?php if ($use_columns): ?>
                 </div>
             </div>
             <?php else: ?>
-            <h3 class="block-rules-heading">Block Rules</h3>
-            <div class="hosting-callout">
-                <strong>No SSH access?</strong> Block IPs directly from your hosting panel instead:
-                <ul class="hosting-callout-links">
-                    <li><a href="https://docs.cpanel.net/cpanel/security/ip-blocker/" target="_blank" rel="noopener">cPanel IP Blocker</a> <span class="hosting-note">(Namecheap, GoDaddy, Bluehost, most shared hosts)</span></li>
-                    <li><a href="https://docs.plesk.com/en-US/obsidian/administrator-guide/server-administration/restricting-access-to-server-with-fail2ban/banning-ip-addresses-manually.80125/" target="_blank" rel="noopener">Plesk IP Ban</a> <span class="hosting-note">(another common shared host panel)</span></li>
-                    <li><a href="https://developers.cloudflare.com/waf/tools/ip-access-rules/" target="_blank" rel="noopener">Cloudflare IP Access Rules</a> <span class="hosting-note">(if your site is proxied through Cloudflare)</span></li>
-                    <li><a href="https://docs.digitalocean.com/products/networking/firewalls/" target="_blank" rel="noopener">DigitalOcean Cloud Firewall</a></li>
-                    <li><a href="https://docs.hetzner.com/cloud/firewalls/overview/" target="_blank" rel="noopener">Hetzner Cloud Firewall</a></li>
-                </ul>
             </div>
-            <?php include_block_rules_tabs($token, $has_ranges, $report); ?>
             <?php endif; ?>
             <script>
             function switchBlockTab(name) {

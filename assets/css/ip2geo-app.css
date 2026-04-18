@@ -276,7 +276,14 @@
     padding: 0 0.25em;
 }
 
-/* --- Ranges + Block Rules side-by-side grid (report.php) --- */
+/* --- Ranges + Block Rules layout (report.php) --- */
+.ranges-stack {
+    margin-bottom: 2em;
+}
+.block-rules-fullwidth {
+    margin-bottom: 2em;
+}
+
 .ranges-rules-grid {
     display: flex !important;
     gap: 2.5em;
