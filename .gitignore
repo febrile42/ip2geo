@@ -38,3 +38,4 @@ QA.md
 .gstack*/
 .vscode/
 .DS_store
+.gstack/

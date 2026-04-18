@@ -276,7 +276,14 @@
     padding: 0 0.25em;
 }
 
-/* --- Ranges + Block Rules side-by-side grid (report.php) --- */
+/* --- Ranges + Block Rules layout (report.php) --- */
+.ranges-stack {
+    margin-bottom: 2em;
+}
+.block-rules-fullwidth {
+    margin-bottom: 2em;
+}
+
 .ranges-rules-grid {
     display: flex !important;
     gap: 2.5em;
@@ -707,4 +714,86 @@
         align-items: flex-start;
         gap: 0.6em;
     }
+}
+
+/* --- Block guidance: inline script preview --- */
+.format-entry {
+    width: 100%;
+    margin-bottom: 0.5em;
+}
+.format-toggle {
+    font-family: var(--mono, monospace);
+    font-size: 0.82em;
+    text-align: left;
+    width: 100%;
+}
+.format-block {
+    margin-top: 0.4em;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 4px;
+    overflow: hidden;
+}
+.block-script-preview {
+    margin: 0;
+    padding: 0.75em 1em;
+    background: rgba(0,0,0,0.25);
+    font-size: 0.78em;
+    line-height: 1.55;
+    max-height: 280px;
+    overflow-y: auto;
+    white-space: pre;
+}
+.block-script-preview code {
+    font-family: var(--mono, monospace);
+    background: none;
+    padding: 0;
+    color: inherit;
+}
+.format-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    padding: 0.5em 0.75em;
+    background: rgba(255,255,255,0.04);
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.format-actions .copy-btn,
+.format-actions .button.small {
+    flex: 1;
+    text-align: center;
+    justify-content: center;
+}
+.copy-btn {
+    cursor: pointer;
+    color: inherit;
+    background: transparent;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.copy-btn.copied {
+    color: #6cb87a;
+    border-color: #6cb87a;
+}
+.cidr-explainer {
+    font-size: 0.82em;
+    opacity: 0.7;
+    margin: 0 0 0.75em;
+    font-style: italic;
+}
+.hosting-callout {
+    margin-bottom: 1.25em;
+    padding: 0.7em 1em;
+    font-size: 0.86em;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 4px;
+    background: rgba(255,255,255,0.04);
+    line-height: 1.5;
+}
+.hosting-callout-links {
+    margin: 0.4em 0 0;
+    padding-left: 1.4em;
+}
+.hosting-callout-links li { margin-bottom: 0.2em; }
+.hosting-note {
+    opacity: 0.6;
+    font-size: 0.92em;
 }

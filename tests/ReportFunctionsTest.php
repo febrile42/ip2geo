@@ -258,4 +258,102 @@ class ReportFunctionsTest extends TestCase
         $result = compute_abuseipdb_callout([]);
         $this->assertNull($result);
     }
+
+    // ── get_script_lines ───────────────────────────────────────────────────────
+
+    private function makeReport(array $ips = ['1.2.3.4', '5.6.7.8'], array $cidrs = ['10.0.0.0/8', '192.168.0.0/16']): array
+    {
+        return [
+            'block_ips'  => $ips,
+            'top25'      => array_map(fn($ip) => ['ip' => $ip], $ips),
+            'asn_ranges' => empty($cidrs) ? [] : [['cidrs' => $cidrs, 'total' => count($cidrs)]],
+        ];
+    }
+
+    public function testShUfwCommands(): void
+    {
+        $lines = get_script_lines('sh-ufw', $this->makeReport(), 'testtoken');
+        $this->assertStringContainsString('#!/bin/bash', implode("\n", $lines));
+        $this->assertContains('ufw deny from 1.2.3.4 to any', $lines);
+        $this->assertContains('ufw deny from 5.6.7.8 to any', $lines);
+    }
+
+    public function testShIptablesCommands(): void
+    {
+        $lines = get_script_lines('sh-iptables', $this->makeReport(), 'tok');
+        $this->assertContains('iptables -A INPUT -s 1.2.3.4 -j DROP', $lines);
+        $this->assertContains('iptables -A INPUT -s 5.6.7.8 -j DROP', $lines);
+    }
+
+    public function testShUfwRangesCommands(): void
+    {
+        $lines = get_script_lines('sh-ufw-ranges', $this->makeReport(), 'tok');
+        $this->assertContains('ufw deny from 10.0.0.0/8 to any', $lines);
+        $this->assertContains('ufw deny from 192.168.0.0/16 to any', $lines);
+    }
+
+    public function testShIptablesRangesCommands(): void
+    {
+        $lines = get_script_lines('sh-iptables-ranges', $this->makeReport(), 'tok');
+        $this->assertContains('iptables -A INPUT -s 10.0.0.0/8 -j DROP', $lines);
+    }
+
+    public function testNginxIpsFormat(): void
+    {
+        $lines = get_script_lines('nginx-ips', $this->makeReport(), 'tok');
+        $joined = implode("\n", $lines);
+        $this->assertStringContainsString('default 0;', $joined);
+        $this->assertContains('1.2.3.4 1;', $lines);
+    }
+
+    public function testNginxRangesFormat(): void
+    {
+        $lines = get_script_lines('nginx-ranges', $this->makeReport(), 'tok');
+        $this->assertContains('10.0.0.0/8 1;', $lines);
+    }
+
+    public function testTxtRangesFormat(): void
+    {
+        $lines = get_script_lines('txt-ranges', $this->makeReport(), 'tok');
+        $this->assertContains('10.0.0.0/8', $lines);
+        $this->assertContains('192.168.0.0/16', $lines);
+        $this->assertStringNotContainsString('#!/bin/bash', implode("\n", $lines));
+    }
+
+    public function testFallsBackToTop25WhenBlockIpsEmpty(): void
+    {
+        $report = [
+            'block_ips'  => [],
+            'top25'      => [['ip' => '9.9.9.9'], ['ip' => '8.8.8.8']],
+            'asn_ranges' => [],
+        ];
+        $lines = get_script_lines('sh-ufw', $report, 'tok');
+        $this->assertContains('ufw deny from 9.9.9.9 to any', $lines);
+    }
+
+    public function testRangeFormatWithNoRangesReturnsOnlyPreamble(): void
+    {
+        $report = $this->makeReport(['1.2.3.4'], []);
+        $lines  = get_script_lines('sh-ufw-ranges', $report, 'tok');
+        $joined = implode("\n", $lines);
+        $this->assertStringContainsString('#!/bin/bash', $joined);
+        $this->assertStringNotContainsString('ufw deny from', $joined);
+    }
+
+    public function testInvalidFormatReturnsEmpty(): void
+    {
+        $this->assertSame([], get_script_lines('invalid-format', $this->makeReport(), 'tok'));
+    }
+
+    public function testTokenAppearsInPreamble(): void
+    {
+        $lines = get_script_lines('sh-ufw', $this->makeReport(), 'mytoken123');
+        $this->assertStringContainsString('mytoken123', implode("\n", $lines));
+    }
+
+    public function testNoTrailingEmptyLines(): void
+    {
+        $lines = get_script_lines('sh-ufw', $this->makeReport(), 'tok');
+        $this->assertNotSame('', end($lines));
+    }
 }

@@ -517,112 +517,26 @@ function enrich_abuseipdb(array $ips, $con, string $api_key): array {
 // ── Script download helper ────────────────────────────────────────────────────
 // Called from both the redeemed (cached) and newly-generated paths so that
 // ?format= requests work regardless of how the token was resolved.
+// get_script_lines() lives in report_functions.php (testable pure function).
 
 function maybe_serve_script_download(array $report, string $token): void {
     if (!isset($_GET['format'])) return;
     $fmt = $_GET['format'];
-    $valid = ['sh-iptables', 'sh-ufw', 'sh-iptables-ranges', 'sh-ufw-ranges', 'nginx-ips', 'nginx-ranges', 'txt-ranges'];
-    if (!in_array($fmt, $valid, true)) return;
 
-    $ips = !empty($report['block_ips']) ? $report['block_ips'] : array_column($report['top25'], 'ip');
+    $meta = [
+        'sh-iptables'        => ['block-iptables.sh',        'text/x-sh'],
+        'sh-ufw'             => ['block-ufw.sh',             'text/x-sh'],
+        'sh-iptables-ranges' => ['block-iptables-ranges.sh', 'text/x-sh'],
+        'sh-ufw-ranges'      => ['block-ufw-ranges.sh',      'text/x-sh'],
+        'nginx-ips'          => ['block-nginx-ips.conf',     'text/plain'],
+        'nginx-ranges'       => ['block-nginx-ranges.conf',  'text/plain'],
+        'txt-ranges'         => ['cidr-ranges.txt',          'text/plain'],
+    ];
+    if (!isset($meta[$fmt])) return;
 
-    // Flatten all CIDR ranges from asn_ranges groups
-    $cidrs = [];
-    foreach ($report['asn_ranges'] ?? [] as $group) {
-        foreach ($group['cidrs'] as $cidr) {
-            $cidrs[] = $cidr;
-        }
-    }
-
-    if ($fmt === 'sh-iptables') {
-        $lines    = array_map(fn($ip) => 'iptables -A INPUT -s ' . $ip . ' -j DROP', $ips);
-        $preamble = '#!/bin/bash
-# ip2geo threat report — iptables block rules
-# Generated: ' . date('Y-m-d') . '
-# Token: ' . $token . '
-# Block ' . count($ips) . ' IPs flagged as scanning / proxy infrastructure
-
-set -euo pipefail
-';
-        $filename    = 'block-iptables.sh';
-        $content_type = 'text/x-sh';
-        $body = $preamble . implode("\n", $lines) . "\n";
-    } elseif ($fmt === 'sh-ufw') {
-        $lines    = array_map(fn($ip) => 'ufw deny from ' . $ip . ' to any', $ips);
-        $preamble = '#!/bin/bash
-# ip2geo threat report — ufw block rules
-# Generated: ' . date('Y-m-d') . '
-# Token: ' . $token . '
-# Block ' . count($ips) . ' IPs flagged as scanning / proxy infrastructure
-
-set -euo pipefail
-';
-        $filename    = 'block-ufw.sh';
-        $content_type = 'text/x-sh';
-        $body = $preamble . implode("\n", $lines) . "\n";
-    } elseif ($fmt === 'sh-iptables-ranges') {
-        $lines    = array_map(fn($cidr) => 'iptables -A INPUT -s ' . $cidr . ' -j DROP', $cidrs);
-        $preamble = '#!/bin/bash
-# ip2geo threat report — iptables block rules (ASN ranges)
-# Generated: ' . date('Y-m-d') . '
-# Token: ' . $token . '
-# Block ' . count($cidrs) . ' CIDR ranges covering scanning/VPN ASN prefixes
-
-set -euo pipefail
-';
-        $filename    = 'block-iptables-ranges.sh';
-        $content_type = 'text/x-sh';
-        $body = $preamble . implode("\n", $lines) . "\n";
-    } elseif ($fmt === 'sh-ufw-ranges') {
-        $lines    = array_map(fn($cidr) => 'ufw deny from ' . $cidr . ' to any', $cidrs);
-        $preamble = '#!/bin/bash
-# ip2geo threat report — ufw block rules (ASN ranges)
-# Generated: ' . date('Y-m-d') . '
-# Token: ' . $token . '
-# Block ' . count($cidrs) . ' CIDR ranges covering scanning/VPN ASN prefixes
-
-set -euo pipefail
-';
-        $filename    = 'block-ufw-ranges.sh';
-        $content_type = 'text/x-sh';
-        $body = $preamble . implode("\n", $lines) . "\n";
-    } elseif ($fmt === 'nginx-ips') {
-        $lines = array_map(fn($ip) => $ip . ' 1;', $ips);
-        $preamble = '# ip2geo threat report — nginx geo block (individual IPs)
-# Generated: ' . date('Y-m-d') . '
-# Token: ' . $token . '
-# Block ' . count($ips) . ' IPs flagged as scanning / proxy infrastructure
-# Usage: include this file inside a geo $blocked_ip { } block in nginx.conf
-
-default 0;
-';
-        $filename    = 'block-nginx-ips.conf';
-        $content_type = 'text/plain';
-        $body = $preamble . implode("\n", $lines) . "\n";
-    } elseif ($fmt === 'nginx-ranges') {
-        $lines = array_map(fn($cidr) => $cidr . ' 1;', $cidrs);
-        $preamble = '# ip2geo threat report — nginx geo block (ASN ranges)
-# Generated: ' . date('Y-m-d') . '
-# Token: ' . $token . '
-# Block ' . count($cidrs) . ' CIDR ranges covering scanning/VPN ASN prefixes
-# Usage: include this file inside a geo $blocked_ip { } block in nginx.conf
-
-default 0;
-';
-        $filename    = 'block-nginx-ranges.conf';
-        $content_type = 'text/plain';
-        $body = $preamble . implode("\n", $lines) . "\n";
-    } else { // txt-ranges
-        $preamble = '# ip2geo threat report — CIDR ranges (plain list)
-# Generated: ' . date('Y-m-d') . '
-# Token: ' . $token . '
-# ' . count($cidrs) . ' CIDR ranges covering scanning/VPN ASN prefixes
-# One range per line — paste into ipset, web firewall, or any blocklist tool
-';
-        $filename    = 'cidr-ranges.txt';
-        $content_type = 'text/plain';
-        $body = $preamble . implode("\n", $cidrs) . "\n";
-    }
+    $lines = get_script_lines($fmt, $report, $token);
+    $body  = implode("\n", $lines) . "\n";
+    [$filename, $content_type] = $meta[$fmt];
 
     header('Content-Type: ' . $content_type . '; charset=utf-8');
     header('Content-Disposition: attachment; filename="' . $filename . '"');
@@ -633,33 +547,51 @@ default 0;
 
 // ── Rendering ─────────────────────────────────────────────────────────────────
 
-function include_block_rules_tabs(string $token, bool $has_ranges): void { ?>
+function include_block_rules_tabs(string $token, bool $has_ranges, array $report): void {
+    $format_labels = [
+        'sh-iptables-ranges' => 'block-iptables-ranges.sh',
+        'sh-ufw-ranges'      => 'block-ufw-ranges.sh',
+        'nginx-ranges'       => 'block-nginx-ranges.conf',
+        'txt-ranges'         => 'cidr-ranges.txt',
+        'sh-iptables'        => 'block-iptables.sh',
+        'sh-ufw'             => 'block-ufw.sh',
+        'nginx-ips'          => 'block-nginx-ips.conf',
+    ];
+    $render = function(string $fmt) use ($token, $report, $format_labels): void {
+        $label   = $format_labels[$fmt];
+        $content = htmlspecialchars(implode("\n", get_script_lines($fmt, $report, $token)), ENT_QUOTES, 'UTF-8');
+        $href    = '/report.php?token=' . urlencode($token) . '&amp;format=' . urlencode($fmt);
+        $fid     = 'fmt-' . $fmt;
+        $label_e = htmlspecialchars($label, ENT_QUOTES, 'UTF-8');
+        ?>
+                    <div class="format-entry">
+                        <button class="format-toggle button small" data-target="<?php echo $fid; ?>" data-label="<?php echo $label_e; ?>" aria-expanded="false">&#9656; <?php echo $label_e; ?></button>
+                        <div id="<?php echo $fid; ?>" class="format-block" hidden>
+                            <div class="format-actions">
+                                <button class="copy-btn button small">&#128203; Copy</button>
+                                <a href="<?php echo $href; ?>" class="button small">&#8595; Download</a>
+                            </div>
+                            <pre class="block-script-preview"><code><?php echo $content; ?></code></pre>
+                        </div>
+                    </div>
+        <?php
+    };
+    ?>
             <div class="block-rules-tabs">
                 <div class="block-rules-tablist" role="tablist" aria-label="Block by IP or by range">
                     <div class="block-rules-tab<?php echo $has_ranges ? ' active' : ''; ?>" id="tab-by-range" role="tab" tabindex="<?php echo $has_ranges ? '0' : '-1'; ?>" aria-selected="<?php echo $has_ranges ? 'true' : 'false'; ?>" aria-controls="panel-by-range"<?php echo $has_ranges ? '' : ' aria-disabled="true" title="No ASN ranges available for this report"'; ?>>Block by Range</div>
                     <div class="block-rules-tab<?php echo $has_ranges ? '' : ' active'; ?>" id="tab-by-ip" role="tab" tabindex="0" aria-selected="<?php echo $has_ranges ? 'false' : 'true'; ?>" aria-controls="panel-by-ip">Block by IP</div>
                 </div>
                 <div id="panel-by-range" class="block-rules-panel" role="tabpanel" aria-labelledby="tab-by-range"<?php echo $has_ranges ? '' : ' style="display:none"'; ?>>
-                    <?php if ($has_ranges): ?>
-                    <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=sh-iptables-ranges"
-                       class="button small">&#8595; block-iptables-ranges.sh</a>
-                    <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=sh-ufw-ranges"
-                       class="button small">&#8595; block-ufw-ranges.sh</a>
-                    <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=nginx-ranges"
-                       class="button small">&#8595; block-nginx-ranges.conf</a>
-                    <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=txt-ranges"
-                       class="button small alt">&#8595; cidr-ranges.txt</a>
-                    <?php else: ?>
+                    <p class="cidr-explainer">Ranges cover all current and future IPs from these networks &mdash; attackers rotate IPs, ranges don&rsquo;t.</p>
+                    <?php if ($has_ranges):
+                        foreach (['sh-iptables-ranges', 'sh-ufw-ranges', 'nginx-ranges', 'txt-ranges'] as $fmt) $render($fmt);
+                    else: ?>
                     <p style="font-size:0.9em;opacity:0.5;margin:0.6em 0">No ASN ranges available for this report.</p>
                     <?php endif; ?>
                 </div>
                 <div id="panel-by-ip" class="block-rules-panel" role="tabpanel" aria-labelledby="tab-by-ip"<?php echo $has_ranges ? ' style="display:none"' : ''; ?>>
-                    <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=sh-iptables"
-                       class="button small" data-format="sh-iptables">&#8595; block-iptables.sh</a>
-                    <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=sh-ufw"
-                       class="button small" data-format="sh-ufw">&#8595; block-ufw.sh</a>
-                    <a href="/report.php?token=<?php echo urlencode($token); ?>&amp;format=nginx-ips"
-                       class="button small" data-format="nginx-ips">&#8595; block-nginx-ips.conf</a>
+                    <?php foreach (['sh-iptables', 'sh-ufw', 'nginx-ips'] as $fmt) $render($fmt); ?>
                 </div>
             </div>
 <?php }
@@ -787,24 +719,144 @@ function render_report(array $report, string $token, ?string $expires_at, array 
             </div>
             <?php endif; ?>
 
-            <?php if ($is_demo): ?>
-            <div style="background:rgba(108,184,122,0.12);border-left:3px solid #6cb87a;padding:0.8em 1em;margin-bottom:1.5em;font-size:0.9em">
-                <strong>Community Intel</strong> <span style="opacity:0.6;font-size:0.85em;margin-left:0.3em">Preview</span>
-                <p style="margin:0.4em 0 0.7em">Community Intel is available on paid reports. When you opt in, ip2geo cross-references your IPs against anonymized data from other users this week. The Community column shows how many other ip2geo reports contained the same IP &mdash; corroborating active threats and flagging escalating campaigns.</p>
-                <p style="margin:0 0 0.4em;opacity:0.85;font-size:0.9em">This is what the Community column looks like in the Top Threat Sources table:</p>
-                <table style="width:100%;font-size:0.85em;border-collapse:collapse">
-                    <thead><tr style="opacity:0.6"><th style="text-align:left;padding:0.2em 0.6em 0.2em 0;font-weight:normal">IP</th><th style="text-align:left;padding:0.2em 0.6em;font-weight:normal">Category</th><th style="text-align:left;padding:0.2em 0;font-weight:normal">Community</th></tr></thead>
-                    <tbody>
-                        <tr><td style="padding:0.15em 0.6em 0.15em 0;font-family:monospace;opacity:0.8">185.220.101.x</td><td style="padding:0.15em 0.6em">Scanning</td><td style="padding:0.15em 0">23 reports</td></tr>
-                        <tr><td style="padding:0.15em 0.6em 0.15em 0;font-family:monospace;opacity:0.8">193.32.162.x</td><td style="padding:0.15em 0.6em">VPN/Proxy</td><td style="padding:0.15em 0">8 reports</td></tr>
-                        <tr><td style="padding:0.15em 0.6em 0.15em 0;font-family:monospace;opacity:0.8">192.168.x.x</td><td style="padding:0.15em 0.6em">Residential</td><td style="padding:0.15em 0"><span style="opacity:0.4">&mdash;</span></td></tr>
-                    </tbody>
-                </table>
-                <p style="font-size:0.85em;opacity:0.6;margin:0.6em 0 0.75em">Residential IPs are never collected. 52-week retention. <a href="/privacy.php" target="_blank" rel="noopener noreferrer">Privacy policy</a></p>
-                <a href="/" class="button small">Try with your own IPs &rarr;</a>
+            <style>
+                .report-header-row {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    gap: 1em;
+                    margin-bottom: 0.5em;
+                }
+                .report-header-row h2 { margin: 0; }
+                .report-header-stats { opacity: 0.6; font-size: 0.85em; margin: 0; white-space: nowrap; }
+                .report-verdict-row { margin-top: 0.6em; }
+                .report-verdict-row .asn-verdict { margin: 0; }
+                @media (max-width: 736px) {
+                    .report-header-row { flex-direction: column; align-items: flex-start; gap: 0.25em; }
+                    .print-report-btn { display: none; }
+                }
+                .report-email-notice {
+                    border-radius: 4px;
+                    padding: 0.7em 1em;
+                    margin-bottom: 1.5em;
+                    font-size: 0.9em;
+                    display: flex;
+                    align-items: flex-start;
+                    gap: 0.75em;
+                    flex-wrap: wrap;
+                }
+                .report-email-notice.sent {
+                    background: rgba(80,180,120,0.12);
+                    border-left: 3px solid #50b478;
+                }
+                .report-email-notice.save {
+                    background: rgba(224,168,90,0.12);
+                    border-left: 3px solid #e0a85a;
+                }
+                .report-link-row {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5em;
+                    margin-top: 0.5em;
+                    flex-wrap: wrap;
+                    width: 100%;
+                }
+                .report-link-input {
+                    font-family: monospace;
+                    font-size: 0.85em;
+                    background: rgba(255,255,255,0.06);
+                    border: 1px solid rgba(255,255,255,0.15);
+                    color: inherit;
+                    padding: 0.3em 0.6em;
+                    border-radius: 3px;
+                    flex: 1;
+                    min-width: 0;
+                }
+                .report-stat-strip {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 0.5em;
+                    margin: 0.75em 0 1.25em;
+                }
+                .stat-pill {
+                    font-size: 0.82em;
+                    opacity: 0.7;
+                    background: rgba(255,255,255,0.06);
+                    border: 1px solid rgba(255,255,255,0.1);
+                    border-radius: 3px;
+                    padding: 0.2em 0.6em;
+                    white-space: nowrap;
+                }
+                .report-row-hidden { display: none; }
+                #show-all-rows-btn { margin-top: 0.75em; }
+                @media print {
+                    .report-row-hidden { display: table-row !important; }
+                    #show-all-rows-btn { display: none; }
+                    #report-table-summary { display: none; }
+                }
+            </style>
+
+            <?php
+            // Pre-compute values needed for stat strip (also used below)
+            $has_ranges = !empty($report['asn_ranges']);
+            $asn_count  = count($report['asn_ranges'] ?? []);
+            $abuse_data = compute_abuseipdb_callout($top25);
+            ?>
+
+            <!-- Row 1: Title + stats -->
+            <div class="report-header-row">
+                <h2>Threat Report</h2>
+                <p class="report-header-stats">
+                    <?php echo number_format($total); ?> IPs &middot;
+                    <?php echo htmlspecialchars(date('F j, Y', strtotime($gen_date)), ENT_QUOTES, 'UTF-8'); ?>
+                </p>
             </div>
+
+            <!-- Row 2: Verdict badge + Print/Copy buttons -->
+            <div class="report-header-row report-verdict-row">
+                <p class="asn-verdict asn-verdict--<?php echo $verdict_lc; ?>">
+                    <?php echo $verdict; ?> THREAT
+                </p>
+                <div style="display:flex;gap:0.5em;align-items:center">
+                    <button onclick="window.print()" class="button small alt print-report-btn" style="white-space:nowrap">Print / Save as PDF</button>
+                    <button id="copy-link-header-btn" class="button small alt" style="white-space:nowrap">Copy link</button>
+                </div>
+            </div>
+
+            <!-- Stat strip -->
+            <div class="report-stat-strip">
+                <span class="stat-pill"><?php echo number_format($total); ?> IPs analyzed</span>
+                <?php if ((int)($report['scanning_pct'] ?? 0) > 0): ?>
+                <span class="stat-pill"><?php echo (int)$report['scanning_pct']; ?>% scanning/proxy</span>
+                <?php endif; ?>
+                <?php if ($asn_count > 0): ?>
+                <span class="stat-pill"><?php echo $asn_count; ?> ASN<?php echo $asn_count === 1 ? '' : 's'; ?></span>
+                <?php endif; ?>
+                <?php if ($abuse_data !== null): ?>
+                <span class="stat-pill">AbuseIPDB avg <?php echo $abuse_data['avg']; ?>%</span>
+                <?php endif; ?>
+            </div>
+
+            <?php if ($verdict === 'LOW'): ?>
+            <p style="opacity:0.7;font-size:0.9em">No high-confidence threats detected. Scores below confirm low risk.</p>
+            <?php endif; ?>
+            <!-- Threat narrative (supersedes verdict_text when present) -->
+            <?php
+            $narrative = generate_threat_narrative($verdict, $report['asn_ranges'] ?? [], (int)($report['scanning_pct'] ?? 0));
+            if ($narrative !== ''): ?>
+            <p><?php echo $narrative; ?></p>
+            <?php else: ?>
+            <p><?php echo htmlspecialchars($verdict_text, ENT_QUOTES, 'UTF-8'); ?></p>
             <?php endif; ?>
 
+            <!-- AbuseIPDB callout -->
+            <?php if ($abuse_data !== null): ?>
+            <p class="abuseipdb-callout">
+                AbuseIPDB independently verified <strong><?php echo $abuse_data['count']; ?></strong> of <?php echo $abuse_data['total']; ?> top IPs as known attackers (average confidence: <strong><?php echo $abuse_data['avg']; ?>%</strong>).
+            </p>
+            <?php endif; ?>
+
+            <!-- Community Intel CTA (paid reports only — demo preview stays at bottom) -->
             <?php if (!$is_demo && ($data_consent === null || $data_consent === 0)): ?>
             <div id="community-consent-banner" class="community-intel-banner" style="background:rgba(108,184,122,0.12);border-left:3px solid #6cb87a;padding:0.8em 1em;margin-bottom:1.5em;font-size:0.9em">
                 <?php if ($data_consent === 0): ?>
@@ -903,127 +955,13 @@ function render_report(array $report, string $token, ?string $expires_at, array 
             </div>
             <?php endif; ?>
 
-            <style>
-                .report-header-row {
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                    gap: 1em;
-                    margin-bottom: 0.5em;
-                }
-                .report-header-row h2 { margin: 0; }
-                .report-header-stats { opacity: 0.6; font-size: 0.85em; margin: 0; white-space: nowrap; }
-                .report-verdict-row { margin-top: 0.6em; }
-                .report-verdict-row .asn-verdict { margin: 0; }
-                @media (max-width: 736px) {
-                    .report-header-row { flex-direction: column; align-items: flex-start; gap: 0.25em; }
-                    .print-report-btn { display: none; }
-                }
-                .report-email-notice {
-                    border-radius: 4px;
-                    padding: 0.7em 1em;
-                    margin-bottom: 1.5em;
-                    font-size: 0.9em;
-                    display: flex;
-                    align-items: flex-start;
-                    gap: 0.75em;
-                    flex-wrap: wrap;
-                }
-                .report-email-notice.sent {
-                    background: rgba(80,180,120,0.12);
-                    border-left: 3px solid #50b478;
-                }
-                .report-email-notice.save {
-                    background: rgba(224,168,90,0.12);
-                    border-left: 3px solid #e0a85a;
-                }
-                .report-link-row {
-                    display: flex;
-                    align-items: center;
-                    gap: 0.5em;
-                    margin-top: 0.5em;
-                    flex-wrap: wrap;
-                    width: 100%;
-                }
-                .report-link-input {
-                    font-family: monospace;
-                    font-size: 0.85em;
-                    background: rgba(255,255,255,0.06);
-                    border: 1px solid rgba(255,255,255,0.15);
-                    color: inherit;
-                    padding: 0.3em 0.6em;
-                    border-radius: 3px;
-                    flex: 1;
-                    min-width: 0;
-                }
-            </style>
-
-            <!-- Row 1: Title + stats -->
-            <div class="report-header-row">
-                <h2>Threat Report</h2>
-                <p class="report-header-stats">
-                    <?php echo number_format($total); ?> IPs &middot;
-                    <?php echo htmlspecialchars(date('F j, Y', strtotime($gen_date)), ENT_QUOTES, 'UTF-8'); ?>
-                </p>
-            </div>
-
-            <!-- Row 2: Verdict badge + Print/Copy buttons -->
-            <div class="report-header-row report-verdict-row">
-                <p class="asn-verdict asn-verdict--<?php echo $verdict_lc; ?>">
-                    <?php echo $verdict; ?> THREAT
-                </p>
-                <div style="display:flex;gap:0.5em;align-items:center">
-                    <button onclick="window.print()" class="button small alt print-report-btn" style="white-space:nowrap">Print / Save as PDF</button>
-                    <button id="copy-link-header-btn" class="button small alt" style="white-space:nowrap">Copy link</button>
-                </div>
-            </div>
-
-            <?php if ($verdict === 'LOW'): ?>
-            <p style="opacity:0.7;font-size:0.9em">No high-confidence threats detected. Scores below confirm low risk.</p>
-            <?php endif; ?>
-            <!-- Threat narrative (supersedes verdict_text when present) -->
-            <?php
-            $narrative = generate_threat_narrative($verdict, $report['asn_ranges'] ?? [], (int)($report['scanning_pct'] ?? 0));
-            if ($narrative !== ''): ?>
-            <p><?php echo $narrative; ?></p>
-            <?php else: ?>
-            <p><?php echo htmlspecialchars($verdict_text, ENT_QUOTES, 'UTF-8'); ?></p>
-            <?php endif; ?>
-
-            <!-- AbuseIPDB callout -->
-            <?php
-            $abuse_data = compute_abuseipdb_callout($top25);
-            if ($abuse_data !== null): ?>
-            <p class="abuseipdb-callout">
-                AbuseIPDB independently verified <strong><?php echo $abuse_data['count']; ?></strong> of <?php echo $abuse_data['total']; ?> top IPs as known attackers (average confidence: <strong><?php echo $abuse_data['avg']; ?>%</strong>).
-            </p>
-            <?php endif; ?>
-
-            <!-- Analysis scope callout -->
-            <?php if (!empty($report['asn_ranges'])): ?>
-            <p style="font-size:0.85em;opacity:0.65">
-                Analyzed <?php echo number_format($total); ?> IPs, verified top threats against AbuseIPDB, extracted CIDR prefixes from <?php echo count($report['asn_ranges']); ?> ASN<?php echo count($report['asn_ranges']) === 1 ? '' : 's'; ?>.
-            </p>
-            <?php endif; ?>
-
-            <!-- What to do next -->
-            <?php $has_ranges = !empty($report['asn_ranges']); ?>
-            <div class="next-steps">
-                <h3>What to do next</h3>
-                <ol>
-                    <?php if ($has_ranges): ?>
-                    <li>Download a block script below, or copy the CIDR ranges and add them to your firewall directly — blocking by range is more resilient as IPs rotate.</li>
-                    <?php else: ?>
-                    <li>Download a block script below and run it on your server.</li>
-                    <?php endif; ?>
-                    <li>Verify in your firewall logs that traffic from these sources drops within a few minutes.</li>
-                    <li>Check back in 48 hours: <a href="/">submit new logs</a> to confirm the blocking worked.</li>
-                </ol>
-            </div>
-
-            <!-- ASN Ranges + Block Rules: side-by-side when ranges exist, Block Rules full-width otherwise -->
+            <!-- ASN Ranges + Block Rules layout:
+                 ≥3 ASNs → two-column grid (sticky right col floats alongside long list)
+                 <3 ASNs → full-width stack (avoids empty space next to short list)
+                 no ranges → block rules full-width only -->
             <div id="block-rules"></div>
-            <?php if ($has_ranges): ?>
+            <?php $use_columns = $has_ranges && $asn_count >= 3; ?>
+            <?php if ($use_columns): ?>
             <div class="ranges-rules-grid">
                 <div class="ranges-col">
                     <h3>ASN Ranges to Block</h3>
@@ -1052,16 +990,66 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                     <?php endforeach; ?>
                 </div>
                 <div class="rules-col">
-                    <h3>Block Rules</h3>
-                    <p style="font-size:0.9em;opacity:0.7;margin-bottom:1em">
-                        Range-based rules stay valid as IPs rotate. Download a ready-to-run script, or plain text for paste-in to a web firewall or ipset.
+            <?php else: ?>
+            <?php if ($has_ranges): ?>
+            <div class="ranges-stack">
+                <h3>ASN Ranges to Block</h3>
+                <?php foreach ($report['asn_ranges'] as $group):
+                    $shown = count($group['cidrs']);
+                    $total_ranges = $group['total'];
+                ?>
+                <div class="asn-range-group">
+                    <div class="asn-range-header">
+                        <strong><?php echo htmlspecialchars($group['asn'], ENT_QUOTES, 'UTF-8'); ?></strong>
+                        <?php if ($group['org']): ?>
+                        <span class="asn-range-org"><?php echo htmlspecialchars($group['org'], ENT_QUOTES, 'UTF-8'); ?></span>
+                        <?php endif; ?>
+                        <?php if ($total_ranges > $shown): ?>
+                        <span class="asn-range-count"><?php echo $shown; ?> of <?php echo number_format($total_ranges); ?> &mdash; all in download</span>
+                        <?php else: ?>
+                        <span class="asn-range-count"><?php echo $total_ranges; ?> range<?php echo $total_ranges === 1 ? '' : 's'; ?></span>
+                        <?php endif; ?>
+                    </div>
+                    <div class="cidr-chips">
+                        <?php foreach ($group['cidrs'] as $cidr): ?>
+                        <span class="cidr-chip"><?php echo htmlspecialchars($cidr, ENT_QUOTES, 'UTF-8'); ?></span>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+                <?php endforeach; ?>
+            </div>
+            <?php endif; ?>
+            <div class="block-rules-fullwidth">
+            <?php endif; ?>
+                    <h3 class="block-rules-heading">Block Rules</h3>
+                    <p style="font-size:0.9em;opacity:0.7;margin-bottom:0.5em">
+                        Click a format to preview, then copy or download.
                     </p>
-                    <?php include_block_rules_tabs($token, $has_ranges); ?>
+                    <?php include_block_rules_tabs($token, $has_ranges, $report); ?>
+                    <div class="hosting-callout" style="margin-top:1.25em">
+                        <strong>No console/SSH access?</strong> Block IPs directly from your hosting panel instead:
+                        <ul class="hosting-callout-links">
+                            <li><a href="https://docs.cpanel.net/cpanel/security/ip-blocker/" target="_blank" rel="noopener">cPanel IP Blocker</a> <span class="hosting-note">(Namecheap, GoDaddy, Bluehost, most shared hosts)</span></li>
+                            <li><a href="https://www.plesk.com/kb/support/how-to-block-an-ip-address-in-plesk-firewall/" target="_blank" rel="noopener">Plesk IP Ban</a> <span class="hosting-note">(another common shared host panel)</span></li>
+                            <li><a href="https://developers.cloudflare.com/waf/tools/ip-access-rules/" target="_blank" rel="noopener">Cloudflare IP Access Rules</a> <span class="hosting-note">(if your site is proxied through Cloudflare)</span></li>
+                            <li><a href="https://docs.digitalocean.com/products/networking/firewalls/" target="_blank" rel="noopener">DigitalOcean Cloud Firewall</a></li>
+                            <li><a href="https://docs.hetzner.com/cloud/firewalls/overview/" target="_blank" rel="noopener">Hetzner Cloud Firewall</a></li>
+                        </ul>
+                        <p class="hosting-note" style="margin:0.6em 0 0">
+                            <strong>What to paste:</strong>
+                            <?php if ($has_ranges): ?>
+                            <span id="hosting-paste-ranges">Expand <strong>cidr-ranges.txt</strong> above and copy the list &mdash; one range per line, works with all panels above. If your panel only accepts single IPs, copy them from the Top Threat Sources table instead.</span>
+                            <span id="hosting-paste-ips" style="display:none">Copy the IPs you want to block from the Top Threat Sources table below and paste them one per line into your panel.</span>
+                            <?php else: ?>
+                            Copy the IPs you want to block from the Top Threat Sources table below and paste them one per line into your panel.
+                            <?php endif; ?>
+                        </p>
+                    </div>
+            <?php if ($use_columns): ?>
                 </div>
             </div>
             <?php else: ?>
-            <h3 class="block-rules-heading">Block Rules</h3>
-            <?php include_block_rules_tabs($token, $has_ranges); ?>
+            </div>
             <?php endif; ?>
             <script>
             function switchBlockTab(name) {
@@ -1073,6 +1061,12 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                 document.querySelectorAll('.block-rules-panel').forEach(function(p) {
                     p.style.display = p.id === 'panel-' + name ? '' : 'none';
                 });
+                var pasteRanges = document.getElementById('hosting-paste-ranges');
+                var pasteIPs = document.getElementById('hosting-paste-ips');
+                if (pasteRanges && pasteIPs) {
+                    pasteRanges.style.display = name === 'by-range' ? '' : 'none';
+                    pasteIPs.style.display = name === 'by-ip' ? '' : 'none';
+                }
                 window.umami && umami.track('report_tab_switch', { tab: name });
             }
             document.querySelectorAll('.block-rules-tab:not(.brt-disabled)').forEach(function(t) {
@@ -1081,11 +1075,57 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); switchBlockTab(this.id.replace('tab-', '')); }
                 });
             });
-            // Track range-panel downloads (plain <a> tags, no JS intercept)
-            document.querySelectorAll('#panel-by-range a.button[href]').forEach(function(a) {
+            // Track downloads via format-actions links
+            document.querySelectorAll('.format-actions a.button[href]').forEach(function(a) {
                 a.addEventListener('click', function() {
                     var fmt = (this.getAttribute('href') || '').replace(/.*format=/, '');
-                    window.umami && umami.track('report_download', { format: fmt, scope: 'by-range' });
+                    var scope = this.closest('#panel-by-range') ? 'by-range' : 'by-ip';
+                    window.umami && umami.track('report_download', { format: fmt, scope: scope });
+                });
+            });
+            // Format-toggle: accordion — one open at a time within each tab panel
+            document.querySelectorAll('.format-toggle').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    var target = document.getElementById(btn.dataset.target);
+                    var opening = target.hidden;
+                    // Close all siblings in the same panel first
+                    var panel = btn.closest('.block-rules-panel');
+                    panel.querySelectorAll('.format-toggle').forEach(function(other) {
+                        var otherTarget = document.getElementById(other.dataset.target);
+                        otherTarget.hidden = true;
+                        other.setAttribute('aria-expanded', 'false');
+                        other.innerHTML = '&#9656; ' + other.dataset.label;
+                    });
+                    // Then open the clicked one (unless it was already open)
+                    if (opening) {
+                        target.hidden = false;
+                        btn.setAttribute('aria-expanded', 'true');
+                        btn.innerHTML = '&#9662; ' + btn.dataset.label;
+                        window.umami && umami.track('report_script_preview', { format: btn.dataset.target.replace('fmt-', '') });
+                    }
+                });
+            });
+            // Copy button: copy script content to clipboard
+            document.querySelectorAll('.copy-btn').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    var pre = btn.closest('.format-block').querySelector('pre');
+                    var text = pre.textContent;
+                    if (navigator.clipboard && window.isSecureContext) {
+                        navigator.clipboard.writeText(text).then(function() {
+                            btn.textContent = 'Copied!';
+                            setTimeout(function() { btn.textContent = 'Copy'; }, 2000);
+                        });
+                    } else {
+                        var sel = window.getSelection();
+                        var range = document.createRange();
+                        range.selectNodeContents(pre);
+                        sel.removeAllRanges();
+                        sel.addRange(range);
+                        document.execCommand('copy');
+                        sel.removeAllRanges();
+                        btn.textContent = 'Copied!';
+                        setTimeout(function() { btn.textContent = 'Copy'; }, 2000);
+                    }
                 });
             });
             </script>
@@ -1194,9 +1234,10 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                     var checkedCtries = {};
                     document.querySelectorAll('.report-filter-country:checked').forEach(function(cb)  { checkedCtries[cb.value] = true; });
 
-                    // Filter top-25 table rows; track visible count
+                    // Filter top-25 table rows; track visible count (skip collapsed rows)
                     var visibleRows = 0;
                     document.querySelectorAll('.report-table tbody tr').forEach(function(row) {
+                        if (row.classList.contains('report-row-hidden')) return;
                         var cat = row.dataset.category || '';
                         var cc  = row.dataset.country  || '';
                         var catOk  = !allCatChips[cat]  || checkedCats[cat];
@@ -1320,13 +1361,14 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                     </tr>
                 </thead>
                 <tbody>
-                <?php foreach ($top25 as $entry):
+                <?php foreach ($top25 as $i => $entry):
                     $cat = $entry['classification'] ?? 'unknown';
                     $score = $entry['abuse_score'] ?? null;
                     $freq = $entry['freq'] ?? 1;
                     $asn_org_full = ($entry['asn'] ?? '') . ($entry['asn'] && ($entry['asn_org'] ?? '') ? ' ' : '') . ($entry['asn_org'] ?? '');
+                    $row_class = $i >= 10 ? ' class="report-row-hidden"' : '';
                 ?>
-                    <tr data-category="<?php echo htmlspecialchars($cat, ENT_QUOTES, 'UTF-8'); ?>" data-country="<?php echo htmlspecialchars($entry['country'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
+                    <tr<?php echo $row_class; ?> data-category="<?php echo htmlspecialchars($cat, ENT_QUOTES, 'UTF-8'); ?>" data-country="<?php echo htmlspecialchars($entry['country'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
                         <td style="font-family:monospace"><?php echo htmlspecialchars($entry['ip'] ?? '', ENT_QUOTES, 'UTF-8'); ?></td>
                         <td class="cell-asn-org" title="<?php echo htmlspecialchars($asn_org_full, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($asn_org_full, ENT_QUOTES, 'UTF-8'); ?></td>
                         <td class="asn-category asn-category--<?php echo htmlspecialchars($cat, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($cat, ENT_QUOTES, 'UTF-8'); ?></td>
@@ -1349,6 +1391,18 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                 </tbody>
             </table>
             </div>
+            <?php if (count($top25) > 10): ?>
+            <button id="show-all-rows-btn" class="button small alt">Show all <?php echo count($top25); ?> IPs</button>
+            <script>
+            document.getElementById('show-all-rows-btn').addEventListener('click', function() {
+                document.querySelectorAll('.report-row-hidden').forEach(function(r) { r.classList.remove('report-row-hidden'); });
+                this.style.display = 'none';
+                var countEl = document.getElementById('report-table-count');
+                var totalEl = document.getElementById('report-table-total');
+                if (countEl && totalEl) countEl.textContent = totalEl.textContent;
+            });
+            </script>
+            <?php endif; ?>
             <p style="font-size:0.8em;opacity:0.6">
                 Top 25 by weighted frequency (scanning/VPN weighted 2&times;). Hits = times
                 this IP appeared in your submitted log. AbuseIPDB score 0–100; a score of 0
@@ -1364,6 +1418,25 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                 <a href="/intel.php" target="_blank" rel="noopener noreferrer">Download the community block list &rarr;</a>
             </p>
             <?php endif; ?>
+            <?php endif; ?>
+
+            <!-- Community Intel demo preview (paid CTA moved above block rules) -->
+            <?php if ($is_demo): ?>
+            <div style="background:rgba(108,184,122,0.12);border-left:3px solid #6cb87a;padding:0.8em 1em;margin-bottom:1.5em;font-size:0.9em">
+                <strong>Community Intel</strong> <span style="opacity:0.6;font-size:0.85em;margin-left:0.3em">Preview</span>
+                <p style="margin:0.4em 0 0.7em">Community Intel is available on paid reports. When you opt in, ip2geo cross-references your IPs against anonymized data from other users this week. The Community column shows how many other ip2geo reports contained the same IP &mdash; corroborating active threats and flagging escalating campaigns.</p>
+                <p style="margin:0 0 0.4em;opacity:0.85;font-size:0.9em">This is what the Community column looks like in the Top Threat Sources table:</p>
+                <table style="width:100%;font-size:0.85em;border-collapse:collapse">
+                    <thead><tr style="opacity:0.6"><th style="text-align:left;padding:0.2em 0.6em 0.2em 0;font-weight:normal">IP</th><th style="text-align:left;padding:0.2em 0.6em;font-weight:normal">Category</th><th style="text-align:left;padding:0.2em 0;font-weight:normal">Community</th></tr></thead>
+                    <tbody>
+                        <tr><td style="padding:0.15em 0.6em 0.15em 0;font-family:monospace;opacity:0.8">185.220.101.x</td><td style="padding:0.15em 0.6em">Scanning</td><td style="padding:0.15em 0">23 reports</td></tr>
+                        <tr><td style="padding:0.15em 0.6em 0.15em 0;font-family:monospace;opacity:0.8">193.32.162.x</td><td style="padding:0.15em 0.6em">VPN/Proxy</td><td style="padding:0.15em 0">8 reports</td></tr>
+                        <tr><td style="padding:0.15em 0.6em 0.15em 0;font-family:monospace;opacity:0.8">192.168.x.x</td><td style="padding:0.15em 0.6em">Residential</td><td style="padding:0.15em 0"><span style="opacity:0.4">&mdash;</span></td></tr>
+                    </tbody>
+                </table>
+                <p style="font-size:0.85em;opacity:0.6;margin:0.6em 0 0.75em">Residential IPs are never collected. 52-week retention. <a href="/privacy.php" target="_blank" rel="noopener noreferrer">Privacy policy</a></p>
+                <a href="/" class="button small">Try with your own IPs &rarr;</a>
+            </div>
             <?php endif; ?>
 
             <!-- Share link + expiry -->
