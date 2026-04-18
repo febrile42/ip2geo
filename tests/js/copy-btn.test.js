@@ -25,15 +25,56 @@ function buildFormatBlock(fmt = 'sh-ufw', scriptText = 'ufw deny from 1.2.3.4 to
   `;
 }
 
-// Attach the format-toggle handler (mirrors production JS)
+// Build two format blocks inside a shared panel (for accordion tests)
+function buildTwoFormatBlocks() {
+  document.body.innerHTML = `
+    <div class="block-rules-panel">
+      <div class="format-entry">
+        <button class="format-toggle button small"
+                data-target="fmt-sh-ufw"
+                data-label="block-ufw.sh"
+                aria-expanded="false">&#9656; block-ufw.sh</button>
+        <div id="fmt-sh-ufw" class="format-block" hidden>
+          <div class="format-actions">
+            <button class="copy-btn button small">&#128203; Copy</button>
+          </div>
+          <pre class="block-script-preview"><code>ufw deny from 1.2.3.4 to any</code></pre>
+        </div>
+      </div>
+      <div class="format-entry">
+        <button class="format-toggle button small"
+                data-target="fmt-sh-iptables"
+                data-label="block-iptables.sh"
+                aria-expanded="false">&#9656; block-iptables.sh</button>
+        <div id="fmt-sh-iptables" class="format-block" hidden>
+          <div class="format-actions">
+            <button class="copy-btn button small">&#128203; Copy</button>
+          </div>
+          <pre class="block-script-preview"><code>iptables -A INPUT -s 1.2.3.4 -j DROP</code></pre>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// Attach the format-toggle handler — accordion: one open at a time per panel
 function attachToggleHandlers() {
   document.querySelectorAll('.format-toggle').forEach(function (btn) {
     btn.addEventListener('click', function () {
       var target = document.getElementById(btn.dataset.target);
-      var showing = target.hidden;
-      target.hidden = !showing;
-      btn.setAttribute('aria-expanded', showing ? 'true' : 'false');
-      btn.innerHTML = (showing ? '&#9662; ' : '&#9656; ') + btn.dataset.label;
+      var opening = target.hidden;
+      var panel = btn.closest('.block-rules-panel') || btn.closest('.format-entry').parentElement;
+      panel.querySelectorAll('.format-toggle').forEach(function (other) {
+        var otherTarget = document.getElementById(other.dataset.target);
+        otherTarget.hidden = true;
+        other.setAttribute('aria-expanded', 'false');
+        other.innerHTML = '&#9656; ' + other.dataset.label;
+      });
+      if (opening) {
+        target.hidden = false;
+        btn.setAttribute('aria-expanded', 'true');
+        btn.innerHTML = '&#9662; ' + btn.dataset.label;
+      }
     });
   });
 }
@@ -68,20 +109,32 @@ function attachCopyHandlers() {
 
 describe('format-toggle', () => {
   beforeEach(() => {
-    buildFormatBlock();
+    // Single block wrapped in a panel so accordion scoping works
+    document.body.innerHTML = `
+      <div class="block-rules-panel">
+        <div class="format-entry">
+          <button class="format-toggle button small"
+                  data-target="fmt-sh-ufw"
+                  data-label="block-ufw.sh"
+                  aria-expanded="false">&#9656; block-ufw.sh</button>
+          <div id="fmt-sh-ufw" class="format-block" hidden>
+            <div class="format-actions">
+              <button class="copy-btn button small">&#128203; Copy</button>
+            </div>
+            <pre class="block-script-preview"><code>ufw deny from 1.2.3.4 to any</code></pre>
+          </div>
+        </div>
+      </div>`;
     attachToggleHandlers();
   });
 
   test('block is hidden initially', () => {
-    const block = document.getElementById('fmt-sh-ufw');
-    expect(block.hidden).toBe(true);
+    expect(document.getElementById('fmt-sh-ufw').hidden).toBe(true);
   });
 
   test('first click reveals the block', () => {
-    const btn = document.querySelector('.format-toggle');
-    const block = document.getElementById('fmt-sh-ufw');
-    btn.click();
-    expect(block.hidden).toBe(false);
+    document.querySelector('.format-toggle').click();
+    expect(document.getElementById('fmt-sh-ufw').hidden).toBe(false);
   });
 
   test('sets aria-expanded=true when opened', () => {
@@ -97,6 +150,30 @@ describe('format-toggle', () => {
     btn.click();
     expect(block.hidden).toBe(true);
     expect(btn.getAttribute('aria-expanded')).toBe('false');
+  });
+});
+
+describe('format-toggle: accordion', () => {
+  beforeEach(() => {
+    buildTwoFormatBlocks();
+    attachToggleHandlers();
+  });
+
+  test('opening second format closes first', () => {
+    const [btn1, btn2] = document.querySelectorAll('.format-toggle');
+    btn1.click();
+    expect(document.getElementById('fmt-sh-ufw').hidden).toBe(false);
+    btn2.click();
+    expect(document.getElementById('fmt-sh-ufw').hidden).toBe(true);
+    expect(document.getElementById('fmt-sh-iptables').hidden).toBe(false);
+  });
+
+  test('clicking open format closes it (toggle off)', () => {
+    const btn1 = document.querySelector('.format-toggle');
+    btn1.click();
+    btn1.click();
+    expect(document.getElementById('fmt-sh-ufw').hidden).toBe(true);
+    expect(btn1.getAttribute('aria-expanded')).toBe('false');
   });
 });
 

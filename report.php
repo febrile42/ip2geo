@@ -1026,15 +1026,24 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                     window.umami && umami.track('report_download', { format: fmt, scope: scope });
                 });
             });
-            // Format-toggle: reveal/hide inline script preview
+            // Format-toggle: accordion — one open at a time within each tab panel
             document.querySelectorAll('.format-toggle').forEach(function(btn) {
                 btn.addEventListener('click', function() {
                     var target = document.getElementById(btn.dataset.target);
-                    var showing = target.hidden;
-                    target.hidden = !showing;
-                    btn.setAttribute('aria-expanded', showing ? 'true' : 'false');
-                    btn.innerHTML = (showing ? '&#9662; ' : '&#9656; ') + btn.dataset.label;
-                    if (showing) {
+                    var opening = target.hidden;
+                    // Close all siblings in the same panel first
+                    var panel = btn.closest('.block-rules-panel');
+                    panel.querySelectorAll('.format-toggle').forEach(function(other) {
+                        var otherTarget = document.getElementById(other.dataset.target);
+                        otherTarget.hidden = true;
+                        other.setAttribute('aria-expanded', 'false');
+                        other.innerHTML = '&#9656; ' + other.dataset.label;
+                    });
+                    // Then open the clicked one (unless it was already open)
+                    if (opening) {
+                        target.hidden = false;
+                        btn.setAttribute('aria-expanded', 'true');
+                        btn.innerHTML = '&#9662; ' + btn.dataset.label;
                         window.umami && umami.track('report_script_preview', { format: btn.dataset.target.replace('fmt-', '') });
                     }
                 });
