@@ -36,7 +36,9 @@
 					<section id="main" class="wrapper">
 						<div class="inner">
 							<h1 class="major">Changelog</h1>
-									<h3>3.3.0 - 2026-04-18</h3>
+									<h3>3.4.0 - 2026-04-18</h3>
+							<p>The paid report has always included ready-to-run block scripts. Turns out that&rsquo;s not very helpful if you&rsquo;ve never pasted something into a terminal. Click any format to preview the exact commands inline, copy them in one click, and follow the three-step guide below if you&rsquo;re not sure what to do next. If you don&rsquo;t have SSH access at all, there&rsquo;s a new section pointing toward your hosting panel&rsquo;s IP blocker instead.</p>
+								<h3>3.3.0 - 2026-04-18</h3>
 							<p>Wondered how people are using the free reports. Added some additional tracking &mdash; and disclosed it all in the <a href="/privacy.php">privacy policy</a> &mdash; so I can see if there are ways to make it better.</p>
 								<h3>3.2.1 - 2026-04-13</h3>
 							<p>Squashed a bug in Umami event tracking.</p>
