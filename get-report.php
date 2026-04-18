@@ -154,7 +154,8 @@ if (($_POST['action'] ?? '') === 'upgrade' && isset($_POST['upgrade_token'])) {
     try {
         $ev_con = mysqli_connect($db_host, $db_user, $db_pass, $db_name);
         if ($ev_con) {
-            $ev_sid = $_COOKIE['report_sid_' . $free_token] ?? null;
+            $ev_sid_raw = $_COOKIE['report_sid_' . $free_token] ?? null;
+            $ev_sid = ($ev_sid_raw !== null && preg_match('/^[0-9a-f]{32}$/', $ev_sid_raw)) ? $ev_sid_raw : null;
             $ev_ins = $ev_con->prepare(
                 'INSERT INTO report_events (token, event_type, session_id) VALUES (?, "checkout_started", ?)'
             );
