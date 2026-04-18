@@ -719,122 +719,6 @@ function render_report(array $report, string $token, ?string $expires_at, array 
             </div>
             <?php endif; ?>
 
-            <?php if ($is_demo): ?>
-            <div style="background:rgba(108,184,122,0.12);border-left:3px solid #6cb87a;padding:0.8em 1em;margin-bottom:1.5em;font-size:0.9em">
-                <strong>Community Intel</strong> <span style="opacity:0.6;font-size:0.85em;margin-left:0.3em">Preview</span>
-                <p style="margin:0.4em 0 0.7em">Community Intel is available on paid reports. When you opt in, ip2geo cross-references your IPs against anonymized data from other users this week. The Community column shows how many other ip2geo reports contained the same IP &mdash; corroborating active threats and flagging escalating campaigns.</p>
-                <p style="margin:0 0 0.4em;opacity:0.85;font-size:0.9em">This is what the Community column looks like in the Top Threat Sources table:</p>
-                <table style="width:100%;font-size:0.85em;border-collapse:collapse">
-                    <thead><tr style="opacity:0.6"><th style="text-align:left;padding:0.2em 0.6em 0.2em 0;font-weight:normal">IP</th><th style="text-align:left;padding:0.2em 0.6em;font-weight:normal">Category</th><th style="text-align:left;padding:0.2em 0;font-weight:normal">Community</th></tr></thead>
-                    <tbody>
-                        <tr><td style="padding:0.15em 0.6em 0.15em 0;font-family:monospace;opacity:0.8">185.220.101.x</td><td style="padding:0.15em 0.6em">Scanning</td><td style="padding:0.15em 0">23 reports</td></tr>
-                        <tr><td style="padding:0.15em 0.6em 0.15em 0;font-family:monospace;opacity:0.8">193.32.162.x</td><td style="padding:0.15em 0.6em">VPN/Proxy</td><td style="padding:0.15em 0">8 reports</td></tr>
-                        <tr><td style="padding:0.15em 0.6em 0.15em 0;font-family:monospace;opacity:0.8">192.168.x.x</td><td style="padding:0.15em 0.6em">Residential</td><td style="padding:0.15em 0"><span style="opacity:0.4">&mdash;</span></td></tr>
-                    </tbody>
-                </table>
-                <p style="font-size:0.85em;opacity:0.6;margin:0.6em 0 0.75em">Residential IPs are never collected. 52-week retention. <a href="/privacy.php" target="_blank" rel="noopener noreferrer">Privacy policy</a></p>
-                <a href="/" class="button small">Try with your own IPs &rarr;</a>
-            </div>
-            <?php endif; ?>
-
-            <?php if (!$is_demo && ($data_consent === null || $data_consent === 0)): ?>
-            <div id="community-consent-banner" class="community-intel-banner" style="background:rgba(108,184,122,0.12);border-left:3px solid #6cb87a;padding:0.8em 1em;margin-bottom:1.5em;font-size:0.9em">
-                <?php if ($data_consent === 0): ?>
-                <div id="consent-full" style="display:none">
-                <?php else: ?>
-                <div id="consent-full">
-                <?php endif; ?>
-                    <strong>Community Intel &mdash; opt in</strong>
-                    <p style="margin:0.4em 0 0.8em">Share anonymized network and IP data to see how your traffic compares to this week's global attack trends. <a href="/privacy.php" target="_blank" rel="noopener noreferrer" style="opacity:0.7;font-size:0.9em">Privacy policy</a></p>
-                    <div style="display:flex;gap:0.5em;flex-wrap:wrap">
-                        <button class="button small" id="consent-yes-btn">Opt in &mdash; show me the comparison</button>
-                        <button class="button small alt" id="consent-no-btn">No thanks</button>
-                    </div>
-                    <p style="margin:0.6em 0 0;font-size:0.82em;opacity:0.55">Community data is currently limited as this feature grows &mdash; your opt-in helps build it.</p>
-                </div>
-                <div id="consent-collapsed" style="<?php echo $data_consent === 0 ? '' : 'display:none;'; ?>font-size:0.9em;opacity:0.75">
-                    Community Intel &mdash; you opted out.
-                    <a id="consent-reconsider-btn" tabindex="0" style="color:inherit;text-decoration:underline;cursor:pointer;margin-left:0.2em">Change your mind?</a>
-                </div>
-            </div>
-            <script>
-            (function() {
-                var token = <?php echo json_encode($token); ?>;
-                function postConsent(consent, callback) {
-                    var fd = new FormData();
-                    fd.append('token', token);
-                    fd.append('consent', String(consent));
-                    fetch('/community-consent.php', { method: 'POST', body: fd })
-                        .then(function(r) { return r.json(); })
-                        .then(callback)
-                        .catch(function() {});
-                }
-                function showCollapsed() {
-                    document.getElementById('consent-full').style.display = 'none';
-                    document.getElementById('consent-collapsed').style.display = '';
-                }
-                function showFull() {
-                    document.getElementById('consent-collapsed').style.display = 'none';
-                    document.getElementById('consent-full').style.display = '';
-                    document.getElementById('consent-no-btn').disabled = false;
-                }
-                document.getElementById('consent-yes-btn').addEventListener('click', function() {
-                    var btn = this;
-                    btn.disabled = true;
-                    btn.textContent = 'Saving\u2026';
-                    postConsent(1, function(data) {
-                        if (!data.ok) return;
-                        var banner = document.getElementById('community-consent-banner');
-                        var html = '<div class="community-intel-banner" style="background:rgba(108,184,122,0.12);border-left:3px solid #6cb87a;padding:0.8em 1em;margin-bottom:1.5em;font-size:0.9em">';
-                        html += '<strong>&#10003; Thanks for contributing!</strong>';
-                        if (data.top_cidrs && data.top_cidrs.length) {
-                            html += '<p style="margin:0.5em 0 0.3em;opacity:0.85">Top reported ranges in the past 7 days:</p>';
-                            html += '<ul style="margin:0;padding-left:1.5em">';
-                            data.top_cidrs.slice(0, 3).forEach(function(c) {
-                                html += '<li><code>' + c.cidr + '</code> &mdash; ' + c.org + ' (' + c.report_count + ' report' + (c.report_count === 1 ? '' : 's') + ')</li>';
-                            });
-                            html += '</ul>';
-                        } else {
-                            html += '<p style="margin:0.5em 0 0.3em;opacity:0.85">The community dataset is still in its early days &mdash; data will grow as more users opt in. You\'ll get richer comparisons on future reports as the dataset builds.</p>';
-                        }
-                        html += '<p style="margin:0.7em 0 0"><a href="" onclick="window.location.reload();return false;" class="button small">Refresh to view your community data &rarr;</a></p>';
-                        html += '</div>';
-                        banner.outerHTML = html;
-                    });
-                });
-                document.getElementById('consent-no-btn').addEventListener('click', function() {
-                    this.disabled = true;
-                    postConsent(0, function() { showCollapsed(); });
-                });
-                document.getElementById('consent-reconsider-btn').addEventListener('click', function(e) {
-                    e.preventDefault();
-                    showFull();
-                });
-            })();
-            </script>
-            <?php endif; ?>
-
-            <?php if (!$is_demo && $data_consent === 1):
-                $community_has_data = false;
-                if (!empty($community_data['ip_stats'])) {
-                    foreach ($community_data['ip_stats'] as $ip_count) {
-                        if ($ip_count >= 3) {
-                            $community_has_data = true;
-                            break;
-                        }
-                    }
-                }
-            ?>
-            <div class="community-intel-banner" style="background:rgba(108,184,122,0.12);border-left:3px solid #6cb87a;padding:0.8em 1em;margin-bottom:1.5em;font-size:0.9em">
-                <strong>&#10003; Thank you for contributing to Community Intel</strong>
-                <?php if (!$community_has_data): ?>
-                <p style="margin:0.4em 0 0;opacity:0.8">The community dataset is still in its early days &mdash; data will grow as more users opt in. Check back on future reports for richer comparisons.</p>
-                <?php else: ?>
-                <p style="margin:0.4em 0 0;opacity:0.8">Your data is contributing to the community feed. See the Community column in the Top Threat Sources table below.</p>
-                <?php endif; ?>
-            </div>
-            <?php endif; ?>
-
             <style>
                 .report-header-row {
                     display: flex;
@@ -888,7 +772,31 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                     flex: 1;
                     min-width: 0;
                 }
+                .report-stat-strip {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 0.5em;
+                    margin: 0.75em 0 1.25em;
+                }
+                .stat-pill {
+                    font-size: 0.82em;
+                    opacity: 0.7;
+                    background: rgba(255,255,255,0.06);
+                    border: 1px solid rgba(255,255,255,0.1);
+                    border-radius: 3px;
+                    padding: 0.2em 0.6em;
+                    white-space: nowrap;
+                }
+                .report-row-hidden { display: none; }
+                #show-all-rows-btn { margin-top: 0.75em; }
             </style>
+
+            <?php
+            // Pre-compute values needed for stat strip (also used below)
+            $has_ranges = !empty($report['asn_ranges']);
+            $asn_count  = count($report['asn_ranges'] ?? []);
+            $abuse_data = compute_abuseipdb_callout($top25);
+            ?>
 
             <!-- Row 1: Title + stats -->
             <div class="report-header-row">
@@ -910,6 +818,20 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                 </div>
             </div>
 
+            <!-- Stat strip -->
+            <div class="report-stat-strip">
+                <span class="stat-pill"><?php echo number_format($total); ?> IPs analyzed</span>
+                <?php if ((int)($report['scanning_pct'] ?? 0) > 0): ?>
+                <span class="stat-pill"><?php echo (int)$report['scanning_pct']; ?>% scanning/proxy</span>
+                <?php endif; ?>
+                <?php if ($asn_count > 0): ?>
+                <span class="stat-pill"><?php echo $asn_count; ?> ASN<?php echo $asn_count === 1 ? '' : 's'; ?></span>
+                <?php endif; ?>
+                <?php if ($abuse_data !== null): ?>
+                <span class="stat-pill">AbuseIPDB avg <?php echo $abuse_data['avg']; ?>%</span>
+                <?php endif; ?>
+            </div>
+
             <?php if ($verdict === 'LOW'): ?>
             <p style="opacity:0.7;font-size:0.9em">No high-confidence threats detected. Scores below confirm low risk.</p>
             <?php endif; ?>
@@ -923,41 +845,18 @@ function render_report(array $report, string $token, ?string $expires_at, array 
             <?php endif; ?>
 
             <!-- AbuseIPDB callout -->
-            <?php
-            $abuse_data = compute_abuseipdb_callout($top25);
-            if ($abuse_data !== null): ?>
+            <?php if ($abuse_data !== null): ?>
             <p class="abuseipdb-callout">
                 AbuseIPDB independently verified <strong><?php echo $abuse_data['count']; ?></strong> of <?php echo $abuse_data['total']; ?> top IPs as known attackers (average confidence: <strong><?php echo $abuse_data['avg']; ?>%</strong>).
             </p>
             <?php endif; ?>
-
-            <!-- Analysis scope callout -->
-            <?php if (!empty($report['asn_ranges'])): ?>
-            <p style="font-size:0.85em;opacity:0.65">
-                Analyzed <?php echo number_format($total); ?> IPs, verified top threats against AbuseIPDB, extracted CIDR prefixes from <?php echo count($report['asn_ranges']); ?> ASN<?php echo count($report['asn_ranges']) === 1 ? '' : 's'; ?>.
-            </p>
-            <?php endif; ?>
-
-            <!-- What to do next -->
-            <?php $has_ranges = !empty($report['asn_ranges']); ?>
-            <div class="next-steps">
-                <h3>What to do next</h3>
-                <ol>
-                    <li>Click a script name below to preview it, then copy or download.</li>
-                    <li>In your terminal: paste and run, or <code>chmod +x block-ufw.sh &amp;&amp; sudo bash block-ufw.sh</code></li>
-                    <li>Using iptables or nginx? Switch to that tab and repeat.</li>
-                </ol>
-            </div>
 
             <!-- ASN Ranges + Block Rules layout:
                  ≥3 ASNs → two-column grid (sticky right col floats alongside long list)
                  <3 ASNs → full-width stack (avoids empty space next to short list)
                  no ranges → block rules full-width only -->
             <div id="block-rules"></div>
-            <?php
-            $asn_count = count($report['asn_ranges']);
-            $use_columns = $has_ranges && $asn_count >= 3;
-            ?>
+            <?php $use_columns = $has_ranges && $asn_count >= 3; ?>
             <?php if ($use_columns): ?>
             <div class="ranges-rules-grid">
                 <div class="ranges-col">
@@ -1019,8 +918,8 @@ function render_report(array $report, string $token, ?string $expires_at, array 
             <div class="block-rules-fullwidth">
             <?php endif; ?>
                     <h3 class="block-rules-heading">Block Rules</h3>
-                    <p style="font-size:0.9em;opacity:0.7;margin-bottom:1em">
-                        Download a ready-to-run script, or grab plain text for paste-in to a web firewall or ipset.
+                    <p style="font-size:0.9em;opacity:0.7;margin-bottom:0.5em">
+                        Click a format to preview, then copy or download. In your terminal: <code>chmod +x block-ufw.sh &amp;&amp; sudo bash block-ufw.sh</code>
                     </p>
                     <div class="hosting-callout">
                         <strong>No console/SSH access?</strong> Block IPs directly from your hosting panel instead:
@@ -1216,9 +1115,10 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                     var checkedCtries = {};
                     document.querySelectorAll('.report-filter-country:checked').forEach(function(cb)  { checkedCtries[cb.value] = true; });
 
-                    // Filter top-25 table rows; track visible count
+                    // Filter top-25 table rows; track visible count (skip collapsed rows)
                     var visibleRows = 0;
                     document.querySelectorAll('.report-table tbody tr').forEach(function(row) {
+                        if (row.classList.contains('report-row-hidden')) return;
                         var cat = row.dataset.category || '';
                         var cc  = row.dataset.country  || '';
                         var catOk  = !allCatChips[cat]  || checkedCats[cat];
@@ -1342,13 +1242,14 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                     </tr>
                 </thead>
                 <tbody>
-                <?php foreach ($top25 as $entry):
+                <?php foreach ($top25 as $i => $entry):
                     $cat = $entry['classification'] ?? 'unknown';
                     $score = $entry['abuse_score'] ?? null;
                     $freq = $entry['freq'] ?? 1;
                     $asn_org_full = ($entry['asn'] ?? '') . ($entry['asn'] && ($entry['asn_org'] ?? '') ? ' ' : '') . ($entry['asn_org'] ?? '');
+                    $row_class = $i >= 10 ? ' class="report-row-hidden"' : '';
                 ?>
-                    <tr data-category="<?php echo htmlspecialchars($cat, ENT_QUOTES, 'UTF-8'); ?>" data-country="<?php echo htmlspecialchars($entry['country'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
+                    <tr<?php echo $row_class; ?> data-category="<?php echo htmlspecialchars($cat, ENT_QUOTES, 'UTF-8'); ?>" data-country="<?php echo htmlspecialchars($entry['country'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
                         <td style="font-family:monospace"><?php echo htmlspecialchars($entry['ip'] ?? '', ENT_QUOTES, 'UTF-8'); ?></td>
                         <td class="cell-asn-org" title="<?php echo htmlspecialchars($asn_org_full, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($asn_org_full, ENT_QUOTES, 'UTF-8'); ?></td>
                         <td class="asn-category asn-category--<?php echo htmlspecialchars($cat, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($cat, ENT_QUOTES, 'UTF-8'); ?></td>
@@ -1371,6 +1272,15 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                 </tbody>
             </table>
             </div>
+            <?php if (count($top25) > 10): ?>
+            <button id="show-all-rows-btn" class="button small alt">Show all <?php echo count($top25); ?> IPs</button>
+            <script>
+            document.getElementById('show-all-rows-btn').addEventListener('click', function() {
+                document.querySelectorAll('.report-row-hidden').forEach(function(r) { r.classList.remove('report-row-hidden'); });
+                this.style.display = 'none';
+            });
+            </script>
+            <?php endif; ?>
             <p style="font-size:0.8em;opacity:0.6">
                 Top 25 by weighted frequency (scanning/VPN weighted 2&times;). Hits = times
                 this IP appeared in your submitted log. AbuseIPDB score 0–100; a score of 0
@@ -1386,6 +1296,123 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                 <a href="/intel.php" target="_blank" rel="noopener noreferrer">Download the community block list &rarr;</a>
             </p>
             <?php endif; ?>
+            <?php endif; ?>
+
+            <!-- Community Intel (demo preview / consent / opted-in) -->
+            <?php if ($is_demo): ?>
+            <div style="background:rgba(108,184,122,0.12);border-left:3px solid #6cb87a;padding:0.8em 1em;margin-bottom:1.5em;font-size:0.9em">
+                <strong>Community Intel</strong> <span style="opacity:0.6;font-size:0.85em;margin-left:0.3em">Preview</span>
+                <p style="margin:0.4em 0 0.7em">Community Intel is available on paid reports. When you opt in, ip2geo cross-references your IPs against anonymized data from other users this week. The Community column shows how many other ip2geo reports contained the same IP &mdash; corroborating active threats and flagging escalating campaigns.</p>
+                <p style="margin:0 0 0.4em;opacity:0.85;font-size:0.9em">This is what the Community column looks like in the Top Threat Sources table:</p>
+                <table style="width:100%;font-size:0.85em;border-collapse:collapse">
+                    <thead><tr style="opacity:0.6"><th style="text-align:left;padding:0.2em 0.6em 0.2em 0;font-weight:normal">IP</th><th style="text-align:left;padding:0.2em 0.6em;font-weight:normal">Category</th><th style="text-align:left;padding:0.2em 0;font-weight:normal">Community</th></tr></thead>
+                    <tbody>
+                        <tr><td style="padding:0.15em 0.6em 0.15em 0;font-family:monospace;opacity:0.8">185.220.101.x</td><td style="padding:0.15em 0.6em">Scanning</td><td style="padding:0.15em 0">23 reports</td></tr>
+                        <tr><td style="padding:0.15em 0.6em 0.15em 0;font-family:monospace;opacity:0.8">193.32.162.x</td><td style="padding:0.15em 0.6em">VPN/Proxy</td><td style="padding:0.15em 0">8 reports</td></tr>
+                        <tr><td style="padding:0.15em 0.6em 0.15em 0;font-family:monospace;opacity:0.8">192.168.x.x</td><td style="padding:0.15em 0.6em">Residential</td><td style="padding:0.15em 0"><span style="opacity:0.4">&mdash;</span></td></tr>
+                    </tbody>
+                </table>
+                <p style="font-size:0.85em;opacity:0.6;margin:0.6em 0 0.75em">Residential IPs are never collected. 52-week retention. <a href="/privacy.php" target="_blank" rel="noopener noreferrer">Privacy policy</a></p>
+                <a href="/" class="button small">Try with your own IPs &rarr;</a>
+            </div>
+            <?php endif; ?>
+
+            <?php if (!$is_demo && ($data_consent === null || $data_consent === 0)): ?>
+            <div id="community-consent-banner" class="community-intel-banner" style="background:rgba(108,184,122,0.12);border-left:3px solid #6cb87a;padding:0.8em 1em;margin-bottom:1.5em;font-size:0.9em">
+                <?php if ($data_consent === 0): ?>
+                <div id="consent-full" style="display:none">
+                <?php else: ?>
+                <div id="consent-full">
+                <?php endif; ?>
+                    <strong>Community Intel &mdash; opt in</strong>
+                    <p style="margin:0.4em 0 0.8em">Share anonymized network and IP data to see how your traffic compares to this week's global attack trends. <a href="/privacy.php" target="_blank" rel="noopener noreferrer" style="opacity:0.7;font-size:0.9em">Privacy policy</a></p>
+                    <div style="display:flex;gap:0.5em;flex-wrap:wrap">
+                        <button class="button small" id="consent-yes-btn">Opt in &mdash; show me the comparison</button>
+                        <button class="button small alt" id="consent-no-btn">No thanks</button>
+                    </div>
+                    <p style="margin:0.6em 0 0;font-size:0.82em;opacity:0.55">Community data is currently limited as this feature grows &mdash; your opt-in helps build it.</p>
+                </div>
+                <div id="consent-collapsed" style="<?php echo $data_consent === 0 ? '' : 'display:none;'; ?>font-size:0.9em;opacity:0.75">
+                    Community Intel &mdash; you opted out.
+                    <a id="consent-reconsider-btn" tabindex="0" style="color:inherit;text-decoration:underline;cursor:pointer;margin-left:0.2em">Change your mind?</a>
+                </div>
+            </div>
+            <script>
+            (function() {
+                var token = <?php echo json_encode($token); ?>;
+                function postConsent(consent, callback) {
+                    var fd = new FormData();
+                    fd.append('token', token);
+                    fd.append('consent', String(consent));
+                    fetch('/community-consent.php', { method: 'POST', body: fd })
+                        .then(function(r) { return r.json(); })
+                        .then(callback)
+                        .catch(function() {});
+                }
+                function showCollapsed() {
+                    document.getElementById('consent-full').style.display = 'none';
+                    document.getElementById('consent-collapsed').style.display = '';
+                }
+                function showFull() {
+                    document.getElementById('consent-collapsed').style.display = 'none';
+                    document.getElementById('consent-full').style.display = '';
+                    document.getElementById('consent-no-btn').disabled = false;
+                }
+                document.getElementById('consent-yes-btn').addEventListener('click', function() {
+                    var btn = this;
+                    btn.disabled = true;
+                    btn.textContent = 'Saving\u2026';
+                    postConsent(1, function(data) {
+                        if (!data.ok) return;
+                        var banner = document.getElementById('community-consent-banner');
+                        var html = '<div class="community-intel-banner" style="background:rgba(108,184,122,0.12);border-left:3px solid #6cb87a;padding:0.8em 1em;margin-bottom:1.5em;font-size:0.9em">';
+                        html += '<strong>&#10003; Thanks for contributing!</strong>';
+                        if (data.top_cidrs && data.top_cidrs.length) {
+                            html += '<p style="margin:0.5em 0 0.3em;opacity:0.85">Top reported ranges in the past 7 days:</p>';
+                            html += '<ul style="margin:0;padding-left:1.5em">';
+                            data.top_cidrs.slice(0, 3).forEach(function(c) {
+                                html += '<li><code>' + c.cidr + '</code> &mdash; ' + c.org + ' (' + c.report_count + ' report' + (c.report_count === 1 ? '' : 's') + ')</li>';
+                            });
+                            html += '</ul>';
+                        } else {
+                            html += '<p style="margin:0.5em 0 0.3em;opacity:0.85">The community dataset is still in its early days &mdash; data will grow as more users opt in. You\'ll get richer comparisons on future reports as the dataset builds.</p>';
+                        }
+                        html += '<p style="margin:0.7em 0 0"><a href="" onclick="window.location.reload();return false;" class="button small">Refresh to view your community data &rarr;</a></p>';
+                        html += '</div>';
+                        banner.outerHTML = html;
+                    });
+                });
+                document.getElementById('consent-no-btn').addEventListener('click', function() {
+                    this.disabled = true;
+                    postConsent(0, function() { showCollapsed(); });
+                });
+                document.getElementById('consent-reconsider-btn').addEventListener('click', function(e) {
+                    e.preventDefault();
+                    showFull();
+                });
+            })();
+            </script>
+            <?php endif; ?>
+
+            <?php if (!$is_demo && $data_consent === 1):
+                $community_has_data = false;
+                if (!empty($community_data['ip_stats'])) {
+                    foreach ($community_data['ip_stats'] as $ip_count) {
+                        if ($ip_count >= 3) {
+                            $community_has_data = true;
+                            break;
+                        }
+                    }
+                }
+            ?>
+            <div class="community-intel-banner" style="background:rgba(108,184,122,0.12);border-left:3px solid #6cb87a;padding:0.8em 1em;margin-bottom:1.5em;font-size:0.9em">
+                <strong>&#10003; Thank you for contributing to Community Intel</strong>
+                <?php if (!$community_has_data): ?>
+                <p style="margin:0.4em 0 0;opacity:0.8">The community dataset is still in its early days &mdash; data will grow as more users opt in. Check back on future reports for richer comparisons.</p>
+                <?php else: ?>
+                <p style="margin:0.4em 0 0;opacity:0.8">Your data is contributing to the community feed. See the Community column in the Top Threat Sources table above.</p>
+                <?php endif; ?>
+            </div>
             <?php endif; ?>
 
             <!-- Share link + expiry -->
