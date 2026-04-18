@@ -792,6 +792,7 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                 @media print {
                     .report-row-hidden { display: table-row !important; }
                     #show-all-rows-btn { display: none; }
+                    #report-table-summary { display: none; }
                 }
             </style>
 
