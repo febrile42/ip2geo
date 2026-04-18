@@ -567,11 +567,11 @@ function include_block_rules_tabs(string $token, bool $has_ranges, array $report
                     <div class="format-entry">
                         <button class="format-toggle button small" data-target="<?php echo $fid; ?>" data-label="<?php echo $label_e; ?>" aria-expanded="false">&#9656; <?php echo $label_e; ?></button>
                         <div id="<?php echo $fid; ?>" class="format-block" hidden>
-                            <pre class="block-script-preview"><code><?php echo $content; ?></code></pre>
                             <div class="format-actions">
-                                <button class="copy-btn">Copy</button>
+                                <button class="copy-btn button small">&#128203; Copy</button>
                                 <a href="<?php echo $href; ?>" class="button small">&#8595; Download</a>
                             </div>
+                            <pre class="block-script-preview"><code><?php echo $content; ?></code></pre>
                         </div>
                     </div>
         <?php

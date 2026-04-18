@@ -15,11 +15,11 @@ function buildFormatBlock(fmt = 'sh-ufw', scriptText = 'ufw deny from 1.2.3.4 to
               data-label="block-ufw.sh"
               aria-expanded="false">&#9656; block-ufw.sh</button>
       <div id="fmt-${fmt}" class="format-block" hidden>
-        <pre class="block-script-preview"><code>${scriptText}</code></pre>
         <div class="format-actions">
-          <button class="copy-btn">Copy</button>
+          <button class="copy-btn button small">&#128203; Copy</button>
           <a href="/report.php?token=abc&format=${fmt}" class="button small">&#8595; Download</a>
         </div>
+        <pre class="block-script-preview"><code>${scriptText}</code></pre>
       </div>
     </div>
   `;
