@@ -982,7 +982,7 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                 <div class="rules-col">
                     <h3>Block Rules</h3>
                     <p style="font-size:0.9em;opacity:0.7;margin-bottom:1em">
-                        Range-based rules stay valid as IPs rotate. Download a ready-to-run script, or plain text for paste-in to a web firewall or ipset.
+                        Download a ready-to-run script, or grab plain text for paste-in to a web firewall or ipset.
                     </p>
                     <?php include_block_rules_tabs($token, $has_ranges, $report); ?>
                 </div>
