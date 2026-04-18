@@ -1038,7 +1038,8 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                         <p class="hosting-note" style="margin:0.6em 0 0">
                             <strong>What to paste:</strong>
                             <?php if ($has_ranges): ?>
-                            Expand <strong>cidr-ranges.txt</strong> above and copy the list &mdash; one range per line, works with all panels above. If your panel only accepts single IPs, copy them from the Top Threat Sources table instead.
+                            <span id="hosting-paste-ranges">Expand <strong>cidr-ranges.txt</strong> above and copy the list &mdash; one range per line, works with all panels above. If your panel only accepts single IPs, copy them from the Top Threat Sources table instead.</span>
+                            <span id="hosting-paste-ips" style="display:none">Copy the IPs you want to block from the Top Threat Sources table below and paste them one per line into your panel.</span>
                             <?php else: ?>
                             Copy the IPs you want to block from the Top Threat Sources table below and paste them one per line into your panel.
                             <?php endif; ?>
@@ -1060,6 +1061,12 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                 document.querySelectorAll('.block-rules-panel').forEach(function(p) {
                     p.style.display = p.id === 'panel-' + name ? '' : 'none';
                 });
+                var pasteRanges = document.getElementById('hosting-paste-ranges');
+                var pasteIPs = document.getElementById('hosting-paste-ips');
+                if (pasteRanges && pasteIPs) {
+                    pasteRanges.style.display = name === 'by-range' ? '' : 'none';
+                    pasteIPs.style.display = name === 'by-ip' ? '' : 'none';
+                }
                 window.umami && umami.track('report_tab_switch', { tab: name });
             }
             document.querySelectorAll('.block-rules-tab:not(.brt-disabled)').forEach(function(t) {
