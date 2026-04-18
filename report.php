@@ -1034,6 +1034,14 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                             <li><a href="https://docs.digitalocean.com/products/networking/firewalls/" target="_blank" rel="noopener">DigitalOcean Cloud Firewall</a></li>
                             <li><a href="https://docs.hetzner.com/cloud/firewalls/overview/" target="_blank" rel="noopener">Hetzner Cloud Firewall</a></li>
                         </ul>
+                        <p class="hosting-note" style="margin:0.6em 0 0">
+                            <strong>What to paste:</strong>
+                            <?php if ($has_ranges): ?>
+                            Expand <strong>cidr-ranges.txt</strong> below and copy the list &mdash; one range per line, works with all panels above. If your panel only accepts single IPs, copy them from the Top Threat Sources table instead.
+                            <?php else: ?>
+                            Copy the IPs you want to block from the Top Threat Sources table below and paste them one per line into your panel.
+                            <?php endif; ?>
+                        </p>
                     </div>
                     <?php include_block_rules_tabs($token, $has_ranges, $report); ?>
             <?php if ($use_columns): ?>
