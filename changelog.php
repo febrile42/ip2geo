@@ -36,7 +36,9 @@
 					<section id="main" class="wrapper">
 						<div class="inner">
 							<h1 class="major">Changelog</h1>
-									<h3>3.2.1 - 2026-04-13</h3>
+									<h3>3.3.0 - 2026-04-18</h3>
+							<p>Behavioral analytics for free reports. The funnel is now instrumented end-to-end: page views, time on page, CTA visibility, and checkout clicks are tracked via a lightweight beacon endpoint. Acquisition source is captured at checkout. Rate-limited, session-scoped, and privacy-disclosed.</p>
+								<h3>3.2.1 - 2026-04-13</h3>
 							<p>Squashed a bug in Umami event tracking.</p>
 								<h3>3.2.0 - 2026-04-12</h3>
 							<p>The paywall moved. Paste your IPs, get a free geo and ASN breakdown of your top 25 &mdash; shareable link, no account, no payment. It expires in 7 days, which is probably long enough to do something about the IPs in it. If you want AbuseIPDB confidence scores for the worst offenders, ready-to-run firewall scripts, and a permanent link, that&rsquo;s still $9. Speaking of permanent: paid reports no longer expire. The 30-day window is gone. You paid for it, it&rsquo;s yours.</p>
