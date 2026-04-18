@@ -919,7 +919,7 @@ function render_report(array $report, string $token, ?string $expires_at, array 
             <?php endif; ?>
                     <h3 class="block-rules-heading">Block Rules</h3>
                     <p style="font-size:0.9em;opacity:0.7;margin-bottom:0.5em">
-                        Click a format to preview, then copy or download. In your terminal: <code>chmod +x block-ufw.sh &amp;&amp; sudo bash block-ufw.sh</code>
+                        Click a format to preview, then copy or download.
                     </p>
                     <div class="hosting-callout">
                         <strong>No console/SSH access?</strong> Block IPs directly from your hosting panel instead:
