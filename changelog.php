@@ -37,7 +37,7 @@
 						<div class="inner">
 							<h1 class="major">Changelog</h1>
 									<h3>3.3.0 - 2026-04-18</h3>
-							<p>Behavioral analytics for free reports. The funnel is now instrumented end-to-end: page views, time on page, CTA visibility, and checkout clicks are tracked via a lightweight beacon endpoint. Acquisition source is captured at checkout. Rate-limited, session-scoped, and privacy-disclosed.</p>
+							<p>Wondered how people are using the free reports. Added some additional tracking &mdash; and disclosed it all in the <a href="/privacy.php">privacy policy</a> &mdash; so I can see if there are ways to make it better.</p>
 								<h3>3.2.1 - 2026-04-13</h3>
 							<p>Squashed a bug in Umami event tracking.</p>
 								<h3>3.2.0 - 2026-04-12</h3>
