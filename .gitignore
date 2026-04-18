@@ -10,6 +10,9 @@ google*.html
 # Composer — vendor dir not committed; composer.json is
 vendor/
 
+# Node / Jest
+node_modules/
+
 # Stripe keys and environment secrets — set in config.php (already gitignored)
 # Never commit these files
 stripe_keys.php
@@ -27,10 +30,11 @@ asn_classification_candidates.txt
 # Composer lock — commit this if you want reproducible builds on CI
 # composer.lock
 
-# Claude & IDE Files
+# Claude, IDE, OS Files
 .claude
 TODOS.md
 QUESTIONS.md
 QA.md
 .gstack*/
 .vscode/
+.DS_store

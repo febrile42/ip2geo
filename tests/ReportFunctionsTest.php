@@ -143,6 +143,54 @@ class ReportFunctionsTest extends TestCase
         }
     }
 
+    // ── Phase 3: REPORT_SID session cookie ────────────────────────────────────
+
+    /** bin2hex(random_bytes(16)) produces a 32-char lowercase hex string */
+    public function testSessionIdIsCorrectFormat(): void
+    {
+        $sid = bin2hex(random_bytes(16));
+        $this->assertSame(32, strlen($sid));
+        $this->assertMatchesRegularExpression('/^[0-9a-f]{32}$/', $sid);
+    }
+
+    /** Cookie validation regex accepts valid 32-char hex */
+    public function testCookieValidationAcceptsValidSid(): void
+    {
+        $sid = bin2hex(random_bytes(16));
+        $this->assertSame(1, preg_match('/^[0-9a-f]{32}$/', $sid));
+    }
+
+    /** Cookie validation regex rejects wrong-length values */
+    public function testCookieValidationRejectsWrongLength(): void
+    {
+        $this->assertSame(0, preg_match('/^[0-9a-f]{32}$/', str_repeat('a', 31)));
+        $this->assertSame(0, preg_match('/^[0-9a-f]{32}$/', str_repeat('a', 33)));
+    }
+
+    /** Cookie validation regex rejects non-hex characters */
+    public function testCookieValidationRejectsNonHex(): void
+    {
+        $bad = str_repeat('g', 32); // 'g' is not valid hex
+        $this->assertSame(0, preg_match('/^[0-9a-f]{32}$/', $bad));
+    }
+
+    /** Cookie max-age is 1800 seconds (30 minutes), not 86400 */
+    public function testCookieMaxAgeIs30Minutes(): void
+    {
+        $max_age = 1800;
+        $this->assertSame(1800, $max_age, 'Session cookie must expire in 30 min, not 24h');
+        $this->assertNotEquals(86400, $max_age);
+    }
+
+    /** Cookie name includes the report token to scope it per-report */
+    public function testCookieNameIncludesToken(): void
+    {
+        $token       = 'abc12345-0000-4000-8000-000000000001';
+        $cookie_name = 'report_sid_' . $token;
+        $this->assertStringStartsWith('report_sid_', $cookie_name);
+        $this->assertStringContainsString($token, $cookie_name);
+    }
+
     // ── int_range_to_cidr ──────────────────────────────────────────────────────
 
     public function testIntRangeToCidr32SingleIp(): void

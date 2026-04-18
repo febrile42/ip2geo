@@ -148,6 +148,25 @@ if (($_POST['action'] ?? '') === 'upgrade' && isset($_POST['upgrade_token'])) {
         error_log('ip2geo Stripe session create failed (upgrade): ' . $e->getMessage());
         header('Location: /report.php?token=' . urlencode($free_token) . '&error=payment'); exit;
     }
+
+    // Phase 3: fire checkout_started server-side before Stripe redirect.
+    // Analytical only — swallow any failure so the redirect always proceeds.
+    try {
+        $ev_con = mysqli_connect($db_host, $db_user, $db_pass, $db_name);
+        if ($ev_con) {
+            $ev_sid = $_COOKIE['report_sid_' . $free_token] ?? null;
+            $ev_ins = $ev_con->prepare(
+                'INSERT INTO report_events (token, event_type, session_id) VALUES (?, "checkout_started", ?)'
+            );
+            $ev_ins->bind_param('ss', $free_token, $ev_sid);
+            $ev_ins->execute();
+            $ev_ins->close();
+            mysqli_close($ev_con);
+        }
+    } catch (\Throwable $e) {
+        error_log('ip2geo get-report.php checkout_started INSERT failed: ' . $e->getMessage());
+    }
+
     header('Location: ' . $session->url);
     exit;
 }
@@ -342,15 +361,22 @@ if ($tier === 'free') {
         substr($rand, 20, 12),
     ]);
 
+    // Phase 4: acquisition_source — capture referrer at submission time
+    $acquisition_source = null;
+    $raw_acq = $_POST['acquisition_source'] ?? '';
+    if ($raw_acq !== '') {
+        $acquisition_source = substr(trim($raw_acq), 0, 2000);
+    }
+
     $stmt = $con->prepare(
         'INSERT INTO reports
            (token, submission_hash, ip_list_json, geo_results_json,
-            status, pending_expires_at, report_expires_at, created_at)
+            status, pending_expires_at, report_expires_at, acquisition_source, created_at)
          VALUES (?, ?, ?, ?, "free",
                  DATE_ADD(NOW(), INTERVAL 7 DAY),
-                 DATE_ADD(NOW(), INTERVAL 7 DAY), NOW())'
+                 DATE_ADD(NOW(), INTERVAL 7 DAY), ?, NOW())'
     );
-    $stmt->bind_param('ssss', $token, $submission_hash, $raw_json, $geo_results_raw);
+    $stmt->bind_param('sssss', $token, $submission_hash, $raw_json, $geo_results_raw, $acquisition_source);
     if (!$stmt->execute()) {
         error_log('ip2geo get-report.php free INSERT failed: ' . $stmt->error);
         $stmt->close();

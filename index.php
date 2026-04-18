@@ -431,6 +431,7 @@ if ($_POST || $view_token_mode)
 			<input type="hidden" name="ip_classified_json" id="ip-classified-json"
 				value="<?php echo htmlspecialchars(json_encode($ip_classified_data), ENT_QUOTES, 'UTF-8'); ?>" />
 			<input type="hidden" name="tier" value="free">
+				<input type="hidden" name="acquisition_source" id="acquisition-source" value="">
 			<div class="threat-cta-top">
 				<div class="threat-cta-left">
 					<p class="asn-verdict asn-verdict--<?php echo htmlspecialchars(strtolower($verdict_level), ENT_QUOTES, 'UTF-8'); ?>">
@@ -678,6 +679,10 @@ else
 		<!-- Scripts -->
 		<script data-cfasync="false">
 		(function() {
+			// Phase 4: set acquisition_source on any server-rendered CTA form
+			var _acqEl = document.getElementById('acquisition-source');
+			if (_acqEl) _acqEl.value = (document.referrer || '').slice(0, 2000);
+
 			var form = document.getElementById('iplookup');
 			if (!form) return;
 			var btn = form.querySelector('input[type="submit"]');
@@ -733,6 +738,9 @@ else
 					var inserted = document.getElementById('results');
 					cleanup();
 					if (inserted) inserted.scrollIntoView({ behavior: 'smooth' });
+					// Phase 4: re-set after AJAX injection (form element was replaced)
+					var acqEl = document.getElementById('acquisition-source');
+					if (acqEl) acqEl.value = (document.referrer || '').slice(0, 2000);
 
 					var bucket = count === 1 ? '1'
 					             : count <= 10   ? '2-10'
