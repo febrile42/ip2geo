@@ -469,7 +469,9 @@
             listEl.innerHTML = '';
             var now = Date.now();
 
-            // Render newest first
+            // Render newest first as pill chips: "10,000 IPs · 2 min ago".
+            // The IP preview (first 3 + ellipsis) lives on the title attribute
+            // for hover-to-peek without cluttering the chip surface.
             items.slice().reverse().forEach(function (entry, revIdx) {
                 var origIdx = items.length - 1 - revIdx;
                 var li = document.createElement('li');
@@ -480,18 +482,25 @@
 
                 var preview = entry.ips.slice(0, 3).join(', ');
                 if (entry.count > 3) preview += ', …';
-                var label = entry.count + ' IP' + (entry.count !== 1 ? 's' : '');
+                btn.title = preview;
 
-                var labelEl = document.createElement('span');
-                labelEl.className = 'recent-lookup-label';
-                labelEl.textContent = label;
+                var countLabel = entry.count.toLocaleString() + ' IP' + (entry.count !== 1 ? 's' : '');
+                var countEl = document.createElement('span');
+                countEl.className = 'recent-lookup-count';
+                countEl.textContent = countLabel;
 
-                var metaEl = document.createElement('small');
-                metaEl.className = 'recent-lookup-meta';
-                metaEl.textContent = preview + ' · ' + relativeTime(entry.ts, now);
+                var dotEl = document.createElement('span');
+                dotEl.className = 'recent-lookup-dot';
+                dotEl.setAttribute('aria-hidden', 'true');
+                dotEl.textContent = '·';
 
-                btn.appendChild(labelEl);
-                btn.appendChild(metaEl);
+                var timeEl = document.createElement('span');
+                timeEl.className = 'recent-lookup-time';
+                timeEl.textContent = relativeTime(entry.ts, now);
+
+                btn.appendChild(countEl);
+                btn.appendChild(dotEl);
+                btn.appendChild(timeEl);
                 li.appendChild(btn);
                 listEl.appendChild(li);
             });
