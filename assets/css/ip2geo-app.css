@@ -836,26 +836,33 @@
     margin: 0;
     padding: 0;
 }
-.recent-lookup-item {
+/* Override theme's `button` defaults (font-size:0.6em, height:4.75em,
+   text-transform:uppercase, border-radius:3em + !important on border/color). */
+#recent-lookups-list .recent-lookup-item {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
     gap: 0.15em;
     width: 100%;
+    height: auto;
     text-align: left;
-    padding: 0.4em 0.6em;
+    padding: 0.5em 0.7em;
     background: transparent;
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 3px;
-    color: inherit;
+    border: solid 1px rgba(255,255,255,0.1) !important;
+    border-radius: 3px !important;
+    color: inherit !important;
     font: inherit;
+    font-weight: normal;
+    text-transform: none;
+    letter-spacing: normal;
+    line-height: 1.4;
     cursor: pointer;
     transition: background 0.12s, border-color 0.12s;
 }
-.recent-lookup-item:hover,
-.recent-lookup-item:focus {
+#recent-lookups-list .recent-lookup-item:hover,
+#recent-lookups-list .recent-lookup-item:focus {
     background: rgba(255,255,255,0.06);
-    border-color: rgba(255,255,255,0.18);
+    border-color: rgba(255,255,255,0.22) !important;
     outline: none;
 }
 .recent-lookup-label {
@@ -870,29 +877,19 @@
 }
 
 /* ── Opt-in toggle row ────────────────────────────────────────────────── */
+/* Uses html5up's custom checkbox pattern: <input> + sibling <label for>.
+   The theme renders the visible checkbox via label:before (Font Awesome icon).
+   We just position the wrapper and the fineprint underneath. */
 .opt-in-toggle {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 0.5em;
     margin-top: 1em;
     padding: 0.5em 0;
-    font-size: 0.88em;
-    cursor: pointer;
-    user-select: none;
-}
-.opt-in-toggle input[type="checkbox"] {
-    margin: 0;
-    flex: 0 0 auto;
-}
-.opt-in-toggle .opt-in-text {
-    opacity: 0.85;
 }
 .opt-in-toggle .opt-in-fineprint {
-    opacity: 0.5;
-    font-size: 0.85em;
-    flex: 1 1 100%;
-    margin-left: 1.7em;
+    display: block;
+    margin-top: 0.2em;
+    margin-left: 2.4em; /* aligns with the label text (theme's padding-left) */
+    opacity: 0.55;
+    font-size: 0.78em;
     line-height: 1.3;
 }
 
@@ -922,20 +919,26 @@
 #rl-toast-msg {
     line-height: 1.3;
 }
-#rl-toast-undo {
+/* Override theme's `button` defaults (font-size:0.6em, height:4.75em,
+   text-transform:uppercase, border-radius:3em + !important on border/color). */
+#rl-toast #rl-toast-undo {
     background: transparent;
-    border: 1px solid rgba(255,255,255,0.25);
-    color: inherit;
+    border: 1px solid rgba(255,255,255,0.25) !important;
+    color: inherit !important;
     font: inherit;
     font-weight: 600;
+    height: auto;
     padding: 0.35em 0.85em;
-    border-radius: 3px;
+    border-radius: 3px !important;
+    text-transform: none;
+    letter-spacing: normal;
+    line-height: 1.3;
     cursor: pointer;
     transition: background 0.12s, border-color 0.12s;
 }
-#rl-toast-undo:hover,
-#rl-toast-undo:focus {
+#rl-toast #rl-toast-undo:hover,
+#rl-toast #rl-toast-undo:focus {
     background: rgba(255,255,255,0.08);
-    border-color: rgba(255,255,255,0.45);
+    border-color: rgba(255,255,255,0.45) !important;
     outline: none;
 }

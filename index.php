@@ -113,11 +113,12 @@ if ($view_token_mode) {
 									</form>
 
 									<!-- Opt-in toggle for recent-lookups (default off; localStorage only) -->
-									<label id="rl-optin-row" class="opt-in-toggle" hidden>
-										<input type="checkbox" id="rl-optin">
-										<span class="opt-in-text">Remember my lookups in this browser</span>
+									<!-- Theme's custom checkbox pattern: <input> + sibling <label for="..."> -->
+									<div id="rl-optin-row" class="opt-in-toggle" hidden>
+										<input type="checkbox" id="rl-optin" name="rl-optin">
+										<label for="rl-optin">Remember my lookups in this browser</label>
 										<small class="opt-in-fineprint">localStorage; never sent to our server</small>
-									</label>
+									</div>
 								</section>
 							</div>
 						</div>
