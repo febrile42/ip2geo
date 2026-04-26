@@ -108,17 +108,15 @@ if ($view_token_mode) {
 											<div class="field half">
 												<label for="email">&nbsp;</label>
 												<input type="submit" class="submit" value="Look Up IP Addresses" />
+												<!-- Opt-in toggle for recent-lookups (default off; localStorage only).
+												     Lives under the submit button: discoverable but unobtrusive. -->
+												<div id="rl-optin-row" class="opt-in-toggle" hidden>
+													<input type="checkbox" id="rl-optin" name="rl-optin">
+													<label for="rl-optin" title="Stored in your browser only. Never sent to our server.">Remember in this browser</label>
+												</div>
 											</div>
 										</div>
 									</form>
-
-									<!-- Opt-in toggle for recent-lookups (default off; localStorage only) -->
-									<!-- Theme's custom checkbox pattern: <input> + sibling <label for="..."> -->
-									<div id="rl-optin-row" class="opt-in-toggle" hidden>
-										<input type="checkbox" id="rl-optin" name="rl-optin">
-										<label for="rl-optin">Remember my lookups in this browser</label>
-										<small class="opt-in-fineprint">localStorage; never sent to our server</small>
-									</div>
 								</section>
 							</div>
 						</div>
