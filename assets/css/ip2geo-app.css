@@ -880,13 +880,13 @@
 /* Lives directly below the submit button in its .field.half cell.
    Uses html5up's custom checkbox pattern: <input> + sibling <label for>.
    Theme renders the visible checkbox via label:before (FA icon).
-   We shrink it to 0.75em and dock it left-aligned under the button so
-   the checkbox icon sits at the same x as the button's left edge. The
-   theme's default 2.75em label padding-left is tightened so checkbox
-   and text sit together. */
+   We shrink it to 0.75em; centering happens via the parent rule below
+   that text-aligns the cell, so the row sits visually centered under
+   the (centered) submit button. Inner geometry (label padding, before
+   line-height) inherits theme defaults so the check glyph stays
+   vertically centered in its box. */
 .opt-in-toggle {
     margin-top: 0.6em;
-    text-align: left;
     font-size: 0.75em;
     opacity: 0.7;
     transition: opacity 0.15s;
@@ -896,11 +896,14 @@
     opacity: 1;
 }
 .opt-in-toggle label {
-    padding-left: 1.9em !important; /* theme default is 2.75em — tighten */
     cursor: pointer;
 }
-.opt-in-toggle label:before {
-    line-height: 1.5em !important; /* re-center icon at smaller size */
+
+/* Center the button cell so the inline-block submit and the opt-in
+   row's centered content both sit on the same vertical axis. Scoped
+   via :has() to the only .field.half on the site that holds a submit. */
+form > .fields > .field.half:has(input.submit) {
+    text-align: center;
 }
 
 /* ── Toast with undo (privacy-action confirm) ─────────────────────────── */
