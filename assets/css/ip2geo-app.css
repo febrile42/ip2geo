@@ -880,11 +880,13 @@
 /* Lives directly below the submit button in its .field.half cell.
    Uses html5up's custom checkbox pattern: <input> + sibling <label for>.
    Theme renders the visible checkbox via label:before (FA icon).
-   We shrink it to 0.75em, center it under the button, and tighten the
-   theme's default 2.75em label padding-left so checkbox+text sit together. */
+   We shrink it to 0.75em and dock it left-aligned under the button so
+   the checkbox icon sits at the same x as the button's left edge. The
+   theme's default 2.75em label padding-left is tightened so checkbox
+   and text sit together. */
 .opt-in-toggle {
     margin-top: 0.6em;
-    text-align: center;
+    text-align: left;
     font-size: 0.75em;
     opacity: 0.7;
     transition: opacity 0.15s;
