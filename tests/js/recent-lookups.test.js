@@ -76,10 +76,21 @@ function buildEntry(ips, count, nowMs) {
     return { ips: safeIps, count: safeCount, ts: nowMs };
 }
 
+function fingerprintIps(ips) {
+    return (ips || []).join('\n');
+}
+
 function appendLookup(ips, count) {
     if (!loadOptInState()) return;
     var list = loadList();
-    list.push(buildEntry(ips, count, Date.now()));
+    var entry = buildEntry(ips, count, Date.now());
+    var fp = fingerprintIps(entry.ips);
+    var dupeIdx = -1;
+    for (var i = list.length - 1; i >= 0; i--) {
+        if (fingerprintIps(list[i].ips) === fp) { dupeIdx = i; break; }
+    }
+    if (dupeIdx >= 0) list.splice(dupeIdx, 1);
+    list.push(entry);
     saveList(list);
 }
 
@@ -328,6 +339,45 @@ describe('appendLookup', () => {
         expect(list).toHaveLength(2);
         expect(list[0].count).toBe(1);
         expect(list[1].count).toBe(2);
+    });
+
+    test('dedupe: identical IP list collapses onto existing entry, ts refreshed', () => {
+        saveOptInState(true);
+        const realNow = Date.now;
+        let now = 1000;
+        Date.now = () => now;
+        try {
+            appendLookup(['1.1.1.1', '2.2.2.2'], 2);
+            now = 5000;
+            appendLookup(['3.3.3.3'], 1); // distinct entry between dupes
+            now = 9000;
+            appendLookup(['1.1.1.1', '2.2.2.2'], 2); // dupe of first
+            const list = loadList();
+            expect(list).toHaveLength(2); // 3 appends, 1 dedup'd
+            // Newest entry is the promoted dupe
+            expect(list[list.length - 1].ips).toEqual(['1.1.1.1', '2.2.2.2']);
+            expect(list[list.length - 1].ts).toBe(9000);
+            // Distinct entry stays in place
+            expect(list[0].ips).toEqual(['3.3.3.3']);
+        } finally {
+            Date.now = realNow;
+        }
+    });
+
+    test('dedupe: different order = different entry (not deduplicated)', () => {
+        saveOptInState(true);
+        appendLookup(['1.1.1.1', '2.2.2.2'], 2);
+        appendLookup(['2.2.2.2', '1.1.1.1'], 2); // same IPs, different order
+        const list = loadList();
+        expect(list).toHaveLength(2);
+    });
+
+    test('dedupe: edited list (one IP added) = different entry', () => {
+        saveOptInState(true);
+        appendLookup(['1.1.1.1', '2.2.2.2'], 2);
+        appendLookup(['1.1.1.1', '2.2.2.2', '3.3.3.3'], 3);
+        const list = loadList();
+        expect(list).toHaveLength(2);
     });
 });
 

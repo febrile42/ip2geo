@@ -412,10 +412,29 @@
             return { ips: safeIps, count: safeCount, ts: nowMs };
         }
 
+        // Order-dependent fingerprint. Re-running the exact same list
+        // (clicked from history, or retyped identically) collapses onto the
+        // existing entry. Reordered or edited input gets a fresh entry.
+        function fingerprintIps(ips) {
+            return (ips || []).join('\n');
+        }
+
         function appendLookup(ips, count) {
             if (!loadOptInState()) return; // OFF: no-op
             var list = loadList();
-            list.push(buildEntry(ips, count, Date.now()));
+            var entry = buildEntry(ips, count, Date.now());
+            var fp = fingerprintIps(entry.ips);
+            // Find existing match (search newest-first — most recent wins on
+            // collision, though the list is dedup'd so there should be ≤1).
+            var dupeIdx = -1;
+            for (var i = list.length - 1; i >= 0; i--) {
+                if (fingerprintIps(list[i].ips) === fp) { dupeIdx = i; break; }
+            }
+            if (dupeIdx >= 0) {
+                // Promote: remove old, push fresh entry (new ts, refreshed count).
+                list.splice(dupeIdx, 1);
+            }
+            list.push(entry);
             saveList(list);
         }
 
