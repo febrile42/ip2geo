@@ -12,7 +12,7 @@
 const OPTIN_KEY = 'rl_optin';
 const LIST_KEY  = 'rl_list';
 const MAX_ENTRIES = 20;
-const IPS_PER_ENTRY_CAP = 50;
+const IPS_PER_ENTRY_CAP = 10000;
 const TOAST_TIMEOUT_MS = 6000;
 
 // ── Pure helpers — mirror of production logic in ip2geo-app.js ────────────────
@@ -55,18 +55,15 @@ function saveList(items) {
     var capped = items.length > MAX_ENTRIES
         ? items.slice(items.length - MAX_ENTRIES)
         : items;
-    try {
-        window.localStorage.setItem(LIST_KEY, JSON.stringify(capped));
-        return true;
-    } catch (e) {
-        if (capped.length > 1) {
-            try {
-                window.localStorage.setItem(LIST_KEY, JSON.stringify(capped.slice(1)));
-                return true;
-            } catch (_) {}
+    while (capped.length > 0) {
+        try {
+            window.localStorage.setItem(LIST_KEY, JSON.stringify(capped));
+            return true;
+        } catch (_) {
+            capped = capped.slice(1);
         }
-        return false;
     }
+    return false;
 }
 
 function clearList() {
@@ -222,6 +219,40 @@ describe('saveList', () => {
         spy.mockRestore();
     });
 
+    test('on persistent QuotaExceeded, drops oldest iteratively until it fits', () => {
+        const items = [
+            { ips: [], count: 1, ts: 1 },
+            { ips: [], count: 2, ts: 2 },
+            { ips: [], count: 3, ts: 3 },
+            { ips: [], count: 4, ts: 4 },
+        ];
+        const realSetItem = Storage.prototype.setItem;
+        let callCount = 0;
+        const spy = jest.spyOn(Storage.prototype, 'setItem')
+            .mockImplementation(function (key, value) {
+                callCount++;
+                // Fail until only 1 entry remains
+                if (callCount < 4) throw new Error('quota');
+                return realSetItem.call(this, key, value);
+            });
+        const ok = saveList(items);
+        expect(ok).toBe(true);
+        expect(callCount).toBe(4); // 4,3,2 throw; 1-entry write succeeds
+        const stored = JSON.parse(window.localStorage.getItem(LIST_KEY));
+        expect(stored).toHaveLength(1);
+        expect(stored[0].count).toBe(4); // newest preserved, oldest 3 evicted
+        spy.mockRestore();
+    });
+
+    test('returns false when single entry exceeds quota even alone', () => {
+        const items = [{ ips: [], count: 1, ts: 1 }];
+        const spy = jest.spyOn(Storage.prototype, 'setItem')
+            .mockImplementation(() => { throw new Error('quota'); });
+        const ok = saveList(items);
+        expect(ok).toBe(false); // can't fit, give up — never block lookup flow
+        spy.mockRestore();
+    });
+
     test('on persistent QuotaExceeded, gives up silently', () => {
         const items = [
             { ips: [], count: 1, ts: 1 },
@@ -239,12 +270,25 @@ describe('saveList', () => {
 
 describe('buildEntry', () => {
     test('caps stored ips to IPS_PER_ENTRY_CAP', () => {
+        const overCap = IPS_PER_ENTRY_CAP + 5;
         const ips = [];
-        for (let i = 0; i < 100; i++) ips.push('10.0.0.' + (i % 256));
-        const entry = buildEntry(ips, 100, 12345);
+        for (let i = 0; i < overCap; i++) ips.push('10.0.0.' + (i % 256));
+        const entry = buildEntry(ips, overCap, 12345);
         expect(entry.ips).toHaveLength(IPS_PER_ENTRY_CAP);
-        expect(entry.count).toBe(100);
+        expect(entry.count).toBe(overCap);
         expect(entry.ts).toBe(12345);
+    });
+
+    test('regression: 10,000 IPs round-trip without truncation (FINDING: silent slice(0,50) on save)', () => {
+        // Bug: large lookups labeled "10,000 IPs" but only 50 stored.
+        // After fix: cap matches site input max so a 10K lookup is preserved verbatim.
+        const ips = [];
+        for (let i = 0; i < 10000; i++) ips.push('10.' + ((i >> 16) & 255) + '.' + ((i >> 8) & 255) + '.' + (i & 255));
+        const entry = buildEntry(ips, ips.length, 1);
+        expect(entry.ips).toHaveLength(10000);
+        expect(entry.count).toBe(10000);
+        expect(entry.ips[0]).toBe(ips[0]);
+        expect(entry.ips[9999]).toBe(ips[9999]);
     });
 
     test('uses ips length when count missing', () => {

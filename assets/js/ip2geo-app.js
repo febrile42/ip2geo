@@ -345,7 +345,7 @@
         var OPTIN_KEY  = 'rl_optin';
         var LIST_KEY   = 'rl_list';
         var MAX_ENTRIES = 20;
-        var IPS_PER_ENTRY_CAP = 50;
+        var IPS_PER_ENTRY_CAP = 10000; // matches the form's documented max input
         var TOAST_TIMEOUT_MS = 6000;
 
         // ── Pure helpers (testable) ────────────────────────────────────────
@@ -388,19 +388,18 @@
             var capped = items.length > MAX_ENTRIES
                 ? items.slice(items.length - MAX_ENTRIES)
                 : items;
-            try {
-                window.localStorage.setItem(LIST_KEY, JSON.stringify(capped));
-                return true;
-            } catch (e) {
-                // Quota exceeded — drop oldest, retry once
-                if (capped.length > 1) {
-                    try {
-                        window.localStorage.setItem(LIST_KEY, JSON.stringify(capped.slice(1)));
-                        return true;
-                    } catch (_) {}
+            // On quota exceeded, drop the oldest entry and retry. Loop until
+            // it fits or the list is empty (single huge entry can't fit at all).
+            // Bound the loop by the list length so we never spin forever.
+            while (capped.length > 0) {
+                try {
+                    window.localStorage.setItem(LIST_KEY, JSON.stringify(capped));
+                    return true;
+                } catch (_) {
+                    capped = capped.slice(1);
                 }
-                return false; // give up silently — never block the lookup flow
             }
+            return false; // give up silently — never block the lookup flow
         }
 
         function clearList() {
