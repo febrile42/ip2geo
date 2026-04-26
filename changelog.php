@@ -36,6 +36,8 @@
 					<section id="main" class="wrapper">
 						<div class="inner">
 							<h1 class="major">Changelog</h1>
+									<h3>3.5.0 - 2026-04-26</h3>
+								<p>Recent Lookups saved in local browser storage only. I don&rsquo;t want to save your list, but sometimes you want to pull up that list you pasted five minutes ago. If you want to opt out, just uncheck the box.</p>
 									<h3>3.4.0 - 2026-04-18</h3>
 							<p>The paid report has always included ready-to-run block scripts. Turns out that&rsquo;s not very helpful if you&rsquo;ve never pasted something into a terminal. Click any format to preview the exact commands inline, copy them in one click, and follow the three-step guide below if you&rsquo;re not sure what to do next. If you don&rsquo;t have SSH access at all, there&rsquo;s a new section pointing toward your hosting panel&rsquo;s IP blocker instead.</p>
 								<h3>3.3.0 - 2026-04-18</h3>
