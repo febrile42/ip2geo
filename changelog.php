@@ -37,7 +37,7 @@
 						<div class="inner">
 							<h1 class="major">Changelog</h1>
 							<h3>3.5.1 - 2026-04-26</h3>
-							<p>Tightened the free Threat Report retention wording in the <a href="/privacy.php">privacy policy</a>. Same actual behaviour &mdash; data is still permanently deleted 14 days after generation &mdash; but the previous wording could be read as 21 days. Behind the scenes, the cleanup job now hands a small bundle of anonymised metrics off to the admin dashboard before it deletes a free row, so I can keep watching free-tier trends without keeping the source data around any longer than I have to.</p>
+							<p>Fixed the free Threat Report retention wording in the <a href="/privacy.php">privacy policy</a>. Same actual behaviour &mdash; data is still permanently deleted 14 days after generation &mdash; but the old wording could be read as 21 days and that was, you know, wrong.</p>
 							<h3>3.5.0 - 2026-04-26</h3>
 							<p>Recent Lookups saved &mdash; in local browser storage only. I don't want to save your list, but sometimes you want to pull up that list you pasted five minutes ago. If you want to opt out, just uncheck the box.</p>
 							<h3>3.4.0 - 2026-04-18</h3>
