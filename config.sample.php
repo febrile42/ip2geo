@@ -12,6 +12,12 @@ $db_user = 'your_db_user';
 $db_pass = 'your_db_password';
 $db_name = 'your_db_name';
 
+// Optional: name of the ip2geo-admin cache database on the same MariaDB instance.
+// When set, scripts/cleanup-reports.php materializes free-tier analytics into
+// {$admin_db_name}.report_meta before deleting free rows, so admin dashboards
+// survive deletion. Leave unset (or empty) on staging / dev to skip.
+$admin_db_name = '';
+
 // Stripe — https://dashboard.stripe.com/apikeys
 // Use a restricted key scoped to: Checkout Sessions → Write (nothing else needed).
 // For QA/staging, use a Stripe Sandbox (Dashboard → account menu → Sandboxes) —
