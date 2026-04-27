@@ -67,22 +67,30 @@ if ($admin_db_name !== '') {
     )->fetchAll(PDO::FETCH_ASSOC);
 
     if ($rows) {
+        // Look up free→paid conversion at materialization time so we can record
+        // the timestamp without persisting submission_hash.
+        $conversion_lookup = $pdo->prepare(
+            "SELECT MIN(created_at) AS converted_at FROM reports
+             WHERE submission_hash = :submission_hash
+               AND status IN ('paid','redeemed')"
+        );
+
         $upsert = $pdo->prepare(
             "INSERT INTO `{$admin_db_name}`.`report_meta`
                 (token, top_country, unique_countries, computed_at,
-                 status, submission_hash, created_at,
-                 ip_count, verdict, acquisition_domain, has_email)
+                 status, created_at, ip_count, verdict,
+                 acquisition_domain, has_email, converted_to_paid_at)
              VALUES (:token, NULL, 0, NOW(),
-                 :status, :submission_hash, :created_at,
-                 :ip_count, :verdict, :acquisition_domain, :has_email)
+                 :status, :created_at, :ip_count, :verdict,
+                 :acquisition_domain, :has_email, :converted_to_paid_at)
              ON DUPLICATE KEY UPDATE
                  status = VALUES(status),
-                 submission_hash = VALUES(submission_hash),
                  created_at = VALUES(created_at),
                  ip_count = VALUES(ip_count),
                  verdict = VALUES(verdict),
                  acquisition_domain = VALUES(acquisition_domain),
                  has_email = VALUES(has_email),
+                 converted_to_paid_at = VALUES(converted_to_paid_at),
                  computed_at = NOW()"
         );
 
@@ -99,15 +107,18 @@ if ($admin_db_name !== '') {
                 }
             }
 
+            $conversion_lookup->execute([':submission_hash' => $r['submission_hash']]);
+            $converted_at = $conversion_lookup->fetchColumn() ?: null;
+
             $upsert->execute([
-                ':token'              => $r['token'],
-                ':status'             => $r['status'],
-                ':submission_hash'    => $r['submission_hash'],
-                ':created_at'         => $r['created_at'],
-                ':ip_count'           => count($ip_list),
-                ':verdict'            => $verdict,
-                ':acquisition_domain' => $domain,
-                ':has_email'          => !empty($r['notification_email']) ? 1 : 0,
+                ':token'                => $r['token'],
+                ':status'               => $r['status'],
+                ':created_at'           => $r['created_at'],
+                ':ip_count'             => count($ip_list),
+                ':verdict'              => $verdict,
+                ':acquisition_domain'   => $domain,
+                ':has_email'            => !empty($r['notification_email']) ? 1 : 0,
+                ':converted_to_paid_at' => $converted_at,
             ]);
             $free_materialized++;
         }
