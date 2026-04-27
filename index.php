@@ -688,6 +688,8 @@ else
 					</div>
 				</section>
 
+				<?php require __DIR__ . '/includes/footer.php'; ?>
+
 			</div>
 
 		<!-- Toast container for recent-lookups undo affordance (managed by ip2geo-app.js) -->
@@ -695,8 +697,6 @@ else
 			<span id="rl-toast-msg"></span>
 			<button type="button" id="rl-toast-undo">Undo</button>
 		</div>
-
-		<?php require __DIR__ . '/includes/footer.php'; ?>
 
 		<!-- Scripts -->
 		<script data-cfasync="false">
