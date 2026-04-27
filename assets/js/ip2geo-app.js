@@ -337,4 +337,344 @@
     // Init filters + stripes + rules on initial server-rendered load
     applyFilters();
 
+    // ── Recent lookups: opt-in localStorage memory ─────────────────────────
+    // Default OFF. localStorage only — never sent to the server.
+    // Toast-with-undo pattern for destructive actions (toggle-off, clear).
+    // See ~/.gstack/projects/febrile42-ip2geo/shadows-develop-eng-review-test-plan-20260426-105859.md
+    var RL = (function () {
+        var OPTIN_KEY  = 'rl_optin';
+        var LIST_KEY   = 'rl_list';
+        var MAX_ENTRIES = 20;
+        var IPS_PER_ENTRY_CAP = 10000; // matches the form's documented max input
+        var TOAST_TIMEOUT_MS = 6000;
+
+        // ── Pure helpers (testable) ────────────────────────────────────────
+        function isStorageAvailable() {
+            try {
+                var t = '_rl_test';
+                window.localStorage.setItem(t, '1');
+                window.localStorage.removeItem(t);
+                return true;
+            } catch (_) {
+                return false;
+            }
+        }
+
+        function loadOptInState() {
+            try { return window.localStorage.getItem(OPTIN_KEY) === '1'; }
+            catch (_) { return false; }
+        }
+
+        function saveOptInState(value) {
+            try {
+                if (value) window.localStorage.setItem(OPTIN_KEY, '1');
+                else       window.localStorage.removeItem(OPTIN_KEY);
+            } catch (_) {}
+        }
+
+        function loadList() {
+            try {
+                var raw = window.localStorage.getItem(LIST_KEY);
+                if (raw === null) return [];
+                var parsed = JSON.parse(raw);
+                return Array.isArray(parsed) ? parsed : [];
+            } catch (_) {
+                return [];
+            }
+        }
+
+        function saveList(items) {
+            // Cap entries (keep newest)
+            var capped = items.length > MAX_ENTRIES
+                ? items.slice(items.length - MAX_ENTRIES)
+                : items;
+            // On quota exceeded, drop the oldest entry and retry. Loop until
+            // it fits or the list is empty (single huge entry can't fit at all).
+            // Bound the loop by the list length so we never spin forever.
+            while (capped.length > 0) {
+                try {
+                    window.localStorage.setItem(LIST_KEY, JSON.stringify(capped));
+                    return true;
+                } catch (_) {
+                    capped = capped.slice(1);
+                }
+            }
+            return false; // give up silently — never block the lookup flow
+        }
+
+        function clearList() {
+            try { window.localStorage.removeItem(LIST_KEY); } catch (_) {}
+        }
+
+        function buildEntry(ips, count, nowMs) {
+            var safeIps = (ips || []).slice(0, IPS_PER_ENTRY_CAP);
+            var safeCount = (typeof count === 'number' && count >= 0) ? count : safeIps.length;
+            return { ips: safeIps, count: safeCount, ts: nowMs };
+        }
+
+        // Order-dependent fingerprint. Re-running the exact same list
+        // (clicked from history, or retyped identically) collapses onto the
+        // existing entry. Reordered or edited input gets a fresh entry.
+        function fingerprintIps(ips) {
+            return (ips || []).join('\n');
+        }
+
+        function appendLookup(ips, count) {
+            if (!loadOptInState()) return; // OFF: no-op
+            var list = loadList();
+            var entry = buildEntry(ips, count, Date.now());
+            var fp = fingerprintIps(entry.ips);
+            // Find existing match (search newest-first — most recent wins on
+            // collision, though the list is dedup'd so there should be ≤1).
+            var dupeIdx = -1;
+            for (var i = list.length - 1; i >= 0; i--) {
+                if (fingerprintIps(list[i].ips) === fp) { dupeIdx = i; break; }
+            }
+            if (dupeIdx >= 0) {
+                // Promote: remove old, push fresh entry (new ts, refreshed count).
+                list.splice(dupeIdx, 1);
+            }
+            list.push(entry);
+            saveList(list);
+        }
+
+        function relativeTime(ts, nowMs) {
+            var diffSecs = Math.floor((nowMs - ts) / 1000);
+            if (diffSecs < 60)    return diffSecs <= 1 ? 'just now' : diffSecs + ' sec ago';
+            var diffMins = Math.floor(diffSecs / 60);
+            if (diffMins < 60)    return diffMins === 1 ? '1 min ago' : diffMins + ' min ago';
+            var diffHours = Math.floor(diffMins / 60);
+            if (diffHours < 24)   return diffHours === 1 ? '1 hr ago' : diffHours + ' hr ago';
+            var diffDays = Math.floor(diffHours / 24);
+            return diffDays === 1 ? '1 day ago' : diffDays + ' days ago';
+        }
+
+        // ── DOM rendering ──────────────────────────────────────────────────
+        function renderList() {
+            var widget = document.getElementById('recent-lookups');
+            var listEl = document.getElementById('recent-lookups-list');
+            if (!widget || !listEl) return;
+
+            var optIn = loadOptInState();
+            var items = loadList();
+
+            // Hide widget unless opt-in ON and list nonempty
+            if (!optIn || !items.length) {
+                widget.hidden = true;
+                listEl.innerHTML = '';
+                return;
+            }
+
+            widget.hidden = false;
+            listEl.innerHTML = '';
+            var now = Date.now();
+
+            // Render newest first as pill chips: "10,000 IPs · 2 min ago".
+            // The IP preview (first 3 + ellipsis) lives on the title attribute
+            // for hover-to-peek without cluttering the chip surface.
+            items.slice().reverse().forEach(function (entry, revIdx) {
+                var origIdx = items.length - 1 - revIdx;
+                var li = document.createElement('li');
+                var btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'recent-lookup-item';
+                btn.dataset.idx = String(origIdx);
+
+                var preview = entry.ips.slice(0, 3).join(', ');
+                if (entry.count > 3) preview += ', …';
+                btn.title = preview;
+
+                var countLabel = entry.count.toLocaleString() + ' IP' + (entry.count !== 1 ? 's' : '');
+                var countEl = document.createElement('span');
+                countEl.className = 'recent-lookup-count';
+                countEl.textContent = countLabel;
+
+                var dotEl = document.createElement('span');
+                dotEl.className = 'recent-lookup-dot';
+                dotEl.setAttribute('aria-hidden', 'true');
+                dotEl.textContent = '·';
+
+                var timeEl = document.createElement('span');
+                timeEl.className = 'recent-lookup-time';
+                timeEl.textContent = relativeTime(entry.ts, now);
+
+                btn.appendChild(countEl);
+                btn.appendChild(dotEl);
+                btn.appendChild(timeEl);
+                li.appendChild(btn);
+                listEl.appendChild(li);
+            });
+        }
+
+        function fillTextareaFromEntry(idx) {
+            var items = loadList();
+            var entry = items[idx];
+            if (!entry) return;
+            var textarea = document.getElementById('message');
+            if (!textarea) return;
+            textarea.value = entry.ips.join('\n');
+            textarea.focus();
+            textarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        // ── Toast with undo ────────────────────────────────────────────────
+        var toastTimer = null;
+        var pendingUndo = null;
+
+        function showToast(message, undoFn) {
+            var toast = document.getElementById('rl-toast');
+            var msgEl = document.getElementById('rl-toast-msg');
+            var undoBtn = document.getElementById('rl-toast-undo');
+            if (!toast || !msgEl || !undoBtn) return;
+
+            // Cancel any prior pending toast (commit its action immediately)
+            if (toastTimer) {
+                clearTimeout(toastTimer);
+                toastTimer = null;
+                pendingUndo = null;
+            }
+
+            msgEl.textContent = message;
+            pendingUndo = undoFn;
+            toast.hidden = false;
+            // Force reflow for slide-in transition
+            void toast.offsetWidth;
+            toast.classList.add('rl-toast-visible');
+
+            toastTimer = setTimeout(function () {
+                hideToast(false); // commit action (do not call undo)
+            }, TOAST_TIMEOUT_MS);
+        }
+
+        function hideToast(viaUndo) {
+            var toast = document.getElementById('rl-toast');
+            if (!toast) return;
+            if (viaUndo && typeof pendingUndo === 'function') {
+                try { pendingUndo(); } catch (_) {}
+                try { window.umami && umami.track('recent_lookups_undo'); } catch(_) {}
+            }
+            pendingUndo = null;
+            if (toastTimer) {
+                clearTimeout(toastTimer);
+                toastTimer = null;
+            }
+            toast.classList.remove('rl-toast-visible');
+            // Hide after transition completes; safe to set hidden immediately
+            // since hidden + class removal both prevent display
+            toast.hidden = true;
+        }
+
+        // ── Event handlers ─────────────────────────────────────────────────
+        function handleToggleChange(event) {
+            var checked = event.target.checked;
+            if (checked) {
+                saveOptInState(true);
+                try { window.umami && umami.track('recent_lookups_optin'); } catch(_) {}
+                renderList();
+                return;
+            }
+
+            // Unchecking
+            var listSnapshot = loadList();
+            if (!listSnapshot.length) {
+                // Empty list: silent off, no toast
+                saveOptInState(false);
+                try { window.umami && umami.track('recent_lookups_optout'); } catch(_) {}
+                renderList();
+                return;
+            }
+
+            // Nonempty: optimistic clear + toast with undo
+            saveOptInState(false);
+            clearList();
+            renderList();
+
+            showToast('Cleared ' + listSnapshot.length + ' lookup' + (listSnapshot.length !== 1 ? 's' : '') + '.', function undo() {
+                // Restore both the list and the opt-in flag, re-check the toggle
+                saveOptInState(true);
+                saveList(listSnapshot);
+                renderList();
+                var optInEl = document.getElementById('rl-optin');
+                if (optInEl) optInEl.checked = true;
+            });
+
+            // Fire optout event after toast timeout commits (not on uncheck — undo may revert)
+            // Use a separate timer so umami fires only when commit happens
+            setTimeout(function () {
+                if (!loadOptInState()) {
+                    try { window.umami && umami.track('recent_lookups_optout'); } catch(_) {}
+                }
+            }, TOAST_TIMEOUT_MS + 50);
+        }
+
+        function handleClearClick() {
+            var listSnapshot = loadList();
+            if (!listSnapshot.length) return; // nothing to clear
+
+            clearList();
+            renderList();
+
+            showToast('Cleared ' + listSnapshot.length + ' lookup' + (listSnapshot.length !== 1 ? 's' : '') + '.', function undo() {
+                // Restore list; opt-in stays on
+                saveList(listSnapshot);
+                renderList();
+            });
+
+            setTimeout(function () {
+                if (!loadList().length) {
+                    try { window.umami && umami.track('recent_lookups_clear'); } catch(_) {}
+                }
+            }, TOAST_TIMEOUT_MS + 50);
+        }
+
+        function handleListClick(event) {
+            var btn = event.target.closest && event.target.closest('.recent-lookup-item');
+            if (!btn) return;
+            var idx = parseInt(btn.dataset.idx, 10);
+            if (isNaN(idx)) return;
+            fillTextareaFromEntry(idx);
+        }
+
+        function handleLookupSubmit(event) {
+            var detail = event.detail || {};
+            appendLookup(detail.ips, detail.count);
+            renderList();
+        }
+
+        // ── Init ───────────────────────────────────────────────────────────
+        function init() {
+            if (!isStorageAvailable()) return; // toggle row stays hidden
+
+            var row = document.getElementById('rl-optin-row');
+            var optInEl = document.getElementById('rl-optin');
+            if (!row || !optInEl) return;
+
+            // Reveal toggle row only when storage is available
+            row.hidden = false;
+
+            // Restore toggle state from localStorage
+            optInEl.checked = loadOptInState();
+
+            // Wire up
+            optInEl.addEventListener('change', handleToggleChange);
+
+            var clearBtn = document.getElementById('recent-lookups-clear');
+            if (clearBtn) clearBtn.addEventListener('click', handleClearClick);
+
+            var listEl = document.getElementById('recent-lookups-list');
+            if (listEl) listEl.addEventListener('click', handleListClick);
+
+            var undoBtn = document.getElementById('rl-toast-undo');
+            if (undoBtn) undoBtn.addEventListener('click', function () { hideToast(true); });
+
+            document.addEventListener('ip2geo:lookup_submit', handleLookupSubmit);
+
+            renderList();
+        }
+
+        return { init: init };
+    })();
+
+    RL.init();
+
 })();

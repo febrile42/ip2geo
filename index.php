@@ -74,6 +74,16 @@ $view_token_val  = $view_token_mode ? preg_replace('/[^a-f0-9\-]/', '', trim($_G
 						<div class="inner">
 							<h1>ip2geo Lookup</h1>
 							<p>Enter an IPv4 address (or 10,000) below and hit "Look Up IP Addresses" to find a general geographic area or city the IP is registered to. Any non-IP text is stripped, so feel free to just paste your whole log file, netstat output, or whatever pile of plain text that includes some IPs you want to check (as long as it's less than 2MB).</p>
+
+							<!-- Recent lookups widget — rendered by ip2geo-app.js when opt-in is on + list is nonempty -->
+							<div id="recent-lookups" hidden>
+								<div id="recent-lookups-header">
+									<h3>Recent lookups <small>(this browser only)</small></h3>
+									<button type="button" id="recent-lookups-clear" class="button small">Clear</button>
+								</div>
+								<ul id="recent-lookups-list"></ul>
+							</div>
+
 							<div class="style1">
 								<section>
 									<form action="#results" method="post" name="ip_entry" id="iplookup">
@@ -98,6 +108,12 @@ if ($view_token_mode) {
 											<div class="field half">
 												<label for="email">&nbsp;</label>
 												<input type="submit" class="submit" value="Look Up IP Addresses" />
+												<!-- Opt-in toggle for recent-lookups (default off; localStorage only).
+												     Lives under the submit button: discoverable but unobtrusive. -->
+												<div id="rl-optin-row" class="opt-in-toggle" hidden>
+													<input type="checkbox" id="rl-optin" name="rl-optin">
+													<label for="rl-optin" title="Stored in your browser only. Never sent to our server.">Remember in this browser</label>
+												</div>
 											</div>
 										</div>
 									</form>
@@ -672,9 +688,15 @@ else
 					</div>
 				</section>
 
+				<?php require __DIR__ . '/includes/footer.php'; ?>
+
 			</div>
 
-		<?php require __DIR__ . '/includes/footer.php'; ?>
+		<!-- Toast container for recent-lookups undo affordance (managed by ip2geo-app.js) -->
+		<div id="rl-toast" role="status" aria-live="polite" hidden>
+			<span id="rl-toast-msg"></span>
+			<button type="button" id="rl-toast-undo">Undo</button>
+		</div>
 
 		<!-- Scripts -->
 		<script data-cfasync="false">
@@ -751,6 +773,14 @@ else
 					             : count <= 5000 ? '1001-5000'
 					             :                 '5000+';
 					try { umami.track('lookup_submit', { ip_count_bucket: bucket }); } catch(_) {}
+
+					// Recent-lookups: notify the opt-in handler with the actual IPs.
+					// Listener lives in assets/js/ip2geo-app.js; it no-ops when opt-in is OFF.
+					try {
+						document.dispatchEvent(new CustomEvent('ip2geo:lookup_submit', {
+							detail: { ips: matches || [], count: count }
+						}));
+					} catch(_) {}
 
 				} catch (err) {
 					cleanup();

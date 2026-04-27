@@ -797,3 +797,171 @@
     opacity: 0.6;
     font-size: 0.92em;
 }
+
+/* ── Recent lookups (opt-in localStorage) ─────────────────────────────── */
+/* Pill-chip aesthetic: borrows the theme's pill-button DNA. No panel
+   chrome — sits inline in the form rhythm. Each lookup is a compact
+   rounded chip with count + relative time; the IP preview moves to a
+   title-attribute tooltip so chips stay scannable. */
+#recent-lookups {
+    margin: 1.25em 0;
+    padding: 0;
+    border: none;
+    background: transparent;
+}
+#recent-lookups-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75em;
+    margin-bottom: 0.6em;
+}
+#recent-lookups-header h3 {
+    margin: 0;
+    font-size: 0.7em;
+    font-weight: 700;
+    line-height: 1.3;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    opacity: 0.55;
+}
+#recent-lookups-header h3 small {
+    font-size: 1em;
+    font-weight: 400;
+    letter-spacing: 0;
+    text-transform: none;
+    margin-left: 0.6em;
+    opacity: 0.6;
+}
+#recent-lookups-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5em;
+}
+#recent-lookups-list li {
+    margin: 0;
+    padding: 0;
+}
+/* Override theme's `button` defaults (font-size:0.6em, height:4.75em,
+   text-transform:uppercase + !important on border/color). The pill
+   shape (border-radius: 3em) we keep — it matches the theme's submit
+   button. */
+#recent-lookups-list .recent-lookup-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    height: auto;
+    line-height: 1.4;
+    padding: 0.45em 1em;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.18) !important;
+    border-radius: 3em !important;
+    color: rgba(255,255,255,0.85) !important;
+    font: inherit;
+    font-size: 0.85em;
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: 0;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s;
+}
+#recent-lookups-list .recent-lookup-item:hover,
+#recent-lookups-list .recent-lookup-item:focus {
+    background: rgba(255,255,255,0.08);
+    border-color: rgba(255,255,255,0.35) !important;
+    outline: none;
+}
+.recent-lookup-count {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+.recent-lookup-dot {
+    opacity: 0.3;
+}
+.recent-lookup-time {
+    opacity: 0.55;
+    font-size: 0.92em;
+}
+
+/* ── Opt-in toggle row ────────────────────────────────────────────────── */
+/* Lives directly below the submit button in its .field.half cell.
+   Uses html5up's custom checkbox pattern: <input> + sibling <label for>.
+   Theme renders the visible checkbox via label:before (FA icon).
+   We shrink it to 0.75em; centering happens via the parent rule below
+   that text-aligns the cell, so the row sits visually centered under
+   the (centered) submit button. Inner geometry (label padding, before
+   line-height) inherits theme defaults so the check glyph stays
+   vertically centered in its box. */
+.opt-in-toggle {
+    margin-top: 0.6em;
+    font-size: 0.75em;
+    opacity: 0.7;
+    transition: opacity 0.15s;
+}
+.opt-in-toggle:hover,
+.opt-in-toggle:focus-within {
+    opacity: 1;
+}
+.opt-in-toggle label {
+    cursor: pointer;
+}
+
+/* Center the button cell so the inline-block submit and the opt-in
+   row's centered content both sit on the same vertical axis. Scoped
+   via :has() to the only .field.half on the site that holds a submit. */
+form > .fields > .field.half:has(input.submit) {
+    text-align: center;
+}
+
+/* ── Toast with undo (privacy-action confirm) ─────────────────────────── */
+#rl-toast {
+    position: fixed;
+    left: 50%;
+    bottom: 1.5em;
+    transform: translate(-50%, calc(100% + 2em));
+    display: flex;
+    align-items: center;
+    gap: 0.85em;
+    padding: 0.7em 1em 0.7em 1.1em;
+    background: rgba(28, 28, 32, 0.96);
+    color: #f4f4f6;
+    border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 6px;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.35);
+    font-size: 0.9em;
+    z-index: 2147483646;
+    transition: transform 0.22s ease;
+    max-width: calc(100vw - 2em);
+}
+#rl-toast.rl-toast-visible {
+    transform: translate(-50%, 0);
+}
+#rl-toast-msg {
+    line-height: 1.3;
+}
+/* Override theme's `button` defaults (font-size:0.6em, height:4.75em,
+   text-transform:uppercase, border-radius:3em + !important on border/color). */
+#rl-toast #rl-toast-undo {
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.25) !important;
+    color: inherit !important;
+    font: inherit;
+    font-weight: 600;
+    height: auto;
+    padding: 0.35em 0.85em;
+    border-radius: 3px !important;
+    text-transform: none;
+    letter-spacing: normal;
+    line-height: 1.3;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s;
+}
+#rl-toast #rl-toast-undo:hover,
+#rl-toast #rl-toast-undo:focus {
+    background: rgba(255,255,255,0.08);
+    border-color: rgba(255,255,255,0.45) !important;
+    outline: none;
+}
