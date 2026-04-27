@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - develop
+      - v4reskin
 
 jobs:
 
@@ -106,6 +107,38 @@ jobs:
             exit 1
           fi
           echo "Performance check passed"
+
+  # ── v4reskin → v4reskin.ip2geo.org ────────────────────────────────────────
+  deploy-v4reskin:
+    name: Deploy to v4reskin
+    needs: lint
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/v4reskin'
+    steps:
+      - name: Pull v4reskin on server (v4reskin dir)
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT }}
+          script: |
+            cd ${{ secrets.V4RESKIN_PATH }}
+            git fetch origin && git reset --hard origin/v4reskin
+            ~/bin/composer install --no-dev --no-interaction --quiet
+            printf "User-agent: *\nDisallow: /\n" > robots.txt
+
+      - name: Smoke test — v4reskin origin returns HTTP 200
+        run: |
+          sleep 3
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Host: v4reskin.ip2geo.org" \
+            "http://${{ secrets.DEPLOY_HOST }}")
+          if [ "$STATUS" != "200" ]; then
+            echo "v4reskin smoke test failed: HTTP $STATUS"
+            exit 1
+          fi
+          echo "v4reskin smoke test passed"
 
   # ── main → production ─────────────────────────────────────────────────────
   deploy-production:
