@@ -21,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-$allowed_hosts = ['ip2geo.org', 'staging.ip2geo.org'];
+$allowed_hosts = ['ip2geo.org', 'staging.ip2geo.org', 'v4reskin.ip2geo.org'];
 $host = strtolower(explode(':', $_SERVER['HTTP_HOST'] ?? '')[0]);
 if (!in_array($host, $allowed_hosts, true)) {
     header('Location: /');
