@@ -783,7 +783,7 @@ button.button.small:hover {
    --border, lift to --accent-purple on hover. Matches the asymmetric hero
    rhythm without adding panel chrome. */
 #recent-lookups {
-  margin: 28px 0 0;
+  margin: 1.25em 0 0;
 }
 #recent-lookups-header {
   align-items: center;
