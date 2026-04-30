@@ -84,6 +84,15 @@
 *, *::before, *::after { box-sizing: border-box; }
 html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; scroll-padding-top: 72px; }
 
+/* Honor the HTML5 [hidden] attribute everywhere. The UA stylesheet's
+   `[hidden] { display: none }` is the lowest-specificity rule possible, so
+   any class-based `display: flex` or `display: inline-flex` we set later
+   silently defeats it. JS that does `el.hidden = true` then becomes a no-op
+   for those elements (button.small show-all toggle, block-rules panels).
+   The !important is the canonical fix here — it's how Bootstrap, Tailwind,
+   and modern resets handle the same UA specificity foot-gun. */
+[hidden] { display: none !important; }
+
 body {
   margin: 0;
   background: var(--bg);
@@ -1727,11 +1736,7 @@ button.button.small:hover {
 .block-rules-panel .button {
     margin: 0;
 }
-
-/* The block-rules-panel `display: flex` above beats the browser's UA
-   `[hidden] { display: none }` on specificity, so JS toggling `panel.hidden`
-   would otherwise be a no-op. Restore the hidden semantics here. */
-.report-inner .block-rules-panel[hidden] { display: none; }
+/* (block-rules-panel[hidden] is honored by the global [hidden] rule in §2.) */
 
 /* ---------- 18d. Format-block (CIDR / iptables / ufw / nginx preview) ---------- */
 .format-entry {
