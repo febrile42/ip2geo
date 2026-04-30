@@ -11,7 +11,9 @@ render_page_open('Changelog — ip2geo.org', 'Release notes for ip2geo.org.');
 
         <div class="prose">
             <h3>4.0.0 — 2026-04-30</h3>
-            <p>The whole site got a new look: modern, restrained, brutalist-leaning.&nbsp;&#129304; <a href="https://vercel.com/font" target="_blank" rel="noopener">Geist</a> for type. A sticky top nav that doesn't take up a third of the viewport. And a real light/dark toggle &mdash; but dark as default, because it's correct.</p>
+            <p>The whole site got a new look: modern, restrained, brutalist-leaning. &#129304;</p>
+            
+            <p><a href="https://vercel.com/font" target="_blank" rel="noopener">Geist</a> for type. A sticky top nav that doesn't take up a third of the viewport. And a real light/dark toggle &mdash; but dark as default, because it's correct.</p>
 
             <p>The site also lost weight. Until this release, seven scripts were downloaded that came with the original site template years ago and that nothing on the page needed (maybe ever). About 110KB of JavaScript and seven extra HTTP requests, gone. Another 90KB of leftover, unused template CSS went with it. First paint should be snappier, and the codebase is considerably less embarrassing to <code>git clone</code>.</p>
 
