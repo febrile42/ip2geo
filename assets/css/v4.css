@@ -1203,6 +1203,13 @@ button.button.small:hover {
 .report-inner .report-free-table th { white-space: nowrap; }
 .report-inner .report-free-table .col-num { color: var(--text-muted); opacity: 0.7; }
 .report-inner .report-free-table .col-mono { font-family: var(--font-mono); font-feature-settings: "tnum" 1; }
+
+/* Global col-mono — this is the canonical "monospace digits, aligned"
+   class. Used unwrapped in report.php Top Threat Sources (IP, hits) and
+   intel.php (CIDR), where there's no per-table wrapper class to scope
+   against. The .report-free-table and .intel-table scoped rules above
+   stay as redundant overrides; harmless. */
+.col-mono { font-family: var(--font-mono); font-feature-settings: "tnum" 1; }
 .report-inner .report-free-table .col-asn { font-size: 0.85em; }
 .report-inner .report-free-table .col-asn .asn-org { opacity: 0.6; margin-left: 4px; }
 .report-inner .report-free-table .col-right { text-align: right; }
