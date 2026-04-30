@@ -279,10 +279,10 @@ main {
 .hero { padding: 80px 0 56px; }
 
 .lead {
-  font-size: 18px;
-  line-height: 1.55;
+  font-size: 16px;
+  line-height: 1.6;
   color: var(--text-muted);
-  max-width: 520px;
+  max-width: var(--prose-max);
   margin: 0 0 32px;
 }
 .lead strong { color: var(--text); font-weight: 500; }
