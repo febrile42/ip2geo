@@ -747,10 +747,10 @@ button.button.small:hover {
   background: var(--surface-2);
   border-top-color: var(--border);
 }
-.threat-cta-reason,
-.threat-cta-stats { color: var(--text-muted); opacity: 1; }
+.threat-cta-reason { color: var(--text-muted); opacity: 1; font-size: 1em; }
+.threat-cta-stats { color: var(--text-muted); opacity: 1; font-size: 0.9em; }
 .threat-cta-fine { color: var(--text-muted); opacity: 0.8; }
-.threat-cta-features { color: var(--text); opacity: 1; }
+.threat-cta-features { color: var(--text); opacity: 1; font-size: 0.9em; padding: 14px 0 0; }
 .threat-cta-features li { color: var(--text-muted); }
 
 /* Empty filter message — center align inside the table card. */
