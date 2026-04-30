@@ -47,6 +47,15 @@
   --border: rgba(26,19,48,0.10);
 }
 
+/* Default-link underline visibility tuning, light theme only.
+   Dark theme uses var(--border) at rgba(255,255,255,0.08) which reads
+   correctly on the dark surface. Light theme's var(--border) at
+   rgba(26,19,48,0.10) is too faint on white and links lose their
+   affordance. Bump to a 35%-alpha near-black so links read as links;
+   hover continues to light up to var(--accent-purple). */
+[data-theme="light"] a { text-decoration-color: rgba(26,19,48,0.35); }
+[data-theme="light"] footer#footer a { text-decoration-color: rgba(26,19,48,0.35); }
+
 /* ============================================================
    2. RESET + BASE
    ============================================================ */
@@ -1392,8 +1401,6 @@ button.button.small:hover {
   border-radius: 3px;
   color: var(--text);
 }
-.report-inner .prose a { color: var(--accent-purple); }
-.report-inner .prose a:hover { color: var(--magenta); }
 
 /* Subtle inline link (was style="opacity:0.7;font-size:0.9em") */
 .report-inner .link-muted {
