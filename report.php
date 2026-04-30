@@ -572,7 +572,7 @@ function include_block_rules_tabs(string $token, bool $has_ranges, array $report
                                 <button class="copy-btn button small">&#128203; Copy</button>
                                 <a href="<?php echo $href; ?>" class="button small">&#8595; Download</a>
                             </div>
-                            <pre class="block-script-preview"><code><?php echo $content; ?></code></pre>
+                            <pre class="block-script-preview"><?php echo $content; ?></pre>
                         </div>
                     </div>
         <?php

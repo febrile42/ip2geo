@@ -743,12 +743,6 @@
     overflow-y: auto;
     white-space: pre;
 }
-.block-script-preview code {
-    font-family: var(--mono, monospace);
-    background: none;
-    padding: 0;
-    color: inherit;
-}
 .format-actions {
     display: flex;
     align-items: center;
