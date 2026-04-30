@@ -51,7 +51,7 @@
    2. RESET + BASE
    ============================================================ */
 *, *::before, *::after { box-sizing: border-box; }
-html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; scroll-padding-top: 72px; }
 
 body {
   margin: 0;

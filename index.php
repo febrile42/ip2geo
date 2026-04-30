@@ -748,6 +748,41 @@ else
 		})();
 		</script>
 
+		<!-- Smooth in-page anchor scroll (fixed ~500ms regardless of distance) -->
+		<script>
+		(function() {
+			var DURATION = 500;
+			var OFFSET = 72;
+			var reduced = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+			function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+			function scrollTo(targetY) {
+				if (reduced) { window.scrollTo(0, targetY); return; }
+				var startY = window.pageYOffset;
+				var dy = targetY - startY;
+				if (dy === 0) return;
+				var t0 = performance.now();
+				function step(now) {
+					var p = Math.min(1, (now - t0) / DURATION);
+					window.scrollTo(0, startY + dy * easeOutCubic(p));
+					if (p < 1) requestAnimationFrame(step);
+				}
+				requestAnimationFrame(step);
+			}
+			document.addEventListener('click', function(e) {
+				var a = e.target.closest && e.target.closest('a[href^="#"]');
+				if (!a) return;
+				var hash = a.getAttribute('href');
+				if (!hash || hash === '#') return;
+				var target = document.getElementById(hash.slice(1));
+				if (!target) return;
+				e.preventDefault();
+				var y = target.getBoundingClientRect().top + window.pageYOffset - OFFSET;
+				scrollTo(y);
+				history.replaceState(null, '', hash);
+			});
+		})();
+		</script>
+
 		<!-- Scripts -->
 		<script data-cfasync="false">
 		(function() {
