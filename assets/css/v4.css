@@ -1157,6 +1157,15 @@ button.button.small:hover {
   margin: 12px 0;
 }
 
+/* Panel needs horizontal inset so the .cidr-explainer intro text doesn't
+   hug the panel edge. ip2geo-app.css declares padding: 0.25em 0 — that
+   zero horizontal padding made the italic line read as if it leaked out
+   of the card. format-block children naturally inset by the same amount,
+   reading as cards-inside-card. */
+.report-inner .block-rules-panel {
+  padding: 12px 16px;
+}
+
 /* The block-rules-panel rule in ip2geo-app.css sets display: flex, which
    beats the browser's UA `[hidden] { display: none }` on specificity, so
    the JS that toggles `panel.hidden` was a no-op. Restore the hidden
