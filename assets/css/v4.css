@@ -1176,7 +1176,6 @@ button.button.small:hover {
   font-family: var(--font-mono);
   font-size: 12px;
   color: var(--text);
-  background: rgba(255, 255, 255, 0.04);
   padding: 14px 16px;
   margin: 0;
   overflow-x: auto;
