@@ -361,7 +361,7 @@ function render_free_report(array $report, string $token, ?string $expires_at, a
                             <?php if ($org_safe !== ''): ?><span class="asn-org"><?php echo $org_safe; ?></span><?php endif; ?>
                             <?php else: ?>&mdash;<?php endif; ?>
                         </td>
-                        <td class="asn-category asn-category--<?php echo $cat_safe; ?>"><?php echo $cat_safe; ?></td>
+                        <td class="cell-asn-category"><span class="asn-category asn-category--<?php echo $cat_safe; ?>"><?php echo $cat_safe; ?></span></td>
                         <td class="col-right"><?php echo number_format($freq); ?></td>
                         <td class="col-locked">&mdash;</td>
                     </tr>

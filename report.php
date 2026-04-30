@@ -1394,7 +1394,7 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                     <tr<?php echo $row_class; ?> data-category="<?php echo htmlspecialchars($cat, ENT_QUOTES, 'UTF-8'); ?>" data-country="<?php echo htmlspecialchars($entry['country'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
                         <td class="col-mono"><?php echo htmlspecialchars($entry['ip'] ?? '', ENT_QUOTES, 'UTF-8'); ?></td>
                         <td class="cell-asn-org" title="<?php echo htmlspecialchars($asn_org_full, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($asn_org_full, ENT_QUOTES, 'UTF-8'); ?></td>
-                        <td class="asn-category asn-category--<?php echo htmlspecialchars($cat, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($cat, ENT_QUOTES, 'UTF-8'); ?></td>
+                        <td class="cell-asn-category"><span class="asn-category asn-category--<?php echo htmlspecialchars($cat, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($cat, ENT_QUOTES, 'UTF-8'); ?></span></td>
                         <td class="col-mono"><?php echo $freq > 1 ? '<strong>' . $freq . 'x</strong>' : '1x'; ?></td>
                         <td><?php echo $score !== null ? htmlspecialchars((string)$score, ENT_QUOTES, 'UTF-8') : '<span class="dim-dash">&mdash;</span>'; ?></td>
                         <?php if ($data_consent === 1):
