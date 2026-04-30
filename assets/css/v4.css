@@ -208,7 +208,8 @@ main {
 }
 
 .section-head h1,
-.section-head h2 {
+.section-head h2,
+.section-head h3 {
   font-family: var(--font-sans);
   font-weight: 900;
   letter-spacing: -0.025em;
@@ -217,6 +218,7 @@ main {
 }
 .section-head h1 { font-size: 40px; }
 .section-head h2 { font-size: 34px; }
+.section-head h3 { font-size: 28px; }
 
 .section-tag {
   position: relative;
@@ -1056,6 +1058,37 @@ button.button.small:hover {
   vertical-align: middle;
 }
 .report-inner tbody tr:last-child td { border-bottom: 0; }
+
+/* Section heads inside the report. Use the canonical .section-head pattern
+   (H_ left + 0X / LABEL right + 4px purple rule above the tag) for ASN
+   Ranges / Block Rules / Top Threat Sources subsections. The wrapper
+   provides the section break — kill the default .report-inner h3 margin
+   when an h3 lives inside .section-head, and bump specificity past the
+   later .report-inner h3 rule. */
+.report-inner .section-head h3 {
+  font-size: 28px;
+  font-weight: 900;
+  letter-spacing: -0.025em;
+  line-height: 1.05;
+  margin: 0;
+}
+
+/* Filled verdict pills inside Top Threat Sources. The per-classification
+   color (.asn-category--scanning etc.) drives both bg + border via
+   currentColor + color-mix, so the verdict palette stays the single
+   source of truth. */
+.report-inner .asn-category {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 3px 10px;
+  border-radius: var(--r-pill);
+  border: 1px solid color-mix(in srgb, currentColor 32%, transparent);
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
 
 /* Block-rules tabs */
 .report-inner .block-rules-tab {

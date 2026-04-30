@@ -969,7 +969,10 @@ function render_report(array $report, string $token, ?string $expires_at, array 
             <?php if ($use_columns): ?>
             <div class="ranges-rules-grid">
                 <div class="ranges-col">
-                    <h3>ASN Ranges to Block</h3>
+                    <div class="section-head">
+                        <h3>ASN Ranges to Block</h3>
+                        <span class="section-tag">01 / RANGES</span>
+                    </div>
                     <?php foreach ($report['asn_ranges'] as $group):
                         $shown = count($group['cidrs']);
                         $total_ranges = $group['total'];
@@ -998,7 +1001,10 @@ function render_report(array $report, string $token, ?string $expires_at, array 
             <?php else: ?>
             <?php if ($has_ranges): ?>
             <div class="ranges-stack">
-                <h3>ASN Ranges to Block</h3>
+                <div class="section-head">
+                    <h3>ASN Ranges to Block</h3>
+                    <span class="section-tag">01 / RANGES</span>
+                </div>
                 <?php foreach ($report['asn_ranges'] as $group):
                     $shown = count($group['cidrs']);
                     $total_ranges = $group['total'];
@@ -1026,7 +1032,10 @@ function render_report(array $report, string $token, ?string $expires_at, array 
             <?php endif; ?>
             <div class="block-rules-fullwidth">
             <?php endif; ?>
-                    <h3 class="block-rules-heading">Block Rules</h3>
+                    <div class="section-head">
+                        <h3 class="block-rules-heading">Block Rules</h3>
+                        <span class="section-tag">02 / RULES</span>
+                    </div>
                     <p class="hosting-prose-fine">
                         Click a format to preview, then copy or download.
                     </p>
@@ -1347,7 +1356,10 @@ function render_report(array $report, string $token, ?string $expires_at, array 
             <?php endif; ?>
 
             <!-- Top 25 table -->
-            <h3 id="top-sources">Top Threat Sources <span id="report-table-summary" class="report-list-summary">&mdash; showing <span id="report-table-count"><?php echo count($top25); ?></span> of <span id="report-table-total"><?php echo count($top25); ?></span></span></h3>
+            <div class="section-head">
+                <h3 id="top-sources">Top Threat Sources <span id="report-table-summary" class="report-list-summary">&mdash; showing <span id="report-table-count"><?php echo count($top25); ?></span> of <span id="report-table-total"><?php echo count($top25); ?></span></span></h3>
+                <span class="section-tag">03 / SOURCES</span>
+            </div>
             <?php if (empty($top25)): ?>
                 <p>No IP data available.</p>
             <?php else: ?>
