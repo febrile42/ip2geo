@@ -646,9 +646,7 @@ function fetch_community_data($con, array $ips): array {
 
 function render_error(string $msg, bool $show_new_analysis_link = false): void {
     $title = 'Report Unavailable — ip2geo.org';
-    render_page_open($title, '', [], [
-        ['label' => 'New Lookup', 'href' => '/'],
-    ]); ?>
+    render_page_open($title); ?>
     <section id="report" class="report-section">
         <div class="report-inner">
             <div class="section-head">

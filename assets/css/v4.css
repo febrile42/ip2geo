@@ -1365,7 +1365,7 @@ button.button.small:hover {
    rhythm and gives <h3> headings a consistent feel across pages. */
 .report-inner .prose h3 {
   margin: 1.6em 0 0.4em;
-  font-size: 16px;
+  font-size: 20px;
   font-weight: 700;
   color: var(--text);
   letter-spacing: 0.01em;

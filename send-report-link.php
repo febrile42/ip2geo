@@ -91,9 +91,7 @@ if ($con) mysqli_close($con);
 
 $masked = $stored_email ? mask_email($stored_email) : null;
 
-render_page_open('Resend Report Link — ip2geo.org', 'Resend a paid Threat Report link to the email on file.', [], [
-    ['label' => 'New Lookup', 'href' => '/'],
-]);
+render_page_open('Resend Report Link — ip2geo.org', 'Resend a paid Threat Report link to the email on file.');
 ?>
 <section class="report-section">
     <div class="report-inner">

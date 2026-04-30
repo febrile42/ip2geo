@@ -16,10 +16,13 @@ function render_page_open(string $title, string $meta_desc = '', array $og = [],
     $safe_desc  = $meta_desc
         ? htmlspecialchars($meta_desc, ENT_QUOTES, 'UTF-8')
         : 'ip2geo.org — bulk IP geolocation and threat triage.';
+    // Default nav for housekeeping pages (changelog, legal, privacy, intel,
+    // send-report-link): a single "← Home" link beside the theme toggle. The
+    // public block list and changelog aren't being promoted from the top nav,
+    // so we keep them out by default. Pages that want a richer nav (e.g.
+    // report.php) pass $nav_items explicitly.
     $default_nav = [
-        ['label' => 'Lookup',    'href' => '/#lookup'],
-        ['label' => 'Block List', 'href' => '/intel.php'],
-        ['label' => 'Changelog', 'href' => '/changelog.php'],
+        ['label' => '← Home', 'href' => '/'],
     ];
     $nav = $nav_items ?: $default_nav;
     ?>
