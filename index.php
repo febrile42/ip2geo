@@ -41,8 +41,11 @@ $view_token_val  = $view_token_mode ? preg_replace('/[^a-f0-9\-]/', '', trim($_G
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<link rel="preconnect" href="https://fonts.bunny.net" crossorigin>
 		<link rel="stylesheet" href="https://fonts.bunny.net/css?family=geist:400,500,700,900|geist-mono:400,500&display=swap">
-		<link rel="stylesheet" href="assets/css/v4.css" />
+		<!-- ip2geo-app.css loads FIRST so v4.css wins at equal specificity.
+		     This kills the load-order trap that previously required scoping
+		     v4 overrides under .hero / .threat-cta-box etc. -->
 		<link rel="stylesheet" href="assets/css/ip2geo-app.css" />
+		<link rel="stylesheet" href="assets/css/v4.css" />
 		<link rel="icon" href="/favicon.ico" />
 		<script>
 		// Apply saved theme before paint to avoid a flash. Dark default.
@@ -65,7 +68,6 @@ $view_token_val  = $view_token_mode ? preg_replace('/[^a-f0-9\-]/', '', trim($_G
 				<nav class="nav-links" aria-label="primary">
 					<a href="#lookup">Lookup</a>
 					<a href="#reports">Threat Reports</a>
-					<a href="#intel">Intel</a>
 					<a href="#contribute">Contact</a>
 					<a href="#about">About</a>
 					<button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle color theme">
@@ -649,29 +651,11 @@ else
 			</section>
 
 
-			<!-- Intel (Community Block List teaser) -->
-			<section class="block" id="intel" aria-labelledby="intel-h">
-				<div class="section-head">
-					<h2 id="intel-h">Community Block List</h2>
-					<span class="section-tag">03 / Intel</span>
-				</div>
-
-				<div class="block-body">
-					<p>A rolling 7-day feed of CIDR ranges reported by opted-in ip2geo users. If you contribute your report, your data joins the aggregate anonymously. If you just want the list, download it and apply it to your firewall.</p>
-				</div>
-
-				<div class="intel-card">
-					<div class="intel-meta">Community-sourced &middot; updated continuously &middot; free to download</div>
-					<a href="/intel.php" class="button alt">View block list &rarr;</a>
-				</div>
-			</section>
-
-
 			<!-- Contact / Contribute -->
 			<section class="block" id="contribute" aria-labelledby="contact-h">
 				<div class="section-head">
 					<h2 id="contact-h">Contact / Contribute</h2>
-					<span class="section-tag">04 / Contact</span>
+					<span class="section-tag">03 / Contact</span>
 				</div>
 
 				<div class="block-body" style="margin-bottom:32px">
@@ -699,7 +683,7 @@ else
 			<section class="block" id="about" aria-labelledby="about-h">
 				<div class="section-head">
 					<h2 id="about-h">About ip2geo.org</h2>
-					<span class="section-tag">05 / About</span>
+					<span class="section-tag">04 / About</span>
 				</div>
 
 				<div class="about-prose">
