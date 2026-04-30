@@ -899,3 +899,186 @@ button.button.small:hover {
 @media print {
   .nav, .theme-toggle, .actions { display: none; }
 }
+
+/* ============================================================
+   18. REPORT PAGE (report.php first-pass reskin)
+   Reuses #results-table styling, swaps stat-pill / email-notice /
+   community-banner from v3 tinted-bg + colored-border to v4 surfaces.
+   Inline styles in report.php (the 90-line <style> block) still apply
+   first; this overrides where v4 tokens improve consistency.
+   ============================================================ */
+.report-section {
+  padding: 56px 0 64px;
+}
+.report-inner {
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: 0 32px;
+}
+@media (max-width: 768px) {
+  .report-section { padding: 32px 0 48px; }
+  .report-inner { padding: 0 20px; }
+}
+
+/* Header rows: H2 + meta + verdict badge. v3 used h2 freely; the v4
+   weight scale lives on .section-head h1/h2 — keep the markup but
+   restyle the loose H2 + H3 used inside the report. */
+.report-inner > h2,
+.report-header-row h2 {
+  font-family: var(--font-sans);
+  font-weight: 900;
+  font-size: 34px;
+  letter-spacing: -0.025em;
+  line-height: 1.05;
+  color: var(--text);
+  margin: 0;
+}
+.report-inner h3 {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 20px;
+  letter-spacing: -0.015em;
+  color: var(--text);
+  margin: 32px 0 12px;
+}
+.report-inner p {
+  color: var(--text-muted);
+  line-height: 1.6;
+  margin: 0 0 12px;
+}
+.report-inner p strong { color: var(--text); font-weight: 500; }
+.report-inner code {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  color: var(--text);
+  background: var(--surface);
+  padding: 1px 6px;
+  border-radius: var(--r-sm);
+}
+
+/* Stat-pill: was rgba whites + tiny opacity. v4: surface-2 with hairline. */
+.report-inner .stat-pill {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-radius: var(--r-pill);
+  padding: 5px 12px;
+  opacity: 1;
+  white-space: nowrap;
+}
+
+/* Header meta line (123 IPs · April 30, 2026) */
+.report-inner .report-header-stats {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  opacity: 1;
+}
+
+/* Email notice + community banner: from v3 colored-border-left to v4
+   surface card with accent-purple inset bar. Same hierarchy, v4 tokens. */
+.report-inner .report-email-notice,
+.report-inner .community-intel-banner,
+.report-inner #community-consent-banner {
+  background: var(--surface) !important;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent-purple) !important;
+  border-radius: var(--r-md);
+  color: var(--text-muted);
+  padding: 14px 18px !important;
+  margin-bottom: 20px !important;
+  font-size: 14px !important;
+}
+.report-inner .report-email-notice strong,
+.report-inner .community-intel-banner strong { color: var(--text); }
+
+/* Demo banner — same surface treatment, magenta inset to signal "preview". */
+.report-inner > div[style*="background:rgba(224,168,90"] {
+  background: var(--surface) !important;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--magenta) !important;
+  border-radius: var(--r-md);
+  color: var(--text-muted) !important;
+  padding: 14px 18px !important;
+}
+
+/* Tables in the report — adopt the #results-table treatment. */
+.report-inner table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  margin: 16px 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+.report-inner thead th {
+  text-align: left;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  white-space: nowrap;
+}
+.report-inner tbody td {
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.report-inner tbody tr:last-child td { border-bottom: 0; }
+
+/* Block-rules tabs */
+.report-inner .block-rules-tab {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  border-color: var(--border) !important;
+}
+.report-inner .block-rules-tab.active {
+  color: var(--text);
+  border-color: var(--accent-purple) !important;
+}
+
+/* AbuseIPDB callout */
+.report-inner .abuseipdb-callout {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent-purple);
+  border-radius: var(--r-md);
+  padding: 14px 18px;
+  margin: 16px 0 20px;
+  font-size: 14px;
+}
+
+/* Format blocks (collapsible CIDR, iptables, ufw, nginx output) */
+.report-inner .format-block,
+.report-inner .block-rules-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  margin: 12px 0;
+}
+.report-inner .format-block pre,
+.report-inner .block-rules-panel pre {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text);
+  background: transparent;
+  padding: 14px 16px;
+  margin: 0;
+  overflow-x: auto;
+}
