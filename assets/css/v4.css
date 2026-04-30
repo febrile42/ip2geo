@@ -1073,6 +1073,22 @@ button.button.small:hover {
   margin: 0;
 }
 
+/* Generous breathing room between major report subsections. The default
+   .section-head margin-bottom (20px) is sized for top-level pages; in a
+   long report the gap needs to read as a section break, not a paragraph
+   break. DESIGN.md spec: 96-128px between sections. 80px desktop is the
+   compromise that keeps the page from sprawling on smaller screens. */
+.report-inner .section-head {
+  margin-top: 80px;
+  margin-bottom: 24px;
+}
+@media (max-width: 768px) {
+  .report-inner .section-head {
+    margin-top: 56px;
+    margin-bottom: 16px;
+  }
+}
+
 /* Filled verdict pills inside Top Threat Sources. The per-classification
    color (.asn-category--scanning etc.) drives both bg + border via
    currentColor + color-mix, so the verdict palette stays the single
