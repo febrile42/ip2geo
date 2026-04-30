@@ -1,0 +1,594 @@
+/* ip2geo v4 — modern brutalist utility reskin
+   Source of truth: DESIGN.md
+   Round 3-A approved mockup: ~/.gstack/projects/febrile42-ip2geo/designs/v4reskin-20260426/round3/variant-A.png
+   Companion sheet: ip2geo-app.css (verdict palette + filter chips, kept verbatim) */
+
+/* ============================================================
+   1. TOKENS
+   ============================================================ */
+:root {
+  --bg: #0A0612;
+  --surface: #15102B;
+  --surface-2: #221940;
+  --text: #F5F1FA;
+  --text-muted: #9B92AD;
+  --accent-purple: #A78BFA;
+  --button-purple: #5E42A6;
+  --button-purple-hover: #6B4EB8;
+  --magenta: #F472B6;
+  --border: rgba(255,255,255,0.08);
+  --heritage: linear-gradient(to right, #5E42A6 0%, #B74E91 100%);
+
+  --font-sans: 'Geist', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --content-max: 1200px;
+  --prose-max: 880px;
+  --lead-max: 520px;
+
+  --r-sm: 4px;
+  --r-md: 6px;
+  --r-lg: 8px;
+  --r-pill: 9999px;
+}
+
+[data-theme="light"] {
+  --bg: #FBF7FF;
+  --surface: #FFFFFF;
+  --surface-2: #F2EBFB;
+  --text: #1A1330;
+  --text-muted: #5B5275;
+  --accent-purple: #5E42A6;
+  --button-purple: #5E42A6;
+  --button-purple-hover: #4D3690;
+  --magenta: #B74E91;
+  --border: rgba(26,19,48,0.10);
+}
+
+/* ============================================================
+   2. RESET + BASE
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.55;
+  font-feature-settings: "ss01", "cv11";
+  transition: background-color 200ms ease-in-out, color 200ms ease-in-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body { transition: none; }
+}
+
+::selection { background: var(--button-purple); color: #fff; }
+
+/* Default link: restrained — used for nav, wordmark, utility links. */
+a {
+  color: var(--text);
+  text-decoration: underline;
+  text-decoration-color: var(--border);
+  text-underline-offset: 3px;
+  transition: text-decoration-color 100ms ease-out, color 100ms ease-out;
+}
+a:hover { text-decoration-color: var(--accent-purple); color: var(--accent-purple); }
+
+/* Content link: inline links inside body prose. Accent-purple text + visible
+   1.5px underline. Hover thickens to 2.5px. */
+.lead a,
+.block-body a,
+.about-grid p a,
+.about-prose a,
+.field-hint a,
+footer a {
+  color: var(--accent-purple);
+  text-decoration: underline;
+  text-decoration-color: var(--accent-purple);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+}
+.lead a:hover,
+.block-body a:hover,
+.about-grid p a:hover,
+.about-prose a:hover,
+.field-hint a:hover,
+footer a:hover {
+  color: var(--accent-purple);
+  text-decoration-thickness: 2.5px;
+}
+
+/* ============================================================
+   3. TOP NAV — sticky, 56px, heritage gradient HR
+   ============================================================ */
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  height: 56px;
+  background: var(--bg);
+  border-bottom: 1.5px solid transparent;
+  background-image:
+    linear-gradient(var(--bg), var(--bg)),
+    var(--heritage);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+}
+
+.nav-inner {
+  max-width: var(--content-max);
+  height: 100%;
+  margin: 0 auto;
+  padding: 0 32px;
+  display: flex;
+  align-items: center;
+  gap: 32px;
+}
+
+.wordmark {
+  font-family: var(--font-sans);
+  font-weight: 900;
+  font-size: 22px;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  text-decoration: none;
+}
+.wordmark:hover { color: var(--text); text-decoration: none; }
+
+.nav-links {
+  display: flex;
+  gap: 24px;
+  margin-left: auto;
+  align-items: center;
+}
+.nav-links a {
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  color: var(--text-muted);
+  transition: color 100ms ease-out;
+}
+.nav-links a:hover { color: var(--text); text-decoration: none; }
+
+.theme-toggle {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 100ms ease-out, border-color 100ms ease-out;
+}
+.theme-toggle:hover { color: var(--text); border-color: var(--text-muted); }
+.theme-toggle:focus-visible { outline: 2px solid var(--accent-purple); outline-offset: 2px; }
+.theme-toggle svg { width: 16px; height: 16px; }
+[data-theme="dark"] .theme-toggle .icon-sun,
+[data-theme="light"] .theme-toggle .icon-moon { display: none; }
+
+/* ============================================================
+   4. LAYOUT SHELL
+   ============================================================ */
+main {
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: 0 32px;
+}
+
+/* ============================================================
+   5. SECTION HEAD PATTERN (the editorial flourish)
+   H2 left + 0X / LABEL mono tag right + 4px purple rule above the tag
+   ============================================================ */
+.section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 24px;
+  margin-bottom: 20px;
+}
+
+.section-head h1,
+.section-head h2 {
+  font-family: var(--font-sans);
+  font-weight: 900;
+  letter-spacing: -0.025em;
+  margin: 0;
+  line-height: 1.05;
+}
+.section-head h1 { font-size: 40px; }
+.section-head h2 { font-size: 34px; }
+
+.section-tag {
+  position: relative;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  padding-top: 12px;
+  flex-shrink: 0;
+}
+.section-tag::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 120px;
+  height: 4px;
+  background: var(--accent-purple);
+}
+
+/* ============================================================
+   6. HERO
+   ============================================================ */
+.hero { padding: 80px 0 56px; }
+
+.lead {
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--text-muted);
+  max-width: var(--prose-max);
+  margin: 0 0 32px;
+}
+.lead strong { color: var(--text); font-weight: 500; }
+.lead code {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  color: var(--text);
+  background: var(--surface);
+  padding: 1px 6px;
+  border-radius: var(--r-sm);
+}
+
+/* ============================================================
+   7. LOOKUP FORM
+   Desktop: textarea left, filter + button stacked right.
+   ≤ 768px: collapse to single column (textarea / filter / button).
+   ============================================================ */
+.lookup-form { max-width: var(--content-max); }
+
+.form-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.form-side {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 24px;
+  min-height: 100%;
+}
+
+.ip-textarea {
+  width: 100%;
+  min-height: 200px;
+  padding: 16px 18px;
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  resize: vertical;
+  transition: border-color 100ms ease-out;
+}
+.ip-textarea:focus {
+  outline: none;
+  border-color: var(--accent-purple);
+}
+.ip-textarea::placeholder { color: var(--text-muted); opacity: 0.7; }
+
+.field label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 6px;
+}
+.field input[type="text"] {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+.field input[type="text"]:focus { outline: none; border-color: var(--accent-purple); }
+.field-hint { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+/* ============================================================
+   8. BUTTONS
+   ============================================================ */
+.button {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background: var(--button-purple);
+  color: #fff;
+  font-family: var(--font-sans);
+  font-weight: 500;
+  font-size: 15px;
+  border: none;
+  border-radius: var(--r-md);
+  cursor: pointer;
+  transition: background-color 100ms ease-out;
+  text-decoration: none;
+}
+.button:hover { background: var(--button-purple-hover); text-decoration: none; color: #fff; }
+.button:focus-visible { outline: 2px solid var(--accent-purple); outline-offset: 2px; }
+
+.button.alt {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.button.alt:hover { background: var(--surface); border-color: var(--text-muted); color: var(--text); }
+
+.button.magenta { background: var(--magenta); color: #fff; }
+.button.magenta:hover { background: var(--magenta); filter: brightness(1.08); color: #fff; }
+
+.button.small { padding: 8px 14px; font-size: 13px; }
+
+/* ============================================================
+   9. OPT-IN CHECKBOX (recent-lookups)
+   ============================================================ */
+.opt-in {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+.opt-in input { accent-color: var(--accent-purple); }
+.opt-in .muted-tag { color: var(--text-muted); opacity: 0.7; }
+
+/* ============================================================
+   10. GENERIC SECTIONS
+   Hairline divider + asymmetric padding (72/42).
+   ============================================================ */
+section.block { padding: 72px 0 42px; border-top: 1px solid var(--border); }
+
+.block-body { max-width: var(--prose-max); }
+.block-body p { margin: 0 0 16px; color: var(--text-muted); }
+.block-body p strong { color: var(--text); font-weight: 500; }
+.block-body p:last-child { margin-bottom: 0; }
+
+/* ============================================================
+   11. TWO-COLUMN GRID (Reports: Free / Full)
+   ============================================================ */
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1.25fr;
+  gap: 48px;
+  max-width: 1100px;
+}
+
+/* Feature list with terminal-flavored arrow markers in accent-purple. */
+.feature-list { list-style: none; padding: 0; margin: 0 0 24px; }
+.feature-list li {
+  position: relative;
+  padding: 6px 0 6px 20px;
+  color: var(--text-muted);
+  font-size: 15px;
+  line-height: 1.55;
+}
+.feature-list li::before {
+  content: "→";
+  position: absolute;
+  left: 0;
+  top: 6px;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  color: var(--accent-purple);
+  line-height: 1.55;
+}
+.feature-list strong { color: var(--text); font-weight: 500; }
+
+.price {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.price .amount { font-family: var(--font-mono); font-weight: 500; color: var(--text); font-size: 22px; }
+.price .label { font-size: 13px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+
+h3.subhead {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 22px;
+  letter-spacing: -0.015em;
+  margin: 0 0 12px;
+  color: var(--text);
+}
+
+/* ============================================================
+   12. INTEL CARD (Community Block List summary)
+   ============================================================ */
+.intel-card {
+  margin-top: 24px;
+  padding: 20px 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+.intel-meta {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.intel-meta strong { color: var(--accent-purple); font-weight: 500; }
+
+/* ============================================================
+   13. ABOUT (long-form prose)
+   ============================================================ */
+.about-prose { max-width: var(--prose-max); }
+.about-prose h3 {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 22px;
+  letter-spacing: -0.015em;
+  margin: 32px 0 12px;
+  color: var(--text);
+  line-height: 1.25;
+}
+.about-prose h3:first-child { margin-top: 0; }
+.about-prose p {
+  margin: 0 0 16px;
+  color: var(--text-muted);
+  line-height: 1.7;
+  font-size: 16px;
+}
+.about-prose p:last-child { margin-bottom: 0; }
+.about-prose strong { color: var(--text); font-weight: 500; }
+.about-prose code {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  color: var(--text);
+  background: var(--surface);
+  padding: 1px 6px;
+  border-radius: var(--r-sm);
+}
+
+/* ============================================================
+   14. CONTACT GRID (Social / Donate)
+   ============================================================ */
+.about-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 48px 64px;
+  max-width: var(--prose-max);
+}
+.about-grid h3 {
+  font-size: 12px;
+  font-weight: 500;
+  margin: 0 0 12px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-family: var(--font-mono);
+}
+.about-grid p { margin: 0; color: var(--text-muted); line-height: 1.9; }
+
+/* ============================================================
+   15. FOOTER
+   Targets the existing includes/footer.php markup
+   (<footer id="footer" class="wrapper style1-alt"><div class="inner">...</div>)
+   so other not-yet-reskinned pages that share this include are unaffected.
+   ============================================================ */
+footer#footer {
+  padding: 48px 0 64px;
+  margin-top: 32px;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 13px;
+  background: var(--bg);
+}
+footer#footer .inner {
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: 0 32px;
+}
+footer#footer ul.menu {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 24px;
+  font-size: 13px;
+}
+footer#footer ul.menu:last-child { margin-bottom: 0; }
+footer#footer ul.menu li { color: var(--text-muted); }
+footer#footer a {
+  color: var(--text-muted);
+  text-decoration: underline;
+  text-decoration-color: var(--border);
+  text-underline-offset: 3px;
+}
+footer#footer a:hover {
+  color: var(--accent-purple);
+  text-decoration-color: var(--accent-purple);
+}
+
+/* ============================================================
+   16. RESULTS SECTION (server-rendered after submit / view-token)
+   The data-rendering surfaces (results table, threat-CTA, filter chips)
+   are styled by ip2geo-app.css — kept verbatim from v3.x. The wrapper
+   here just gives the section a v4-shaped header.
+   ============================================================ */
+section#results.block { padding-top: 56px; }
+section#results .section-head { margin-bottom: 16px; }
+
+/* ============================================================
+   17. RESPONSIVE
+   ============================================================ */
+@media (max-width: 768px) {
+  .nav-inner { padding: 0 20px; gap: 16px; }
+  .nav-links { gap: 16px; }
+  .nav-links a { font-size: 13px; }
+  main { padding: 0 20px; }
+  footer#footer .inner { padding: 0 20px; }
+
+  .section-head { gap: 16px; }
+  .section-head h1 { font-size: 30px; }
+  .section-head h2 { font-size: 26px; }
+  .section-tag { font-size: 12px; padding-top: 10px; }
+  .section-tag::before { width: 80px; }
+
+  .hero { padding: 48px 0 40px; }
+  .lead { font-size: 17px; }
+  section.block { padding: 56px 0 24px; }
+
+  /* Form collapse: textarea / filter / button stack. */
+  .form-grid { grid-template-columns: 1fr; gap: 16px; }
+  .form-side { min-height: 0; }
+  .ip-textarea { min-height: 152px; }
+
+  .two-col { grid-template-columns: 1fr; gap: 32px; max-width: 100%; }
+  .about-grid { grid-template-columns: 1fr; gap: 32px; }
+}
+
+@media (max-width: 480px) {
+  /* Compact nav: keep wordmark + first 2 links + theme toggle. */
+  .nav-links a:nth-child(n+3) { display: none; }
+}
+
+@media print {
+  .nav, .theme-toggle, .actions { display: none; }
+}
