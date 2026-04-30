@@ -548,12 +548,212 @@ footer#footer a:hover {
 
 /* ============================================================
    16. RESULTS SECTION (server-rendered after submit / view-token)
-   The data-rendering surfaces (results table, threat-CTA, filter chips)
-   are styled by ip2geo-app.css — kept verbatim from v3.x. The wrapper
-   here just gives the section a v4-shaped header.
+   ip2geo-app.css carries the verdict palette (asn-verdict--high/etc),
+   ASN category text colors, threat-CTA box layout, filter chip pills,
+   and other v3.x styles. v4 here adds:
+   - The section-head wrapper around #results
+   - Table cell typography + spacing using v4 tokens
+   - Filter & Export panel framing
+   - Lower-emphasis utility button style
+   - Stats table as a compact monospace summary
    ============================================================ */
 section#results.block { padding-top: 56px; }
 section#results .section-head { margin-bottom: 16px; }
+
+/* ----- Results table -----
+   Density via 13px Geist Sans body, 11px mono uppercase headers.
+   IP / ASN / CC columns swap to mono so digits align. Hover highlights
+   the row in --surface-2. JS-driven .row-stripe still overrides any
+   nth-child stripe (see ip2geo-app.css notes). */
+section#results .table-wrapper {
+  margin: 20px 0 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  overflow-x: auto;
+}
+
+#results-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  margin: 0;
+}
+
+#results-table thead th {
+  text-align: left;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  white-space: nowrap;
+}
+#results-table tbody td {
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  vertical-align: middle;
+}
+#results-table tbody tr:last-child td { border-bottom: 0; }
+
+/* IP, CC, ASN columns -> mono so digits align across rows */
+#results-table tbody td:first-child,
+#results-table tbody td:nth-child(2),
+#results-table tbody td:nth-child(5) {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-feature-settings: "tnum" 1;
+}
+#results-table tbody td:nth-child(2) { color: var(--text-muted); }
+
+#results-table tbody tr:hover {
+  background: var(--surface-2);
+}
+
+/* JS-driven stripe — keep subtle on dark, lighter on light */
+#results-table tbody tr.row-stripe { background-color: rgba(255,255,255,0.03); }
+[data-theme="light"] #results-table tbody tr.row-stripe { background-color: rgba(26,19,48,0.03); }
+
+#results-table abbr[title] {
+  text-decoration-color: var(--text-muted);
+}
+
+/* ----- Filter & Export panel ----- */
+#filter-export {
+  margin: 24px 0 0;
+  padding: 14px 20px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+#filter-details > summary,
+#report-filter-details > summary {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+#filter-summary #filter-count,
+#filter-summary #filter-total { color: var(--text); }
+
+/* Filter chips: bring the existing pill-style up to v4 colors. */
+#filter-countries label,
+#filter-categories label,
+#report-filter-countries label,
+#report-filter-categories label {
+  border-color: var(--border);
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+}
+#filter-countries label:has(input:checked),
+#filter-categories label:has(input:checked),
+#report-filter-countries label:has(input:checked),
+#report-filter-categories label:has(input:checked) {
+  border-color: var(--text-muted);
+  background: var(--surface-2);
+}
+#filter-countries > strong,
+#filter-categories > strong,
+#report-filter-countries > strong,
+#report-filter-categories > strong {
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  opacity: 0.9;
+}
+
+/* ----- Action buttons row (CSV / unresolved / firewall rules) -----
+   Lower emphasis than the primary lookup button. Transparent fill, hairline
+   border, mono uppercase label. Any child of #filter-left, #export-buttons,
+   or marked .button.small picks this up. The full purple stays reserved
+   for the hero submit + verdict-color CTA. */
+.button.small,
+button.button.small {
+  min-height: 36px;
+  line-height: 1.2;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  font-weight: 500;
+}
+.button.small:hover,
+button.button.small:hover {
+  background: var(--surface);
+  border-color: var(--text-muted);
+  color: var(--text);
+}
+.button.small.alt {
+  /* Same baseline as .button.small — already low-emphasis. */
+  background: transparent;
+}
+
+/* Touch-target a11y: bump min-height on small viewports without breaking flex. */
+@media (max-width: 767px) {
+  .button.small,
+  button.button.small {
+    min-height: 44px;
+    padding: 8px 14px;
+  }
+}
+
+/* ----- Stats summary table at the foot of the results section ----- */
+#stats-table {
+  margin-top: 20px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+  border-collapse: collapse;
+}
+#stats-table td {
+  padding: 2px 12px 2px 0;
+  vertical-align: top;
+}
+#stats-table td:first-child {
+  font-weight: 500;
+  color: var(--text);
+  text-align: right;
+  font-feature-settings: "tnum" 1;
+  min-width: 4em;
+  white-space: nowrap;
+}
+
+/* ----- Threat CTA refinements -----
+   ip2geo-app.css carries the verdict-color border + tint background.
+   v4 just smooths the border + radius and unbakes the dark-only bottom
+   band so the box doesn't look out of place on the v4 dark surface. */
+.threat-cta-box {
+  border-color: var(--border);
+  border-radius: var(--r-md);
+  margin: 0 0 24px;
+}
+.threat-cta-bottom {
+  background: var(--surface-2);
+  border-top-color: var(--border);
+}
+.threat-cta-reason,
+.threat-cta-stats { color: var(--text-muted); opacity: 1; }
+.threat-cta-fine { color: var(--text-muted); opacity: 0.8; }
+.threat-cta-features { color: var(--text); opacity: 1; }
+.threat-cta-features li { color: var(--text-muted); }
+
+/* Empty filter message — center align inside the table card. */
+#empty-filter-msg {
+  color: var(--text-muted);
+  font-size: 13px;
+}
 
 /* ============================================================
    17. RESPONSIVE
