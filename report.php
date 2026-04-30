@@ -1039,7 +1039,11 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                     <p class="hosting-prose-fine">
                         Click a format to preview, then copy or download.
                     </p>
+                    <div class="block-rules-grid">
+                    <div class="block-rules-grid-main">
                     <?php include_block_rules_tabs($token, $has_ranges, $report); ?>
+                    </div>
+                    <aside class="block-rules-grid-rail">
                     <div class="hosting-callout">
                         <strong>No console/SSH access?</strong> Block IPs directly from your hosting panel instead:
                         <ul class="hosting-callout-links">
@@ -1058,6 +1062,8 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                             Copy the IPs you want to block from the Top Threat Sources table below and paste them one per line into your panel.
                             <?php endif; ?>
                         </p>
+                    </div>
+                    </aside>
                     </div>
             <?php if ($use_columns): ?>
                 </div>

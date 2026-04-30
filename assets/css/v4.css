@@ -1106,6 +1106,23 @@ button.button.small:hover {
   background: color-mix(in srgb, currentColor 12%, transparent);
 }
 
+/* Block Rules + Hosting Callout side-by-side at desktop, stacked below.
+   Activates ONLY in stack mode (when .block-rules-fullwidth is the
+   parent — the use_columns mode already runs its own .ranges-rules-grid
+   so a nested 2-col grid would over-cramp). The rail is the natural home
+   for the "No console/SSH access?" callout — it's an alternative path,
+   not the next sequential step after copying rules. */
+.report-inner .block-rules-grid > .block-rules-grid-main,
+.report-inner .block-rules-grid > .block-rules-grid-rail { min-width: 0; }
+@media (min-width: 960px) {
+  .report-inner .block-rules-fullwidth > .block-rules-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 32px;
+    align-items: start;
+  }
+}
+
 /* Block-rules tabs */
 .report-inner .block-rules-tab {
   font-family: var(--font-mono);
