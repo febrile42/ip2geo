@@ -16,6 +16,7 @@
   --button-purple: #5E42A6;
   --button-purple-hover: #6B4EB8;
   --magenta: #F472B6;
+  --magenta-hover: #DC4D9A;
   --border: rgba(255,255,255,0.08);
   --heritage: linear-gradient(to right, #5E42A6 0%, #B74E91 100%);
 
@@ -42,6 +43,7 @@
   --button-purple: #5E42A6;
   --button-purple-hover: #4D3690;
   --magenta: #B74E91;
+  --magenta-hover: #9C3F7B;
   --border: rgba(26,19,48,0.10);
 }
 
@@ -353,7 +355,7 @@ main {
 .button.alt:hover { background: var(--surface); border-color: var(--text-muted); color: var(--text); }
 
 .button.magenta { background: var(--magenta); color: #fff; }
-.button.magenta:hover { background: var(--magenta); filter: brightness(1.08); color: #fff; }
+.button.magenta:hover { background: var(--magenta-hover); color: #fff; }
 
 .button.small { padding: 8px 14px; font-size: 13px; }
 
@@ -757,6 +759,20 @@ button.button.small:hover {
 #empty-filter-msg {
   color: var(--text-muted);
   font-size: 13px;
+}
+
+/* CTA button hover — works for HIGH (pink), MODERATE (amber), LOW (green)
+   variants without needing per-verdict overrides. brightness(0.9) darkens
+   each verdict color by ~10%, which reads as a clear interaction signal
+   on top of the !important verdict-color fills from ip2geo-app.css. */
+.threat-cta-box #cta-button {
+  transition: filter 100ms ease-out, transform 100ms ease-out;
+}
+.threat-cta-box #cta-button:hover {
+  filter: brightness(0.9);
+}
+.threat-cta-box #cta-button:active {
+  transform: translateY(1px);
 }
 
 /* ============================================================
