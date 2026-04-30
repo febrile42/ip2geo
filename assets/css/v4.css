@@ -74,7 +74,7 @@ body {
 a {
   color: var(--text);
   text-decoration: underline;
-  text-decoration-color: var(--border);
+  text-decoration-color: var(--text-muted);
   text-underline-offset: 5px;
   transition: text-decoration-color 100ms ease-out, color 100ms ease-out;
 }
@@ -1392,8 +1392,6 @@ button.button.small:hover {
   border-radius: 3px;
   color: var(--text);
 }
-.report-inner .prose a { color: var(--accent-purple); }
-.report-inner .prose a:hover { color: var(--magenta); }
 
 /* Subtle inline link (was style="opacity:0.7;font-size:0.9em") */
 .report-inner .link-muted {
