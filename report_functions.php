@@ -295,12 +295,12 @@ function render_free_report(array $report, string $token, ?string $expires_at, a
     ];
     render_page_open('IP Threat Report — ip2geo.org', '', $og, $free_nav);
     ?>
-    <section id="report" class="wrapper style4 fade-up">
-        <div class="inner">
+    <section id="report" class="report-section">
+        <div class="report-inner">
 
             <!-- 1. Verdict banner -->
-            <div class="threat-cta-box threat-cta-box--<?php echo htmlspecialchars($verdict_lc, ENT_QUOTES, 'UTF-8'); ?>" style="margin-bottom:1.5em" role="region" aria-label="Threat Assessment">
-                <div class="threat-cta-left" style="padding:1.4em 1.6em">
+            <div class="threat-cta-box threat-cta-box--<?php echo htmlspecialchars($verdict_lc, ENT_QUOTES, 'UTF-8'); ?>" role="region" aria-label="Threat Assessment">
+                <div class="threat-cta-left">
                     <p class="asn-verdict asn-verdict--<?php echo htmlspecialchars($verdict_lc, ENT_QUOTES, 'UTF-8'); ?>">
                         <?php echo htmlspecialchars($verdict, ENT_QUOTES, 'UTF-8'); ?> THREAT
                     </p>
@@ -328,18 +328,18 @@ function render_free_report(array $report, string $token, ?string $expires_at, a
 
             <!-- 3. Top-25 table with locked Threat Score column -->
             <h2 id="top-sources">Top Threat Sources</h2>
-            <p style="font-size:0.85em;opacity:0.65">Ranked by threat weight (scanning/VPN IPs weighted 2×).</p>
-            <div class="report-table-wrap" style="overflow-x:auto">
-            <table class="report-table" style="width:100%;border-collapse:collapse;font-size:0.9em">
+            <p class="report-table-note">Ranked by threat weight (scanning/VPN IPs weighted 2&times;).</p>
+            <div class="report-table-wrap">
+            <table class="report-free-table">
                 <thead>
                     <tr>
-                        <th style="text-align:left;padding:0.4em 0.6em">#</th>
-                        <th style="text-align:left;padding:0.4em 0.6em">IP</th>
-                        <th style="text-align:left;padding:0.4em 0.6em">Country</th>
-                        <th style="text-align:left;padding:0.4em 0.6em">ASN</th>
-                        <th style="text-align:left;padding:0.4em 0.6em">Category</th>
-                        <th style="text-align:right;padding:0.4em 0.6em">Hits</th>
-                        <th style="text-align:right;padding:0.4em 0.6em" title="Upgrade to unlock">Threat Score &#128274;</th>
+                        <th>#</th>
+                        <th>IP</th>
+                        <th>Country</th>
+                        <th>ASN</th>
+                        <th>Category</th>
+                        <th class="col-right">Hits</th>
+                        <th class="col-locked" title="Upgrade to unlock">Threat Score &#128274;</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -352,18 +352,18 @@ function render_free_report(array $report, string $token, ?string $expires_at, a
                         $freq       = (int)($entry['freq'] ?? 1);
                     ?>
                     <tr>
-                        <td style="padding:0.3em 0.6em;opacity:0.5"><?php echo $i + 1; ?></td>
-                        <td style="padding:0.3em 0.6em;font-family:monospace"><?php echo $ip_safe; ?></td>
-                        <td style="padding:0.3em 0.6em"><?php echo $cc_safe ?: '—'; ?></td>
-                        <td style="padding:0.3em 0.6em;font-size:0.85em">
+                        <td class="col-num"><?php echo $i + 1; ?></td>
+                        <td class="col-mono"><?php echo $ip_safe; ?></td>
+                        <td><?php echo $cc_safe ?: '—'; ?></td>
+                        <td class="col-asn">
                             <?php if ($asn_safe !== ''): ?>
                             <span><?php echo $asn_safe; ?></span>
-                            <?php if ($org_safe !== ''): ?><span style="opacity:0.6"> <?php echo $org_safe; ?></span><?php endif; ?>
-                            <?php else: ?>—<?php endif; ?>
+                            <?php if ($org_safe !== ''): ?><span class="asn-org"><?php echo $org_safe; ?></span><?php endif; ?>
+                            <?php else: ?>&mdash;<?php endif; ?>
                         </td>
-                        <td class="asn-category asn-category--<?php echo $cat_safe; ?>" style="padding:0.3em 0.6em"><?php echo $cat_safe; ?></td>
-                        <td style="padding:0.3em 0.6em;text-align:right"><?php echo number_format($freq); ?></td>
-                        <td style="padding:0.3em 0.6em;text-align:right;opacity:0.35">—</td>
+                        <td class="cell-asn-category"><span class="asn-category asn-category--<?php echo $cat_safe; ?>"><?php echo $cat_safe; ?></span></td>
+                        <td class="col-right"><?php echo number_format($freq); ?></td>
+                        <td class="col-locked">&mdash;</td>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
@@ -372,27 +372,26 @@ function render_free_report(array $report, string $token, ?string $expires_at, a
 
             <!-- 4. Expiry banner -->
             <?php if ($expiry_text !== null): ?>
-            <div class="free-report-expiry" style="margin:1.5em 0;padding:0.7em 1em;background:rgba(100,100,100,0.08);border-radius:4px;font-size:0.9em">
-                <?php echo $expiry_text; ?> <a href="/" style="margin-left:0.4em;opacity:0.75">Analyze new logs →</a>
+            <div class="free-report-expiry">
+                <?php echo $expiry_text; ?> <a href="/">Analyze new logs &rarr;</a>
             </div>
             <?php endif; ?>
 
             <!-- 5. Sharing links -->
-            <div class="free-report-share" style="margin:1.5em 0">
-                <p style="margin:0 0 0.5em;font-size:0.9em;opacity:0.75">Share this report</p>
-                <div style="display:flex;gap:0.5em;align-items:center;flex-wrap:wrap">
+            <div class="free-report-share">
+                <p class="free-report-share-label">Share this report</p>
+                <div class="free-report-share-row">
                     <button class="button small alt" id="free-copy-btn"
                         onclick="(function(btn){navigator.clipboard?navigator.clipboard.writeText(<?php echo json_encode($report_url); ?>).then(function(){btn.textContent='Copied!';setTimeout(function(){btn.textContent='Copy link'},2000)}):btn.textContent='Copy link';})(this)">Copy link</button>
-                    <input type="text" readonly
+                    <input type="text" class="free-report-share-input" readonly
                         value="<?php echo htmlspecialchars($report_url, ENT_QUOTES, 'UTF-8'); ?>"
-                        onclick="this.select()"
-                        style="font-family:monospace;font-size:0.85em;padding:0.3em 0.6em;flex:1;min-width:0;max-width:36em">
+                        onclick="this.select()">
                 </div>
             </div>
 
             <!-- 6. Footer attribution -->
-            <p style="margin-top:2em;font-size:0.82em;opacity:0.5;border-top:1px solid rgba(255,255,255,0.08);padding-top:1em">
-                Generated with <a href="/" style="opacity:0.75">ip2geo.org</a> &mdash; paste your logs, get instant threat intel.
+            <p class="report-footer-note">
+                Generated with <a href="/">ip2geo.org</a> &mdash; paste your logs, get instant threat intel.
             </p>
 
         </div>

@@ -14,6 +14,7 @@ require __DIR__ . '/config.php';
 require __DIR__ . '/asn_classification.php';
 require __DIR__ . '/report_functions.php';
 require __DIR__ . '/email_helper.php';
+require __DIR__ . '/includes/page-chrome.php';
 require __DIR__ . '/vendor/autoload.php';
 
 define('DEMO_TOKEN', '00000000-0000-0000-0000-000000000000');
@@ -571,7 +572,7 @@ function include_block_rules_tabs(string $token, bool $has_ranges, array $report
                                 <button class="copy-btn button small">&#128203; Copy</button>
                                 <a href="<?php echo $href; ?>" class="button small">&#8595; Download</a>
                             </div>
-                            <pre class="block-script-preview"><code><?php echo $content; ?></code></pre>
+                            <pre class="block-script-preview"><?php echo $content; ?></pre>
                         </div>
                     </div>
         <?php
@@ -582,15 +583,15 @@ function include_block_rules_tabs(string $token, bool $has_ranges, array $report
                     <div class="block-rules-tab<?php echo $has_ranges ? ' active' : ''; ?>" id="tab-by-range" role="tab" tabindex="<?php echo $has_ranges ? '0' : '-1'; ?>" aria-selected="<?php echo $has_ranges ? 'true' : 'false'; ?>" aria-controls="panel-by-range"<?php echo $has_ranges ? '' : ' aria-disabled="true" title="No ASN ranges available for this report"'; ?>>Block by Range</div>
                     <div class="block-rules-tab<?php echo $has_ranges ? '' : ' active'; ?>" id="tab-by-ip" role="tab" tabindex="0" aria-selected="<?php echo $has_ranges ? 'false' : 'true'; ?>" aria-controls="panel-by-ip">Block by IP</div>
                 </div>
-                <div id="panel-by-range" class="block-rules-panel" role="tabpanel" aria-labelledby="tab-by-range"<?php echo $has_ranges ? '' : ' style="display:none"'; ?>>
+                <div id="panel-by-range" class="block-rules-panel" role="tabpanel" aria-labelledby="tab-by-range"<?php echo $has_ranges ? '' : ' hidden'; ?>>
                     <p class="cidr-explainer">Ranges cover all current and future IPs from these networks &mdash; attackers rotate IPs, ranges don&rsquo;t.</p>
                     <?php if ($has_ranges):
                         foreach (['sh-iptables-ranges', 'sh-ufw-ranges', 'nginx-ranges', 'txt-ranges'] as $fmt) $render($fmt);
                     else: ?>
-                    <p style="font-size:0.9em;opacity:0.5;margin:0.6em 0">No ASN ranges available for this report.</p>
+                    <p class="report-no-ranges">No ASN ranges available for this report.</p>
                     <?php endif; ?>
                 </div>
-                <div id="panel-by-ip" class="block-rules-panel" role="tabpanel" aria-labelledby="tab-by-ip"<?php echo $has_ranges ? ' style="display:none"' : ''; ?>>
+                <div id="panel-by-ip" class="block-rules-panel" role="tabpanel" aria-labelledby="tab-by-ip"<?php echo $has_ranges ? ' hidden' : ''; ?>>
                     <?php foreach (['sh-iptables', 'sh-ufw', 'nginx-ips'] as $fmt) $render($fmt); ?>
                 </div>
             </div>
@@ -646,14 +647,17 @@ function fetch_community_data($con, array $ips): array {
 function render_error(string $msg, bool $show_new_analysis_link = false): void {
     $title = 'Report Unavailable — ip2geo.org';
     render_page_open($title); ?>
-    <section id="report" class="wrapper style4 fade-up">
-        <div class="inner">
-            <h2>Report Unavailable</h2>
+    <section id="report" class="report-section">
+        <div class="report-inner">
+            <div class="section-head">
+                <h1>Report Unavailable</h1>
+                <span class="section-tag">/ Error</span>
+            </div>
             <p><?php echo htmlspecialchars($msg, ENT_QUOTES, 'UTF-8'); ?></p>
             <?php if ($show_new_analysis_link): ?>
-            <p><a href="/" class="button small">Analyze new logs →</a></p>
+            <p><a href="/" class="button small">Analyze new logs &rarr;</a></p>
             <?php else: ?>
-            <p><a href="/" class="button small">← Back to ip2geo</a></p>
+            <p><a href="/" class="button small">&larr; Back to ip2geo</a></p>
             <?php endif; ?>
         </div>
     </section>
@@ -700,22 +704,27 @@ function render_report(array $report, string $token, ?string $expires_at, array 
 
     $is_demo = ($token === DEMO_TOKEN);
 
-    render_page_open('Threat Report — ip2geo.org', $meta_desc);
+    render_page_open('Threat Report — ip2geo.org', $meta_desc, [], [
+        ['label' => 'Summary',     'href' => '#report'],
+        ['label' => 'Block Rules', 'href' => '#block-rules'],
+        ['label' => 'Top Sources', 'href' => '#top-sources'],
+        ['label' => 'New Lookup',  'href' => '/'],
+    ]);
     // Embed full IP list for client-side filtering
     echo '<script>window.reportAllIps = ' . json_encode($all_ips) . ';</script>'; ?>
-    <section id="report" class="wrapper style4 fade-up">
-        <div class="inner">
+    <section id="report" class="report-section">
+        <div class="report-inner">
             <?php if ($is_demo): ?>
-            <div style="background:rgba(224,168,90,0.12);border-left:3px solid #e0a85a;padding:0.6em 1em;margin-bottom:1.5em;font-size:0.9em">
+            <div class="demo-banner">
                 <strong>Demo Report</strong> &mdash; These are real Tor exit nodes with real AbuseIPDB data.
                 This is what a HIGH-threat report looks like.
-                <a href="/" style="margin-left:1em">Run your own lookup &rarr;</a>
+                <a href="/">Run your own lookup &rarr;</a>
             </div>
             <?php elseif ($email_sent && $notification_email !== ''): ?>
             <?php $resend_link = '/send-report-link.php?token=' . urlencode($token); ?>
             <div class="report-email-notice sent">
                 <span>&#10003; Report link sent to <strong><?php echo htmlspecialchars(mask_email($notification_email), ENT_QUOTES, 'UTF-8'); ?></strong>.
-                <a href="<?php echo htmlspecialchars($resend_link, ENT_QUOTES, 'UTF-8'); ?>" style="margin-left:0.5em">Resend</a></span>
+                <a href="<?php echo htmlspecialchars($resend_link, ENT_QUOTES, 'UTF-8'); ?>" class="inline-after">Resend</a></span>
             </div>
             <?php endif; ?>
 
@@ -817,9 +826,9 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                 <p class="asn-verdict asn-verdict--<?php echo $verdict_lc; ?>">
                     <?php echo $verdict; ?> THREAT
                 </p>
-                <div style="display:flex;gap:0.5em;align-items:center">
-                    <button onclick="window.print()" class="button small alt print-report-btn" style="white-space:nowrap">Print / Save as PDF</button>
-                    <button id="copy-link-header-btn" class="button small alt" style="white-space:nowrap">Copy link</button>
+                <div class="report-actions">
+                    <button onclick="window.print()" class="button small alt print-report-btn">Print / Save as PDF</button>
+                    <button id="copy-link-header-btn" class="button small alt">Copy link</button>
                 </div>
             </div>
 
@@ -838,7 +847,7 @@ function render_report(array $report, string $token, ?string $expires_at, array 
             </div>
 
             <?php if ($verdict === 'LOW'): ?>
-            <p style="opacity:0.7;font-size:0.9em">No high-confidence threats detected. Scores below confirm low risk.</p>
+            <p class="report-quiet-note">No high-confidence threats detected. Scores below confirm low risk.</p>
             <?php endif; ?>
             <!-- Threat narrative (supersedes verdict_text when present) -->
             <?php
@@ -858,23 +867,19 @@ function render_report(array $report, string $token, ?string $expires_at, array 
 
             <!-- Community Intel CTA (paid reports only — demo preview stays at bottom) -->
             <?php if (!$is_demo && ($data_consent === null || $data_consent === 0)): ?>
-            <div id="community-consent-banner" class="community-intel-banner" style="background:rgba(108,184,122,0.12);border-left:3px solid #6cb87a;padding:0.8em 1em;margin-bottom:1.5em;font-size:0.9em">
-                <?php if ($data_consent === 0): ?>
-                <div id="consent-full" style="display:none">
-                <?php else: ?>
-                <div id="consent-full">
-                <?php endif; ?>
+            <div id="community-consent-banner" class="community-intel-banner">
+                <div id="consent-full"<?php echo $data_consent === 0 ? ' hidden' : ''; ?>>
                     <strong>Community Intel &mdash; opt in</strong>
-                    <p style="margin:0.4em 0 0.8em">Share anonymized network and IP data to see how your traffic compares to this week's global attack trends. <a href="/privacy.php" target="_blank" rel="noopener noreferrer" style="opacity:0.7;font-size:0.9em">Privacy policy</a></p>
-                    <div style="display:flex;gap:0.5em;flex-wrap:wrap">
+                    <p class="community-banner-prose">Share anonymized network and IP data to see how your traffic compares to this week's global attack trends. <a href="/privacy.php" target="_blank" rel="noopener noreferrer" class="privacy-link">Privacy policy</a></p>
+                    <div class="community-banner-actions">
                         <button class="button small" id="consent-yes-btn">Opt in &mdash; show me the comparison</button>
                         <button class="button small alt" id="consent-no-btn">No thanks</button>
                     </div>
-                    <p style="margin:0.6em 0 0;font-size:0.82em;opacity:0.55">Community data is currently limited as this feature grows &mdash; your opt-in helps build it.</p>
+                    <p class="community-banner-fine">Community data is currently limited as this feature grows &mdash; your opt-in helps build it.</p>
                 </div>
-                <div id="consent-collapsed" style="<?php echo $data_consent === 0 ? '' : 'display:none;'; ?>font-size:0.9em;opacity:0.75">
+                <div id="consent-collapsed" class="consent-collapsed"<?php echo $data_consent === 0 ? '' : ' hidden'; ?>>
                     Community Intel &mdash; you opted out.
-                    <a id="consent-reconsider-btn" tabindex="0" style="color:inherit;text-decoration:underline;cursor:pointer;margin-left:0.2em">Change your mind?</a>
+                    <a id="consent-reconsider-btn" class="consent-reconsider-link" tabindex="0">Change your mind?</a>
                 </div>
             </div>
             <script>
@@ -890,12 +895,12 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                         .catch(function() {});
                 }
                 function showCollapsed() {
-                    document.getElementById('consent-full').style.display = 'none';
-                    document.getElementById('consent-collapsed').style.display = '';
+                    document.getElementById('consent-full').hidden = true;
+                    document.getElementById('consent-collapsed').hidden = false;
                 }
                 function showFull() {
-                    document.getElementById('consent-collapsed').style.display = 'none';
-                    document.getElementById('consent-full').style.display = '';
+                    document.getElementById('consent-collapsed').hidden = true;
+                    document.getElementById('consent-full').hidden = false;
                     document.getElementById('consent-no-btn').disabled = false;
                 }
                 document.getElementById('consent-yes-btn').addEventListener('click', function() {
@@ -905,19 +910,19 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                     postConsent(1, function(data) {
                         if (!data.ok) return;
                         var banner = document.getElementById('community-consent-banner');
-                        var html = '<div class="community-intel-banner" style="background:rgba(108,184,122,0.12);border-left:3px solid #6cb87a;padding:0.8em 1em;margin-bottom:1.5em;font-size:0.9em">';
+                        var html = '<div class="community-intel-banner">';
                         html += '<strong>&#10003; Thanks for contributing!</strong>';
                         if (data.top_cidrs && data.top_cidrs.length) {
-                            html += '<p style="margin:0.5em 0 0.3em;opacity:0.85">Top reported ranges in the past 7 days:</p>';
-                            html += '<ul style="margin:0;padding-left:1.5em">';
+                            html += '<p class="community-banner-prose-tight">Top reported ranges in the past 7 days:</p>';
+                            html += '<ul class="community-banner-list">';
                             data.top_cidrs.slice(0, 3).forEach(function(c) {
                                 html += '<li><code>' + c.cidr + '</code> &mdash; ' + c.org + ' (' + c.report_count + ' report' + (c.report_count === 1 ? '' : 's') + ')</li>';
                             });
                             html += '</ul>';
                         } else {
-                            html += '<p style="margin:0.5em 0 0.3em;opacity:0.85">The community dataset is still in its early days &mdash; data will grow as more users opt in. You\'ll get richer comparisons on future reports as the dataset builds.</p>';
+                            html += '<p class="community-banner-prose-tight">The community dataset is still in its early days &mdash; data will grow as more users opt in. You\'ll get richer comparisons on future reports as the dataset builds.</p>';
                         }
-                        html += '<p style="margin:0.7em 0 0"><a href="" onclick="window.location.reload();return false;" class="button small">Refresh to view your community data &rarr;</a></p>';
+                        html += '<p class="community-banner-refresh-row"><a href="" onclick="window.location.reload();return false;" class="button small">Refresh to view your community data &rarr;</a></p>';
                         html += '</div>';
                         banner.outerHTML = html;
                     });
@@ -945,12 +950,12 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                     }
                 }
             ?>
-            <div class="community-intel-banner" style="background:rgba(108,184,122,0.12);border-left:3px solid #6cb87a;padding:0.8em 1em;margin-bottom:1.5em;font-size:0.9em">
+            <div class="community-intel-banner">
                 <strong>&#10003; Thank you for contributing to Community Intel</strong>
                 <?php if (!$community_has_data): ?>
-                <p style="margin:0.4em 0 0;opacity:0.8">The community dataset is still in its early days &mdash; data will grow as more users opt in. Check back on future reports for richer comparisons.</p>
+                <p class="community-banner-prose-tight">The community dataset is still in its early days &mdash; data will grow as more users opt in. Check back on future reports for richer comparisons.</p>
                 <?php else: ?>
-                <p style="margin:0.4em 0 0;opacity:0.8">Your data is contributing to the community feed. See the Community column in the Top Threat Sources table below.</p>
+                <p class="community-banner-prose-tight">Your data is contributing to the community feed. See the Community column in the Top Threat Sources table below.</p>
                 <?php endif; ?>
             </div>
             <?php endif; ?>
@@ -964,7 +969,10 @@ function render_report(array $report, string $token, ?string $expires_at, array 
             <?php if ($use_columns): ?>
             <div class="ranges-rules-grid">
                 <div class="ranges-col">
-                    <h3>ASN Ranges to Block</h3>
+                    <div class="section-head">
+                        <h3>ASN Ranges to Block</h3>
+                        <span class="section-tag">01 / RANGES</span>
+                    </div>
                     <?php foreach ($report['asn_ranges'] as $group):
                         $shown = count($group['cidrs']);
                         $total_ranges = $group['total'];
@@ -993,7 +1001,10 @@ function render_report(array $report, string $token, ?string $expires_at, array 
             <?php else: ?>
             <?php if ($has_ranges): ?>
             <div class="ranges-stack">
-                <h3>ASN Ranges to Block</h3>
+                <div class="section-head">
+                    <h3>ASN Ranges to Block</h3>
+                    <span class="section-tag">01 / RANGES</span>
+                </div>
                 <?php foreach ($report['asn_ranges'] as $group):
                     $shown = count($group['cidrs']);
                     $total_ranges = $group['total'];
@@ -1021,12 +1032,19 @@ function render_report(array $report, string $token, ?string $expires_at, array 
             <?php endif; ?>
             <div class="block-rules-fullwidth">
             <?php endif; ?>
-                    <h3 class="block-rules-heading">Block Rules</h3>
-                    <p style="font-size:0.9em;opacity:0.7;margin-bottom:0.5em">
+                    <div class="section-head">
+                        <h3 class="block-rules-heading">Block Rules</h3>
+                        <span class="section-tag">02 / RULES</span>
+                    </div>
+                    <p class="hosting-prose-fine">
                         Click a format to preview, then copy or download.
                     </p>
+                    <div class="block-rules-grid">
+                    <div class="block-rules-grid-main">
                     <?php include_block_rules_tabs($token, $has_ranges, $report); ?>
-                    <div class="hosting-callout" style="margin-top:1.25em">
+                    </div>
+                    <aside class="block-rules-grid-rail">
+                    <div class="hosting-callout">
                         <strong>No console/SSH access?</strong> Block IPs directly from your hosting panel instead:
                         <ul class="hosting-callout-links">
                             <li><a href="https://docs.cpanel.net/cpanel/security/ip-blocker/" target="_blank" rel="noopener">cPanel IP Blocker</a> <span class="hosting-note">(Namecheap, GoDaddy, Bluehost, most shared hosts)</span></li>
@@ -1035,15 +1053,17 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                             <li><a href="https://docs.digitalocean.com/products/networking/firewalls/" target="_blank" rel="noopener">DigitalOcean Cloud Firewall</a></li>
                             <li><a href="https://docs.hetzner.com/cloud/firewalls/overview/" target="_blank" rel="noopener">Hetzner Cloud Firewall</a></li>
                         </ul>
-                        <p class="hosting-note" style="margin:0.6em 0 0">
+                        <p class="hosting-note">
                             <strong>What to paste:</strong>
                             <?php if ($has_ranges): ?>
                             <span id="hosting-paste-ranges">Expand <strong>cidr-ranges.txt</strong> above and copy the list &mdash; one range per line, works with all panels above. If your panel only accepts single IPs, copy them from the Top Threat Sources table instead.</span>
-                            <span id="hosting-paste-ips" style="display:none">Copy the IPs you want to block from the Top Threat Sources table below and paste them one per line into your panel.</span>
+                            <span id="hosting-paste-ips" hidden>Copy the IPs you want to block from the Top Threat Sources table below and paste them one per line into your panel.</span>
                             <?php else: ?>
                             Copy the IPs you want to block from the Top Threat Sources table below and paste them one per line into your panel.
                             <?php endif; ?>
                         </p>
+                    </div>
+                    </aside>
                     </div>
             <?php if ($use_columns): ?>
                 </div>
@@ -1059,13 +1079,13 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                     t.setAttribute('aria-selected', active ? 'true' : 'false');
                 });
                 document.querySelectorAll('.block-rules-panel').forEach(function(p) {
-                    p.style.display = p.id === 'panel-' + name ? '' : 'none';
+                    p.hidden = p.id !== 'panel-' + name;
                 });
                 var pasteRanges = document.getElementById('hosting-paste-ranges');
                 var pasteIPs = document.getElementById('hosting-paste-ips');
                 if (pasteRanges && pasteIPs) {
-                    pasteRanges.style.display = name === 'by-range' ? '' : 'none';
-                    pasteIPs.style.display = name === 'by-ip' ? '' : 'none';
+                    pasteRanges.hidden = name !== 'by-range';
+                    pasteIPs.hidden = name !== 'by-ip';
                 }
                 window.umami && umami.track('report_tab_switch', { tab: name });
             }
@@ -1342,15 +1362,18 @@ function render_report(array $report, string $token, ?string $expires_at, array 
             <?php endif; ?>
 
             <!-- Top 25 table -->
-            <h3 id="top-sources">Top Threat Sources <span id="report-table-summary" style="font-size:0.6em;font-weight:normal;opacity:0.6;margin-left:0.5em">— showing <span id="report-table-count"><?php echo count($top25); ?></span> of <span id="report-table-total"><?php echo count($top25); ?></span></span></h3>
+            <div class="section-head">
+                <h3 id="top-sources">Top Threat Sources <span id="report-table-summary" class="report-list-summary">&mdash; showing <span id="report-table-count"><?php echo count($top25); ?></span> of <span id="report-table-total"><?php echo count($top25); ?></span></span></h3>
+                <span class="section-tag">03 / SOURCES</span>
+            </div>
             <?php if (empty($top25)): ?>
                 <p>No IP data available.</p>
             <?php else: ?>
-            <div class="table-wrapper" style="overflow-x:auto">
+            <div class="table-wrapper">
             <table class="report-table">
                 <thead>
                     <tr>
-                        <th scope="col" style="font-family:monospace">IP</th>
+                        <th scope="col" class="col-mono">IP</th>
                         <th scope="col">ASN Org</th>
                         <th scope="col">Category</th>
                         <th scope="col" title="Times this IP appeared in the submitted log">Hits</th>
@@ -1369,11 +1392,11 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                     $row_class = $i >= 10 ? ' class="report-row-hidden"' : '';
                 ?>
                     <tr<?php echo $row_class; ?> data-category="<?php echo htmlspecialchars($cat, ENT_QUOTES, 'UTF-8'); ?>" data-country="<?php echo htmlspecialchars($entry['country'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
-                        <td style="font-family:monospace"><?php echo htmlspecialchars($entry['ip'] ?? '', ENT_QUOTES, 'UTF-8'); ?></td>
+                        <td class="col-mono"><?php echo htmlspecialchars($entry['ip'] ?? '', ENT_QUOTES, 'UTF-8'); ?></td>
                         <td class="cell-asn-org" title="<?php echo htmlspecialchars($asn_org_full, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($asn_org_full, ENT_QUOTES, 'UTF-8'); ?></td>
-                        <td class="asn-category asn-category--<?php echo htmlspecialchars($cat, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($cat, ENT_QUOTES, 'UTF-8'); ?></td>
-                        <td style="font-family:monospace"><?php echo $freq > 1 ? '<strong>' . $freq . 'x</strong>' : '1x'; ?></td>
-                        <td><?php echo $score !== null ? htmlspecialchars((string)$score, ENT_QUOTES, 'UTF-8') : '<span style="opacity:0.4">—</span>'; ?></td>
+                        <td class="cell-asn-category"><span class="asn-category asn-category--<?php echo htmlspecialchars($cat, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($cat, ENT_QUOTES, 'UTF-8'); ?></span></td>
+                        <td class="col-mono"><?php echo $freq > 1 ? '<strong>' . $freq . 'x</strong>' : '1x'; ?></td>
+                        <td><?php echo $score !== null ? htmlspecialchars((string)$score, ENT_QUOTES, 'UTF-8') : '<span class="dim-dash">&mdash;</span>'; ?></td>
                         <?php if ($data_consent === 1):
                             $ip = $entry['ip'] ?? '';
                             $this_week_count = (int)($community_data['ip_stats'][$ip] ?? 0);
@@ -1381,7 +1404,7 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                             $days_ago = $fs_date ? max(0, (int)floor((time() - strtotime($fs_date)) / 86400)) : null;
                             $tooltip = $days_ago !== null ? ' title="First seen in community data: ' . $days_ago . ' day' . ($days_ago === 1 ? '' : 's') . ' ago"' : '';
                             if ($this_week_count < 3): ?>
-                        <td><span style="opacity:0.4">—</span></td>
+                        <td><span class="dim-dash">&mdash;</span></td>
                         <?php else: ?>
                         <td<?php echo $tooltip; ?>><?php echo $this_week_count; ?> reports</td>
                         <?php endif; ?>
@@ -1396,24 +1419,24 @@ function render_report(array $report, string $token, ?string $expires_at, array 
             <script>
             document.getElementById('show-all-rows-btn').addEventListener('click', function() {
                 document.querySelectorAll('.report-row-hidden').forEach(function(r) { r.classList.remove('report-row-hidden'); });
-                this.style.display = 'none';
+                this.hidden = true;
                 var countEl = document.getElementById('report-table-count');
                 var totalEl = document.getElementById('report-table-total');
                 if (countEl && totalEl) countEl.textContent = totalEl.textContent;
             });
             </script>
             <?php endif; ?>
-            <p style="font-size:0.8em;opacity:0.6">
+            <p class="report-fine-print">
                 Top 25 by weighted frequency (scanning/VPN weighted 2&times;). Hits = times
-                this IP appeared in your submitted log. AbuseIPDB score 0–100; a score of 0
-                means no community reports on file — common for Asian ISP ranges that are
+                this IP appeared in your submitted log. AbuseIPDB score 0&ndash;100; a score of 0
+                means no community reports on file &mdash; common for Asian ISP ranges that are
                 underreported in AbuseIPDB, not a signal the IP is clean.
                 <?php if ($report['abuseipdb_note'] ?? null): ?>
                     <?php echo htmlspecialchars($report['abuseipdb_note'], ENT_QUOTES, 'UTF-8'); ?>
                 <?php endif; ?>
             </p>
             <?php if ($data_consent === 1): ?>
-            <p style="font-size:0.85em;opacity:0.75">
+            <p class="report-fine-print">
                 Community column = number of other ip2geo reports that contained this IP this week.
                 <a href="/intel.php" target="_blank" rel="noopener noreferrer">Download the community block list &rarr;</a>
             </p>
@@ -1422,19 +1445,19 @@ function render_report(array $report, string $token, ?string $expires_at, array 
 
             <!-- Community Intel demo preview (paid CTA moved above block rules) -->
             <?php if ($is_demo): ?>
-            <div style="background:rgba(108,184,122,0.12);border-left:3px solid #6cb87a;padding:0.8em 1em;margin-bottom:1.5em;font-size:0.9em">
-                <strong>Community Intel</strong> <span style="opacity:0.6;font-size:0.85em;margin-left:0.3em">Preview</span>
-                <p style="margin:0.4em 0 0.7em">Community Intel is available on paid reports. When you opt in, ip2geo cross-references your IPs against anonymized data from other users this week. The Community column shows how many other ip2geo reports contained the same IP &mdash; corroborating active threats and flagging escalating campaigns.</p>
-                <p style="margin:0 0 0.4em;opacity:0.85;font-size:0.9em">This is what the Community column looks like in the Top Threat Sources table:</p>
-                <table style="width:100%;font-size:0.85em;border-collapse:collapse">
-                    <thead><tr style="opacity:0.6"><th style="text-align:left;padding:0.2em 0.6em 0.2em 0;font-weight:normal">IP</th><th style="text-align:left;padding:0.2em 0.6em;font-weight:normal">Category</th><th style="text-align:left;padding:0.2em 0;font-weight:normal">Community</th></tr></thead>
+            <div class="community-preview-banner">
+                <strong>Community Intel</strong> <span class="community-preview-tag">Preview</span>
+                <p class="community-banner-prose">Community Intel is available on paid reports. When you opt in, ip2geo cross-references your IPs against anonymized data from other users this week. The Community column shows how many other ip2geo reports contained the same IP &mdash; corroborating active threats and flagging escalating campaigns.</p>
+                <p class="community-banner-prose-tight">This is what the Community column looks like in the Top Threat Sources table:</p>
+                <table class="community-preview-table">
+                    <thead><tr><th>IP</th><th>Category</th><th>Community</th></tr></thead>
                     <tbody>
-                        <tr><td style="padding:0.15em 0.6em 0.15em 0;font-family:monospace;opacity:0.8">185.220.101.x</td><td style="padding:0.15em 0.6em">Scanning</td><td style="padding:0.15em 0">23 reports</td></tr>
-                        <tr><td style="padding:0.15em 0.6em 0.15em 0;font-family:monospace;opacity:0.8">193.32.162.x</td><td style="padding:0.15em 0.6em">VPN/Proxy</td><td style="padding:0.15em 0">8 reports</td></tr>
-                        <tr><td style="padding:0.15em 0.6em 0.15em 0;font-family:monospace;opacity:0.8">192.168.x.x</td><td style="padding:0.15em 0.6em">Residential</td><td style="padding:0.15em 0"><span style="opacity:0.4">&mdash;</span></td></tr>
+                        <tr><td class="ip-mono">185.220.101.x</td><td>Scanning</td><td>23 reports</td></tr>
+                        <tr><td class="ip-mono">193.32.162.x</td><td>VPN/Proxy</td><td>8 reports</td></tr>
+                        <tr><td class="ip-mono">192.168.x.x</td><td>Residential</td><td><span class="dim-dash">&mdash;</span></td></tr>
                     </tbody>
                 </table>
-                <p style="font-size:0.85em;opacity:0.6;margin:0.6em 0 0.75em">Residential IPs are never collected. 52-week retention. <a href="/privacy.php" target="_blank" rel="noopener noreferrer">Privacy policy</a></p>
+                <p class="report-fine-print">Residential IPs are never collected. 52-week retention. <a href="/privacy.php" target="_blank" rel="noopener noreferrer">Privacy policy</a></p>
                 <a href="/" class="button small">Try with your own IPs &rarr;</a>
             </div>
             <?php endif; ?>
@@ -1444,7 +1467,7 @@ function render_report(array $report, string $token, ?string $expires_at, array 
             <p>
                 <button id="share-link-btn" class="button small">&#128279; Share this report</button>
             </p>
-            <p style="margin-top:1em">
+            <p class="margin-top-1">
                 <a href="/?view_token=<?php echo urlencode($token); ?>#results" class="button small alt">
                     View all <?php echo number_format($total); ?> IPs
                 </a>
@@ -1496,79 +1519,4 @@ function render_report(array $report, string $token, ?string $expires_at, array 
     });
     </script>
     <?php render_page_close();
-}
-
-// ── Shared page layout ────────────────────────────────────────────────────────
-
-/**
- * @param array $nav_items  Optional custom nav. Each entry: ['label' => '...', 'href' => '...']. Defaults to the full paid-report nav.
- */
-function render_page_open(string $title, string $meta_desc = '', array $og = [], array $nav_items = []): void {
-    $safe_title = htmlspecialchars($title, ENT_QUOTES, 'UTF-8');
-    $safe_desc  = $meta_desc
-        ? htmlspecialchars($meta_desc, ENT_QUOTES, 'UTF-8')
-        : 'ip2geo.org threat report — bulk IP geolocation and threat triage.';
-    ?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <?php if ($_SERVER['HTTP_HOST'] === 'ip2geo.org'): ?>
-    <script defer src="https://cloud.umami.is/script.js" data-website-id="656d7a15-6282-4079-af1e-b8ed857fba2e"></script>
-    <?php endif; ?>
-    <title><?php echo $safe_title; ?></title>
-    <meta charset="utf-8" />
-    <meta name="description" content="<?php echo $safe_desc; ?>" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-    <?php if (!empty($og)): ?>
-    <meta property="og:title" content="<?php echo htmlspecialchars($og['title'] ?? $title, ENT_QUOTES, 'UTF-8'); ?>">
-    <meta property="og:description" content="<?php echo htmlspecialchars($og['description'] ?? $safe_desc, ENT_QUOTES, 'UTF-8'); ?>">
-    <meta property="og:url" content="<?php echo htmlspecialchars($og['url'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
-    <meta property="og:image" content="https://ip2geo.org/assets/images/og-card.webp">
-    <meta property="og:type" content="website">
-    <?php endif; ?>
-    <link rel="stylesheet" href="/assets/css/main.css" />
-    <link rel="stylesheet" href="/assets/css/ip2geo-app.css" />
-    <link rel="stylesheet" href="/assets/css/ip2geo-print.css" media="print" />
-    <link rel="icon" href="/favicon.ico" />
-    <noscript><link rel="stylesheet" href="/assets/css/noscript.css" /></noscript>
-</head>
-<body class="is-preload">
-    <section id="sidebar">
-        <div class="inner">
-            <nav>
-                <ul>
-                    <?php
-                    $default_nav = [
-                        ['label' => 'Summary',      'href' => '#report'],
-                        ['label' => 'Block Rules',   'href' => '#block-rules'],
-                        ['label' => 'Top Sources',   'href' => '#top-sources'],
-                        ['label' => '← New Lookup', 'href' => '/'],
-                    ];
-                    foreach (($nav_items ?: $default_nav) as $item):
-                        $label = htmlspecialchars($item['label'], ENT_QUOTES, 'UTF-8');
-                        $href  = htmlspecialchars($item['href'],  ENT_QUOTES, 'UTF-8');
-                    ?>
-                    <li><a href="<?php echo $href; ?>"><?php echo $label; ?></a></li>
-                    <?php endforeach; ?>
-                </ul>
-            </nav>
-        </div>
-    </section>
-    <div id="wrapper">
-    <?php
-}
-
-function render_page_close(): void { ?>
-    </div>
-    <?php require __DIR__ . '/includes/footer.php'; ?>
-    <script src="/assets/js/jquery.min.js"></script>
-    <script src="/assets/js/jquery.scrollex.min.js"></script>
-    <script src="/assets/js/jquery.scrolly.min.js"></script>
-    <script src="/assets/js/browser.min.js"></script>
-    <script src="/assets/js/breakpoints.min.js"></script>
-    <script src="/assets/js/util.js"></script>
-    <script src="/assets/js/main.js"></script>
-</body>
-</html>
-    <?php
 }

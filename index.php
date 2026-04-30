@@ -29,12 +29,7 @@ $view_token_val  = $view_token_mode ? preg_replace('/[^a-f0-9\-]/', '', trim($_G
 
 
 ?><!DOCTYPE HTML>
-<!--
-	Hyperspace by HTML5 UP
-	html5up.net | @ajlkn
-	Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
--->
-<html lang="en">
+<html lang="en" data-theme="dark">
 	<head>
 		<!-- Umami (production only) -->
 		<?php if ($_SERVER['HTTP_HOST'] === 'ip2geo.org'): ?>
@@ -43,54 +38,60 @@ $view_token_val  = $view_token_mode ? preg_replace('/[^a-f0-9\-]/', '', trim($_G
 		<title>Bulk IP Lookup & Location Finder - Free IP Geolocation Lookup Tool</title>
 		<meta charset="utf-8" />
 		<meta name="description" content="Free tool to filter up to 10,000 IP addresses from an arbitrary text blob and list their geographic location." />
-		<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-		<link rel="stylesheet" href="assets/css/main.css" />
-	<link rel="stylesheet" href="assets/css/ip2geo-app.css" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<link rel="preconnect" href="https://fonts.bunny.net" crossorigin>
+		<link rel="stylesheet" href="https://fonts.bunny.net/css?family=geist:400,500,700,900|geist-mono:400,500&display=swap">
+		<link rel="stylesheet" href="assets/css/v4.css" />
+		<link rel="stylesheet" href="assets/css/ip2geo-print.css" media="print" />
 		<link rel="icon" href="/favicon.ico" />
-		<noscript><link rel="stylesheet" href="assets/css/noscript.css" /></noscript>
+		<script>
+		// Apply saved theme before paint to avoid a flash. Dark default.
+		(function() {
+			try {
+				var t = localStorage.getItem('ip2geo-theme');
+				if (t === 'light' || t === 'dark') {
+					document.documentElement.setAttribute('data-theme', t);
+				}
+			} catch (_) {}
+		})();
+		</script>
 	</head>
-	<body class="is-preload">
+	<body>
 
-		<!-- Sidebar -->
-		<section id="sidebar">
-			<div class="inner">
-				<nav>
-					<ul>
-						<li><a href="#intro">Bulk IP Location Lookup</a></li>
-						<li><a href="#reports">Threat Reports</a></li>
-						<li><a href="/intel.php" target="_blank" rel="noopener noreferrer">Community Block List <i class="fas fa-external-link-alt" style="font-size:0.7em;opacity:0.6;vertical-align:middle"></i></a></li>
-						<li><a href="#contribute">Contact / Contribute</a></li>
-						<li><a href="#about">About</a></li>
-					</ul>
+		<!-- Top nav -->
+		<header class="nav" role="banner">
+			<div class="nav-inner">
+				<a href="/" class="wordmark" aria-label="ip2geo home">ip2geo</a>
+				<nav class="nav-links" aria-label="primary">
+					<a href="#lookup">Lookup</a>
+					<a href="#reports">Threat Reports</a>
+					<a href="#contribute">Contact</a>
+					<a href="#about">About</a>
+					<button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle color theme">
+						<svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+						<svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+					</button>
 				</nav>
 			</div>
-		</section>
+		</header>
 
-		<!-- Wrapper -->
-			<div id="wrapper">
+		<main>
 
-				<!-- Intro -->
-					<section id="intro" class="wrapper style4 fade-up">
-						<div class="inner">
-							<h1>ip2geo Lookup</h1>
-							<p>Enter an IPv4 address (or 10,000) below and hit "Look Up IP Addresses" to find a general geographic area or city the IP is registered to. Any non-IP text is stripped, so feel free to just paste your whole log file, netstat output, or whatever pile of plain text that includes some IPs you want to check (as long as it's less than 2MB).</p>
+			<!-- Hero / Lookup -->
+			<section class="hero" id="lookup" aria-labelledby="lookup-h">
+				<div class="section-head">
+					<h1 id="lookup-h">ip2geo Lookup</h1>
+					<span class="section-tag">01 / Lookup</span>
+				</div>
 
-							<!-- Recent lookups widget — rendered by ip2geo-app.js when opt-in is on + list is nonempty -->
-							<div id="recent-lookups" hidden>
-								<div id="recent-lookups-header">
-									<h3>Recent lookups <small>(this browser only)</small></h3>
-									<button type="button" id="recent-lookups-clear" class="button small">Clear</button>
-								</div>
-								<ul id="recent-lookups-list"></ul>
-							</div>
+				<p class="lead">
+					Enter an IPv4 address (or 10,000) below and hit <strong>Look Up IP Addresses</strong> to find a general geographic area or city the IP is registered to. Any non-IP text is stripped, so feel free to just paste your whole log file, <code>netstat</code> output, or whatever pile of plain text that includes some IPs you want to check (as long as it's less than 2MB).
+				</p>
 
-							<div class="style1">
-								<section>
-									<form action="#results" method="post" name="ip_entry" id="iplookup">
-										<div class="fields">
-											<div class="field">
-												<label for="message">Text containing IPv4 Addresses</label>
-												<textarea name="ip_list" id="message" rows="5"><?php
+				<form class="lookup-form" action="#results" method="post" name="ip_entry" id="iplookup">
+					<label for="message" class="sr-only" style="position:absolute;left:-9999px">Text containing IPv4 Addresses</label>
+					<div class="form-grid">
+						<textarea class="ip-textarea" name="ip_list" id="message" rows="6" spellcheck="false"><?php
 if ($view_token_mode) {
 	// leave empty — user's IPs not re-populated in view mode
 } elseif (!isset($_POST['ip_list'])) {
@@ -99,28 +100,40 @@ if ($view_token_mode) {
 	echo htmlspecialchars($_POST['ip_list'], ENT_QUOTES, 'UTF-8');
 }
 		?></textarea>
-											</div>
-											<div class="field half">
-												<label for="countries_filter">Countries to exclude</label>
-												<input type="text" id="countries_filter" name="countries_filter" value="<?php if (isset($_POST['countries_filter'])) { echo htmlspecialchars(strtoupper($_POST['countries_filter']), ENT_QUOTES, 'UTF-8'); } ?>" />
-												<sub><a href="https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2" target="_blank">2-letter ISO codes</a>, i.e. US CA GB. Use to filter out non-suspicious IPs.</sub>
-											</div>
-											<div class="field half">
-												<label for="email">&nbsp;</label>
-												<input type="submit" class="submit" value="Look Up IP Addresses" />
-												<!-- Opt-in toggle for recent-lookups (default off; localStorage only).
-												     Lives under the submit button: discoverable but unobtrusive. -->
-												<div id="rl-optin-row" class="opt-in-toggle" hidden>
-													<input type="checkbox" id="rl-optin" name="rl-optin">
-													<label for="rl-optin" title="Stored in your browser only. Never sent to our server.">Remember in this browser</label>
-												</div>
-											</div>
-										</div>
-									</form>
-								</section>
+
+						<div class="form-side">
+							<div class="field">
+								<label for="countries_filter">Countries to exclude</label>
+								<input type="text" id="countries_filter" name="countries_filter" placeholder="e.g. US CA GB" value="<?php if (isset($_POST['countries_filter'])) { echo htmlspecialchars(strtoupper($_POST['countries_filter']), ENT_QUOTES, 'UTF-8'); } ?>" />
+								<div class="field-hint"><a href="https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2" target="_blank" rel="noopener noreferrer">2-letter ISO codes</a> separated by spaces. Use to filter out non-suspicious IPs.</div>
+							</div>
+
+							<div class="actions">
+								<input type="submit" class="button submit" value="Look Up IP Addresses" />
+								<!-- Opt-out toggle for recent-lookups (default on; localStorage only).
+								     Lives under the submit button: discoverable but unobtrusive. -->
+								<div id="rl-optin-row" class="opt-in-toggle" hidden>
+									<label class="opt-in" title="Stored in your browser only. Never sent to our server.">
+										<input type="checkbox" id="rl-optin" name="rl-optin">
+										Save recent lookups <span class="muted-tag">(this browser only)</span>
+									</label>
+								</div>
 							</div>
 						</div>
-					</section>
+					</div>
+				</form>
+
+				<!-- Recent lookups widget — rendered by ip2geo-app.js when opt-in is on + list is nonempty.
+				     Sits below the form so the asymmetric hero stays tight; surfaces returning users'
+				     prior lookups right where they'd reach next. -->
+				<div id="recent-lookups" hidden>
+					<div id="recent-lookups-header">
+						<h3>Recent lookups <small>(this browser only)</small></h3>
+						<button type="button" id="recent-lookups-clear" class="button small">Clear</button>
+					</div>
+					<ul id="recent-lookups-list"></ul>
+				</div>
+			</section>
 
 <?php
 
@@ -145,9 +158,9 @@ if ($_POST || $view_token_mode)
 		$stmt->close();
 
 		if (!$vt_row) {
-			echo '<section id="results" class="wrapper style4 fade-up"><div class="inner">';
+			echo '<section id="results" class="block"><div class="section-head"><h2 id="result">Lookup Results</h2><span class="section-tag">01 / Results</span></div>';
 			echo '<p>Report not found or access has expired. <a href="/" class="button small">&#8592; New Lookup</a></p>';
-			echo '</div></section>';
+			echo '</section>';
 			mysqli_close($con);
 			$con = null;
 		} else {
@@ -187,7 +200,7 @@ if ($_POST || $view_token_mode)
 
 		// Make an Array of valid IPs out of the input
 		if (strlen($_POST['ip_list']) > 2097152) { // 2MB hard limit
-			echo '<section id="results" class="wrapper style4 fade-up"><div class="inner"><p>Input exceeds 2MB limit. Please reduce the size of your input.</p></div></section>';
+			echo '<section id="results" class="block"><div class="section-head"><h2 id="result">Lookup Results</h2><span class="section-tag">01 / Results</span></div><p>Input exceeds 2MB limit. Please reduce the size of your input.</p></section>';
 			exit;
 		}
 		preg_match_all("/\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b/", $_POST['ip_list'], $ip_list);
@@ -431,8 +444,7 @@ if ($_POST || $view_token_mode)
 	arsort($country_counts);
 
 	// --- Output results section ---
-	echo '<section id="results" class="wrapper style4 fade-up"><div class="inner">';
-	echo '<h2 id="result">Lookup Results</h2>';
+	echo '<section id="results" class="block"><div class="section-head"><h2 id="result">Lookup Results</h2><span class="section-tag">01 / Results</span></div>';
 	// In view_token mode the page is server-rendered (not injected by AJAX), so
 	// we need a script to scroll to results. The #results hash in the link from
 	// report.php handles the common case; this handles direct URL access without hash.
@@ -513,7 +525,7 @@ if ($_POST || $view_token_mode)
 	echo '<div id="rules-ufw"      class="rules-block" style="display:none" aria-label="ufw deny rules"><button class="button small copy-rules" data-target="rules-ufw-pre">Copy</button><pre id="rules-ufw-pre"></pre></div>';
 	echo '<div id="rules-nginx"    class="rules-block" style="display:none" aria-label="nginx geo block"><button class="button small copy-rules" data-target="rules-nginx-pre">Copy</button><pre id="rules-nginx-pre"></pre></div>';
 
-	echo '<p style="margin:0.8em 0 0;font-size:0.85em;opacity:0.7">Block known scanners reported by the ip2geo community &mdash; <a href="/intel.php" target="_blank" rel="noopener noreferrer">Community Block List <i class="fas fa-external-link-alt" style="font-size:0.7em;opacity:0.6;vertical-align:middle"></i></a></p>';
+	echo '<p class="cbl-callout">Block known scanners reported by the ip2geo community. <a href="/intel.php" target="_blank" rel="noopener noreferrer" class="cbl-link">View the Community Block List <span aria-hidden="true">&rarr;</span></a></p>';
 
 	echo '</div>'; // end #filter-left
 
@@ -586,7 +598,7 @@ if ($_POST || $view_token_mode)
 	}
 	echo '</table>';
 
-	echo '</div></section>';
+	echo '</section>';
 
 	} // end if ($con !== null)
 }
@@ -600,103 +612,159 @@ else
 ?>
 
 
-				<!-- Threat Reports -->
-				<section id="reports" class="wrapper style1 fade-up">
-					<div class="inner">
-						<h2>Threat Reports</h2>
-						<p>When a lookup reveals a high proportion of scanning, cloud, or proxy infrastructure, ip2geo generates a threat report — free instantly, or with full AbuseIPDB threat scores and firewall scripts for $9.</p>
-						<div class="row">
-							<div class="col-6 col-12-medium">
-								<h3>Free report</h3>
-								<ul>
-									<li><strong>Geo + ASN breakdown</strong> of your top 25 IPs</li>
-									<li><strong>Shareable link</strong> — send to your team, saved for 7 days</li>
-								</ul>
-								<h3>Full report — $9 one-time</h3>
-								<ul>
-									<li><strong>AbuseIPDB reputation scores</strong> for your top 25 IPs: see which ones are confirmed attackers</li>
-									<li><strong>ASN CIDR ranges</strong> for resilient blocking: block entire scanning networks, not just individual IPs that rotate</li>
-									<li><strong>Ready-to-run firewall scripts</strong> for iptables, ufw, and nginx</li>
-									<li><strong>Community intel</strong> (opt-in): see how many other ip2geo users reported the same IPs this week, with trend indicators showing whether activity is escalating</li>
-									<li><strong>Permanent link</strong> — no expiry, come back any time</li>
-								</ul>
-							</div>
-							<div class="col-6 col-12-medium">
-								<h3>See it in action</h3>
-								<p>The sample below is a full $9 report using real Tor exit node data with live AbuseIPDB enrichment — so you can see exactly what you get before deciding to upgrade.</p>
-								<p style="text-align:right"><a href="/report.php?token=00000000-0000-0000-0000-000000000000" target="_blank" class="button">See a sample full report &rarr;</a></p>
-							</div>
-						</div>
+			<!-- Threat Reports -->
+			<section class="block" id="reports" aria-labelledby="reports-h">
+				<div class="section-head">
+					<h2 id="reports-h">Threat Reports</h2>
+					<span class="section-tag">02 / Reports</span>
+				</div>
+
+				<div class="block-body" style="margin-bottom:32px">
+					<p>When a lookup reveals a high proportion of scanning, cloud, or proxy infrastructure, ip2geo generates a threat report. Free instantly, or with full <strong>AbuseIPDB</strong> threat scores and ready-to-run firewall scripts for $9.</p>
+				</div>
+
+				<div class="two-col">
+					<div>
+						<div class="price"><span class="amount">Free</span><span class="label">instant</span></div>
+						<h3 class="subhead">Free report</h3>
+						<ul class="feature-list">
+							<li><strong>Geo + ASN breakdown</strong> of your top 25 IPs</li>
+							<li><strong>Shareable link</strong>, saved 7 days</li>
+						</ul>
 					</div>
-				</section>
-
-
-				<!-- Contact / Contribute -->
-				<section id="contribute" class="wrapper style4 fade-up">
-					<div class="inner">
-						<h2>Contact / Contribute</h2>
-						<p>ip2geo.org is maintained and run by me, Josh. Hi. If this tool was helpful, feel free to say hello &mdash; or help cover hosting costs if the free tools saved the day.</p>
-						<div class="row">
-							<div class="col-6 col-12-medium">
-								<ul class="contact">
-									<li>
-										<h3>Social</h3>
-										<ul>
-											<li><a href="https://joshgister.com/" target="_blank">Personal Site</a></li>
-											<li><a href="https://www.linkedin.com/in/joshgister/" target="_blank">LinkedIn</a></li>
-											<li><a rel="me" href="https://ioc.exchange/@joshgister" target="_blank">Mastodon</a></li>
-										</ul>
-									</li>
-								</ul>
-							</div>
-							<div class="col-6 col-12-medium">
-								<ul class="contact">
-									<li>
-										<h3>Donate</h3>
-										<ul>
-											<li><a href="https://www.buymeacoffee.com/ip2geo" target="_blank">Buy me a coffee</a></li>
-										</ul>
-									</li>
-								</ul>
-							</div>
-						</div>
+					<div>
+						<div class="price"><span class="amount">$9</span><span class="label">one-time</span></div>
+						<h3 class="subhead">Full report</h3>
+						<ul class="feature-list">
+							<li><strong>AbuseIPDB reputation scores</strong> for your top 25 IPs</li>
+							<li><strong>ASN CIDR ranges</strong> for resilient blocking</li>
+							<li><strong>Firewall scripts</strong> for iptables, ufw, nginx</li>
+							<li><strong>Community intel</strong> (opt-in): see who else reported these IPs</li>
+							<li><strong>Permanent link</strong>, no expiry</li>
+						</ul>
+						<a href="/report.php?token=00000000-0000-0000-0000-000000000000" target="_blank" class="button magenta">See a sample full report &rarr;</a>
 					</div>
-				</section>
+				</div>
+			</section>
 
 
-				<!-- About -->
-				<section id="about" class="wrapper style1 fade-up">
-					<div class="inner">
-						<section>
-							<h2>About ip2geo.org</h2>
-							<h3>Why This Exists</h3>
-							<p>Ever been on the wrong end of a distributed probe hammering away at your email server, SSH port, or some other exposed service? It's chaos. Logs scroll by like a waterfall, and your tools? They're powerful, sure — but not exactly friendly when you're trying to make sense of hundreds of connections in real time.</p>
-							<h3>The Problem</h3>
-							<p>You run a CLI command, grab the output, and paste it into your favorite text editor. You start cleaning it up, extracting IPs manually, only to hit a wall: now you're supposed to copy-paste those addresses into a web form. One by one. Seriously?</p>
-							<p>When you're facing a flood of suspicious traffic, that's just not going to cut it.</p>
-							<h3>The Fix</h3>
-							<p>I was maintaining an aging email system with no password policies and no support — a perfect storm for account compromises. With no time or budget to overhaul it, I built this tool instead.</p>
-							<p>ip2geo.org lets you paste raw output from tools like <code>netstat</code>, <code>fail2ban</code>, or anything else that spits out IPs. It automatically extracts valid IPv4 addresses, runs a fast geolocation lookup, and gives you clean, actionable data — instantly. With one glance, I could see login attempts from every corner of the globe and quickly block entire botnets.</p>
-							<h3>What It's Grown Into</h3>
-							<p>The free lookup is still here. But over time, ip2geo.org has grown into something more complete. When a lookup shows a high concentration of scanning or proxy infrastructure, you can now generate a <strong>Threat Report</strong> — free instantly (geo and ASN breakdown, 7-day shareable link), or upgrade for $9 to add AbuseIPDB threat scores, ASN CIDR ranges, and ready-to-run firewall scripts for iptables, ufw, and nginx.</p>
-							<p>There's also a <a href="/intel.php">Community Block List</a> — a rolling 7-day feed of CIDR ranges reported by opted-in ip2geo users. If you contribute your report, your data joins the aggregate anonymously. If you just want the list, download it and apply it directly to your firewall.</p>
-							<h3>How It Works</h3>
-							<p>Paste any block of text. ip2geo.org scans it for IPv4 addresses, checks them against a geolocation database, and returns results you can filter by country or infrastructure category — scanning ranges, cloud exit nodes, VPN and proxy infrastructure, or residential traffic. Want to only see scanning infrastructure hits from outside the US? Done. Focus only on what matters.</p>
-							<h3>Why It's Free</h3>
-							<p>This tool was built using free and open-source resources, and it's free because I wish something like this had existed when I needed it most. If it helps you too, consider <a href="https://www.buymeacoffee.com/ip2geo" target="_blank">buying me a coffee</a> or tossing a few bucks toward hosting costs.</p>
-						</section>
+			<!-- Contact / Contribute -->
+			<section class="block" id="contribute" aria-labelledby="contact-h">
+				<div class="section-head">
+					<h2 id="contact-h">Contact / Contribute</h2>
+					<span class="section-tag">03 / Contact</span>
+				</div>
+
+				<div class="block-body" style="margin-bottom:32px">
+					<p>ip2geo.org is maintained and run by me, Josh. Hi. If this tool was helpful, feel free to say hello, or help cover hosting costs if the free tools saved the day.</p>
+				</div>
+
+				<div class="about-grid">
+					<div>
+						<h3>Social</h3>
+						<p>
+							<a href="https://joshgister.com/" target="_blank" rel="noopener">Personal site</a><br>
+							<a href="https://www.linkedin.com/in/joshgister/" target="_blank" rel="noopener">LinkedIn</a><br>
+							<a rel="me noopener" href="https://ioc.exchange/@joshgister" target="_blank">Mastodon</a>
+						</p>
 					</div>
-				</section>
+					<div>
+						<h3>Donate</h3>
+						<p><a href="https://www.buymeacoffee.com/ip2geo" target="_blank" rel="noopener">Buy me a coffee &rarr;</a></p>
+					</div>
+				</div>
+			</section>
 
-				<?php require __DIR__ . '/includes/footer.php'; ?>
 
-			</div>
+			<!-- About -->
+			<section class="block" id="about" aria-labelledby="about-h">
+				<div class="section-head">
+					<h2 id="about-h">About ip2geo.org</h2>
+					<span class="section-tag">04 / About</span>
+				</div>
+
+				<div class="about-prose">
+					<h3>Why This Exists</h3>
+					<p>Ever been on the wrong end of a distributed probe hammering away at your email server, SSH port, or some other exposed service? It's chaos. Logs scroll by like a waterfall, and your tools? They're powerful, sure &mdash; but not exactly friendly when you're trying to make sense of hundreds of connections in real time.</p>
+
+					<h3>The Problem</h3>
+					<p>You run a CLI command, grab the output, and paste it into your favorite text editor. You start cleaning it up, extracting IPs manually, only to hit a wall: now you're supposed to copy-paste those addresses into a web form. One by one. Seriously?</p>
+					<p>When you're facing a flood of suspicious traffic, that's just not going to cut it.</p>
+
+					<h3>The Fix</h3>
+					<p>I was maintaining an aging email system with no password policies and no support &mdash; a perfect storm for account compromises. With no time or budget to overhaul it, I built this tool instead.</p>
+					<p>ip2geo.org lets you paste raw output from tools like <code>netstat</code>, <code>fail2ban</code>, or anything else that spits out IPs. It automatically extracts valid IPv4 addresses, runs a fast geolocation lookup, and gives you clean, actionable data &mdash; instantly. With one glance, I could see login attempts from every corner of the globe and quickly block entire botnets.</p>
+
+					<h3>What It's Grown Into</h3>
+					<p>The free lookup is still here. But over time, ip2geo.org has grown into something more complete. When a lookup shows a high concentration of scanning or proxy infrastructure, you can now generate a <strong>Threat Report</strong> &mdash; free instantly (geo and ASN breakdown, 7-day shareable link), or upgrade for $9 to add AbuseIPDB threat scores, ASN CIDR ranges, and ready-to-run firewall scripts for iptables, ufw, and nginx.</p>
+					<p>There's also a <a href="/intel.php">Community Block List</a> &mdash; a rolling 7-day feed of CIDR ranges reported by opted-in ip2geo users. If you contribute your report, your data joins the aggregate anonymously. If you just want the list, download it and apply it directly to your firewall.</p>
+
+					<h3>How It Works</h3>
+					<p>Paste any block of text. ip2geo.org scans it for IPv4 addresses, checks them against a geolocation database, and returns results you can filter by country or infrastructure category &mdash; scanning ranges, cloud exit nodes, VPN and proxy infrastructure, or residential traffic. Want to only see scanning infrastructure hits from outside the US? Done. Focus only on what matters.</p>
+
+					<h3>Why It's Free</h3>
+					<p>This tool was built using free and open-source resources, and it's free because I wish something like this had existed when I needed it most. If it helps you too, consider <a href="https://www.buymeacoffee.com/ip2geo" target="_blank" rel="noopener">buying me a coffee</a> or tossing a few bucks toward hosting costs.</p>
+				</div>
+			</section>
+
+		</main>
+
+		<?php require __DIR__ . '/includes/footer.php'; ?>
 
 		<!-- Toast container for recent-lookups undo affordance (managed by ip2geo-app.js) -->
 		<div id="rl-toast" role="status" aria-live="polite" hidden>
 			<span id="rl-toast-msg"></span>
 			<button type="button" id="rl-toast-undo">Undo</button>
 		</div>
+
+		<!-- Theme toggle -->
+		<script>
+		(function() {
+			var btn = document.getElementById('themeToggle');
+			if (!btn) return;
+			btn.addEventListener('click', function() {
+				var root = document.documentElement;
+				var next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+				root.setAttribute('data-theme', next);
+				try { localStorage.setItem('ip2geo-theme', next); } catch (_) {}
+			});
+		})();
+		</script>
+
+		<!-- Smooth in-page anchor scroll (fixed ~500ms regardless of distance) -->
+		<script>
+		(function() {
+			var DURATION = 500;
+			var OFFSET = 72;
+			var reduced = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+			function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+			function scrollTo(targetY) {
+				if (reduced) { window.scrollTo(0, targetY); return; }
+				var startY = window.pageYOffset;
+				var dy = targetY - startY;
+				if (dy === 0) return;
+				var t0 = performance.now();
+				function step(now) {
+					var p = Math.min(1, (now - t0) / DURATION);
+					window.scrollTo(0, startY + dy * easeOutCubic(p));
+					if (p < 1) requestAnimationFrame(step);
+				}
+				requestAnimationFrame(step);
+			}
+			document.addEventListener('click', function(e) {
+				var a = e.target.closest && e.target.closest('a[href^="#"]');
+				if (!a) return;
+				var hash = a.getAttribute('href');
+				if (!hash || hash === '#') return;
+				var target = document.getElementById(hash.slice(1));
+				if (!target) return;
+				e.preventDefault();
+				var y = target.getBoundingClientRect().top + window.pageYOffset - OFFSET;
+				scrollTo(y);
+				history.replaceState(null, '', hash);
+			});
+		})();
+		</script>
 
 		<!-- Scripts -->
 		<script data-cfasync="false">
@@ -718,12 +786,12 @@ else
 				var count = matches ? matches.length : 0;
 
 				var overlay = document.createElement('div');
-				overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:linear-gradient(to right,rgba(94,66,166,0.97),rgba(183,78,145,0.97));display:flex;align-items:center;justify-content:center;z-index:2147483647;';
+				overlay.className = 'processing-overlay';
 				var msg = document.createElement('div');
-				msg.style.cssText = 'font-family:monospace;font-size:1.1em;color:#fff;letter-spacing:0.05em;opacity:0.9;';
+				msg.className = 'processing-overlay__msg';
 				msg.textContent = 'Processing ' + count.toLocaleString() + ' IP' + (count !== 1 ? 's' : '') + ' ';
 				var dotSpan = document.createElement('span');
-				dotSpan.style.cssText = 'display:inline-block;width:1.8em;text-align:left;';
+				dotSpan.className = 'processing-overlay__dots';
 				var dots = ['.', '..', '...'];
 				var dotIdx = 0;
 				dotSpan.textContent = dots[dotIdx];
@@ -755,7 +823,7 @@ else
 					if (existing) {
 						existing.outerHTML = newResults.outerHTML;
 					} else {
-						document.getElementById('intro').insertAdjacentHTML('afterend', newResults.outerHTML);
+						document.getElementById('lookup').insertAdjacentHTML('afterend', newResults.outerHTML);
 					}
 					var inserted = document.getElementById('results');
 					cleanup();
@@ -791,7 +859,7 @@ else
 		document.addEventListener('click', function(e) {
 			if (e.target.id !== 'download-csv') return;
 			try { umami.track('download_csv'); } catch(_) {}
-			var bom = '\uFEFF';
+			var bom = '﻿';
 			var headers = ['IP','CC','State/Province','City','ASN','ASN Org','Category'];
 			var rows = [headers];
 			document.querySelectorAll('#results-table tbody tr').forEach(function(tr) {
@@ -816,13 +884,6 @@ else
 
 		})();
 		</script>
-			<script src="assets/js/jquery.min.js"></script>
-			<script src="assets/js/jquery.scrollex.min.js"></script>
-			<script src="assets/js/jquery.scrolly.min.js"></script>
-			<script src="assets/js/browser.min.js"></script>
-			<script src="assets/js/breakpoints.min.js"></script>
-			<script src="assets/js/util.js"></script>
-			<script src="assets/js/main.js"></script>
 		<script src="assets/js/ip2geo-app.js"></script>
 
 	</body>

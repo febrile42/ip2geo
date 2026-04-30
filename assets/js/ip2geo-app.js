@@ -337,10 +337,10 @@
     // Init filters + stripes + rules on initial server-rendered load
     applyFilters();
 
-    // ── Recent lookups: opt-in localStorage memory ─────────────────────────
-    // Default OFF. localStorage only — never sent to the server.
+    // ── Recent lookups: opt-out localStorage memory ────────────────────────
+    // Default ON (opt-out). localStorage only — never sent to the server.
+    // Missing key OR '1' → on; only '0' → off. Existing opt-in users keep '1'.
     // Toast-with-undo pattern for destructive actions (toggle-off, clear).
-    // See ~/.gstack/projects/febrile42-ip2geo/shadows-develop-eng-review-test-plan-20260426-105859.md
     var RL = (function () {
         var OPTIN_KEY  = 'rl_optin';
         var LIST_KEY   = 'rl_list';
@@ -361,14 +361,13 @@
         }
 
         function loadOptInState() {
-            try { return window.localStorage.getItem(OPTIN_KEY) === '1'; }
-            catch (_) { return false; }
+            try { return window.localStorage.getItem(OPTIN_KEY) !== '0'; }
+            catch (_) { return true; }
         }
 
         function saveOptInState(value) {
             try {
-                if (value) window.localStorage.setItem(OPTIN_KEY, '1');
-                else       window.localStorage.removeItem(OPTIN_KEY);
+                window.localStorage.setItem(OPTIN_KEY, value ? '1' : '0');
             } catch (_) {}
         }
 
