@@ -756,6 +756,89 @@ button.button.small:hover {
 .threat-cta-box .threat-cta-features { color: var(--text); opacity: 1; font-size: 0.9em; padding: 14px 0 0; }
 .threat-cta-box .threat-cta-features li { color: var(--text-muted); }
 
+/* ----- Community Block List callout (under the iptables/ufw/nginx buttons) -----
+   Inline opacity:0.7 on the wrapper used to dim the link too, killing affordance.
+   Now: prose stays muted, link uses accent + underline so it reads as a CTA. */
+.cbl-callout {
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.cbl-link {
+  color: var(--accent-purple);
+  text-decoration: underline;
+  text-decoration-color: var(--accent-purple);
+  text-underline-offset: 5px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.cbl-link:hover {
+  color: var(--magenta);
+  text-decoration-color: var(--magenta);
+}
+
+/* ----- Recent lookups widget (opt-out localStorage) -----
+   v4 token swap on top of the existing #recent-lookups markup in ip2geo-app.css.
+   Header tag follows the section-tag mono pattern; pills use --surface-2 +
+   --border, lift to --accent-purple on hover. Matches the asymmetric hero
+   rhythm without adding panel chrome. */
+#recent-lookups {
+  margin: 28px 0 0;
+}
+#recent-lookups-header {
+  align-items: center;
+  margin-bottom: 12px;
+}
+#recent-lookups-header h3 {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  opacity: 1;
+  margin: 0;
+}
+#recent-lookups-header h3 small {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-muted);
+  opacity: 0.7;
+  margin-left: 8px;
+}
+#recent-lookups-list {
+  gap: 8px;
+}
+#recent-lookups-list .recent-lookup-item {
+  background: var(--surface-2);
+  border: 1px solid var(--border) !important;
+  border-radius: 999px !important;
+  color: var(--text) !important;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  padding: 6px 14px;
+  transition: border-color 0.12s, background 0.12s;
+}
+#recent-lookups-list .recent-lookup-item:hover,
+#recent-lookups-list .recent-lookup-item:focus {
+  background: var(--surface-2);
+  border-color: var(--accent-purple) !important;
+  color: var(--text) !important;
+}
+.recent-lookup-count {
+  font-family: var(--font-mono);
+  font-feature-settings: "tnum" 1;
+  color: var(--text);
+}
+.recent-lookup-time {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  opacity: 1;
+}
+
 /* Empty filter message — center align inside the table card. */
 #empty-filter-msg {
   color: var(--text-muted);

@@ -89,15 +89,6 @@ $view_token_val  = $view_token_mode ? preg_replace('/[^a-f0-9\-]/', '', trim($_G
 					Enter an IPv4 address (or 10,000) below and hit <strong>Look Up IP Addresses</strong> to find a general geographic area or city the IP is registered to. Any non-IP text is stripped, so feel free to just paste your whole log file, <code>netstat</code> output, or whatever pile of plain text that includes some IPs you want to check (as long as it's less than 2MB).
 				</p>
 
-				<!-- Recent lookups widget — rendered by ip2geo-app.js when opt-in is on + list is nonempty -->
-				<div id="recent-lookups" hidden>
-					<div id="recent-lookups-header">
-						<h3>Recent lookups <small>(this browser only)</small></h3>
-						<button type="button" id="recent-lookups-clear" class="button small">Clear</button>
-					</div>
-					<ul id="recent-lookups-list"></ul>
-				</div>
-
 				<form class="lookup-form" action="#results" method="post" name="ip_entry" id="iplookup">
 					<label for="message" class="sr-only" style="position:absolute;left:-9999px">Text containing IPv4 Addresses</label>
 					<div class="form-grid">
@@ -120,18 +111,29 @@ if ($view_token_mode) {
 
 							<div class="actions">
 								<input type="submit" class="button submit" value="Look Up IP Addresses" />
-								<!-- Opt-in toggle for recent-lookups (default off; localStorage only).
+								<!-- Opt-out toggle for recent-lookups (default on; localStorage only).
 								     Lives under the submit button: discoverable but unobtrusive. -->
 								<div id="rl-optin-row" class="opt-in-toggle" hidden>
 									<label class="opt-in" title="Stored in your browser only. Never sent to our server.">
 										<input type="checkbox" id="rl-optin" name="rl-optin">
-										Recent lookups <span class="muted-tag">(this browser only)</span>
+										Save recent lookups <span class="muted-tag">(this browser only)</span>
 									</label>
 								</div>
 							</div>
 						</div>
 					</div>
 				</form>
+
+				<!-- Recent lookups widget — rendered by ip2geo-app.js when opt-in is on + list is nonempty.
+				     Sits below the form so the asymmetric hero stays tight; surfaces returning users'
+				     prior lookups right where they'd reach next. -->
+				<div id="recent-lookups" hidden>
+					<div id="recent-lookups-header">
+						<h3>Recent lookups <small>(this browser only)</small></h3>
+						<button type="button" id="recent-lookups-clear" class="button small">Clear</button>
+					</div>
+					<ul id="recent-lookups-list"></ul>
+				</div>
 			</section>
 
 <?php
@@ -524,7 +526,7 @@ if ($_POST || $view_token_mode)
 	echo '<div id="rules-ufw"      class="rules-block" style="display:none" aria-label="ufw deny rules"><button class="button small copy-rules" data-target="rules-ufw-pre">Copy</button><pre id="rules-ufw-pre"></pre></div>';
 	echo '<div id="rules-nginx"    class="rules-block" style="display:none" aria-label="nginx geo block"><button class="button small copy-rules" data-target="rules-nginx-pre">Copy</button><pre id="rules-nginx-pre"></pre></div>';
 
-	echo '<p style="margin:0.8em 0 0;font-size:0.85em;opacity:0.7">Block known scanners reported by the ip2geo community &mdash; <a href="/intel.php" target="_blank" rel="noopener noreferrer">Community Block List</a></p>';
+	echo '<p class="cbl-callout">Block known scanners reported by the ip2geo community. <a href="/intel.php" target="_blank" rel="noopener noreferrer" class="cbl-link">View the Community Block List <span aria-hidden="true">&rarr;</span></a></p>';
 
 	echo '</div>'; // end #filter-left
 

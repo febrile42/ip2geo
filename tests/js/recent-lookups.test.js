@@ -29,14 +29,13 @@ function isStorageAvailable() {
 }
 
 function loadOptInState() {
-    try { return window.localStorage.getItem(OPTIN_KEY) === '1'; }
-    catch (_) { return false; }
+    try { return window.localStorage.getItem(OPTIN_KEY) !== '0'; }
+    catch (_) { return true; }
 }
 
 function saveOptInState(value) {
     try {
-        if (value) window.localStorage.setItem(OPTIN_KEY, '1');
-        else       window.localStorage.removeItem(OPTIN_KEY);
+        window.localStorage.setItem(OPTIN_KEY, value ? '1' : '0');
     } catch (_) {}
 }
 
@@ -130,8 +129,8 @@ describe('isStorageAvailable', () => {
 // ── loadOptInState ────────────────────────────────────────────────────────────
 
 describe('loadOptInState', () => {
-    test('returns false on missing key', () => {
-        expect(loadOptInState()).toBe(false);
+    test('returns true on missing key (default ON / opt-out)', () => {
+        expect(loadOptInState()).toBe(true);
     });
 
     test('returns true on key value "1"', () => {
@@ -139,9 +138,14 @@ describe('loadOptInState', () => {
         expect(loadOptInState()).toBe(true);
     });
 
-    test('returns false on other value', () => {
-        window.localStorage.setItem(OPTIN_KEY, 'true');
+    test('returns false on key value "0" (explicit opt-out)', () => {
+        window.localStorage.setItem(OPTIN_KEY, '0');
         expect(loadOptInState()).toBe(false);
+    });
+
+    test('returns true on other value (treats unknown as default ON)', () => {
+        window.localStorage.setItem(OPTIN_KEY, 'true');
+        expect(loadOptInState()).toBe(true);
     });
 });
 
@@ -153,10 +157,10 @@ describe('saveOptInState', () => {
         expect(window.localStorage.getItem(OPTIN_KEY)).toBe('1');
     });
 
-    test('false removes the key', () => {
+    test('false sets key to "0" (persists explicit opt-out)', () => {
         window.localStorage.setItem(OPTIN_KEY, '1');
         saveOptInState(false);
-        expect(window.localStorage.getItem(OPTIN_KEY)).toBeNull();
+        expect(window.localStorage.getItem(OPTIN_KEY)).toBe('0');
     });
 });
 
@@ -318,6 +322,7 @@ describe('buildEntry', () => {
 
 describe('appendLookup', () => {
     test('opt-in OFF: noop, no list write', () => {
+        saveOptInState(false); // explicit opt-out (default is ON now)
         appendLookup(['1.1.1.1'], 1);
         expect(window.localStorage.getItem(LIST_KEY)).toBeNull();
     });
@@ -756,6 +761,7 @@ describe('ip2geo:lookup_submit integration', () => {
     });
 
     test('opt-in OFF: lookup_submit event does not store anything', () => {
+        saveOptInState(false); // explicit opt-out (default is ON now)
         document.dispatchEvent(new CustomEvent('ip2geo:lookup_submit', {
             detail: { ips: ['1.1.1.1'], count: 1 }
         }));
