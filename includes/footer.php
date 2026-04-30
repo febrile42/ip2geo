@@ -17,7 +17,6 @@ $_footer_data_date = $GLOBALS['db_data_date'] ?? null;
             <li><a href="/privacy.php">Privacy Policy</a></li>
             <li><a href="/legal.php">Refund Policy</a></li>
             <li><a href="&#109;&#97;&#105;&#108;&#116;&#111;&#58;&#115;&#117;&#112;&#112;&#111;&#114;&#116;&#64;&#105;&#112;&#50;&#103;&#101;&#111;&#46;&#111;&#114;&#103;">&#115;&#117;&#112;&#112;&#111;&#114;&#116;&#64;&#105;&#112;&#50;&#103;&#101;&#111;&#46;&#111;&#114;&#103;</a></li>
-            <li>Design: <a href="http://html5up.net" target="_blank">HTML5 UP</a></li>
         </ul>
     </div>
 </footer>
