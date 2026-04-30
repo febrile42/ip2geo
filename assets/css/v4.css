@@ -42,6 +42,14 @@
   --verdict-low: #6cb87a;
   --verdict-cloud: #8ab4d4;
   --verdict-unknown: #aaa;
+
+  /* Processing-overlay gradient (heritage hues, theme-aware lightness).
+     Dark theme: dimmed near-bg pair so the overlay reads as the room dimming
+     rather than a spotlight switching on. Light theme override below restores
+     the saturated heritage stops, which read as a clear "stop, processing"
+     state against the near-white bg. */
+  --overlay-from: rgba(26, 18, 64, 0.96);
+  --overlay-to:   rgba(61, 31, 63, 0.96);
 }
 
 [data-theme="light"] {
@@ -56,6 +64,9 @@
   --magenta: #B74E91;
   --magenta-hover: #9C3F7B;
   --border: rgba(26,19,48,0.10);
+
+  --overlay-from: rgba(94, 66, 166, 0.96);
+  --overlay-to:   rgba(183, 78, 145, 0.96);
 }
 
 /* Default-link underline visibility tuning, light theme only.
@@ -349,6 +360,32 @@ main {
   flex-direction: column;
   gap: 12px;
   align-items: flex-start;
+}
+
+/* Processing overlay — full-viewport scrim shown while the bulk-IP lookup
+   AJAX round-trip is in flight. Heritage gradient at theme-aware lightness
+   (see --overlay-from / --overlay-to in §1) so dark theme doesn't flash-bomb
+   visitors mid-scroll. Built dynamically by the submit handler in index.php. */
+.processing-overlay {
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(to right, var(--overlay-from), var(--overlay-to));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2147483647;
+}
+.processing-overlay__msg {
+  font-family: var(--font-mono);
+  font-size: 1.1em;
+  color: #fff;
+  letter-spacing: 0.05em;
+  opacity: 0.9;
+}
+.processing-overlay__dots {
+  display: inline-block;
+  width: 1.8em;
+  text-align: left;
 }
 
 /* ============================================================

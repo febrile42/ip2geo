@@ -786,12 +786,12 @@ else
 				var count = matches ? matches.length : 0;
 
 				var overlay = document.createElement('div');
-				overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:linear-gradient(to right,rgba(94,66,166,0.97),rgba(183,78,145,0.97));display:flex;align-items:center;justify-content:center;z-index:2147483647;';
+				overlay.className = 'processing-overlay';
 				var msg = document.createElement('div');
-				msg.style.cssText = 'font-family:monospace;font-size:1.1em;color:#fff;letter-spacing:0.05em;opacity:0.9;';
+				msg.className = 'processing-overlay__msg';
 				msg.textContent = 'Processing ' + count.toLocaleString() + ' IP' + (count !== 1 ? 's' : '') + ' ';
 				var dotSpan = document.createElement('span');
-				dotSpan.style.cssText = 'display:inline-block;width:1.8em;text-align:left;';
+				dotSpan.className = 'processing-overlay__dots';
 				var dots = ['.', '..', '...'];
 				var dotIdx = 0;
 				dotSpan.textContent = dots[dotIdx];
