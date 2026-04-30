@@ -1,7 +1,9 @@
 /* ip2geo v4 — modern brutalist utility reskin
    Source of truth: DESIGN.md
    Round 3-A approved mockup: ~/.gstack/projects/febrile42-ip2geo/designs/v4reskin-20260426/round3/variant-A.png
-   Companion sheet: ip2geo-app.css (verdict palette + filter chips, kept verbatim) */
+   Single-file consolidation: every app rule lives here. ip2geo-app.css and the
+   html5up Hyperspace template (main.css, noscript.css, jquery + main.js + util.js)
+   were retired during the v4 reskin — see git history for the cleanup commit. */
 
 /* ============================================================
    1. TOKENS
@@ -31,6 +33,15 @@
   --r-md: 6px;
   --r-lg: 8px;
   --r-pill: 9999px;
+
+  /* Verdict palette — drives .asn-verdict, .asn-category, .threat-cta-box, .cat-* chip
+     accents, and CTA button fills. Single source so the report's color language stays
+     consistent across pill / row text / border / fill contexts. */
+  --verdict-high: #e06c9f;
+  --verdict-moderate: #e0a85a;
+  --verdict-low: #6cb87a;
+  --verdict-cloud: #8ab4d4;
+  --verdict-unknown: #aaa;
 }
 
 [data-theme="light"] {
@@ -391,6 +402,23 @@ main {
 .opt-in input { accent-color: var(--accent-purple); }
 .opt-in .muted-tag { color: var(--text-muted); opacity: 0.7; }
 
+/* Wrapper row for the recent-lookups opt-in checkbox: sits directly below the
+   submit button in the .actions column. Fades on hover so the row stays
+   discoverable without competing with the primary CTA. */
+.opt-in-toggle {
+  margin-top: 0.6em;
+  font-size: 0.75em;
+  opacity: 0.7;
+  transition: opacity 0.15s;
+}
+.opt-in-toggle:hover,
+.opt-in-toggle:focus-within {
+  opacity: 1;
+}
+.opt-in-toggle label {
+  cursor: pointer;
+}
+
 /* ============================================================
    10. GENERIC SECTIONS
    Hairline divider + asymmetric padding (72/42).
@@ -528,9 +556,9 @@ h3.subhead {
 
 /* ============================================================
    15. FOOTER
-   Targets the existing includes/footer.php markup
-   (<footer id="footer" class="wrapper style1-alt"><div class="inner">...</div>)
-   so other not-yet-reskinned pages that share this include are unaffected.
+   Targets includes/footer.php — the v4 reskin renamed the html5up
+   `wrapper style1-alt` / `.inner` / `.menu` classes to `#footer` /
+   `.footer-inner` / `.footer-menu` so the markup is self-documenting.
    ============================================================ */
 footer#footer {
   padding: 48px 0 64px;
@@ -540,12 +568,12 @@ footer#footer {
   font-size: 13px;
   background: var(--bg);
 }
-footer#footer .inner {
+footer#footer .footer-inner {
   max-width: var(--content-max);
   margin: 0 auto;
   padding: 0 32px;
 }
-footer#footer ul.menu {
+footer#footer ul.footer-menu {
   list-style: none;
   padding: 0;
   margin: 0 0 8px;
@@ -554,8 +582,8 @@ footer#footer ul.menu {
   gap: 6px 24px;
   font-size: 13px;
 }
-footer#footer ul.menu:last-child { margin-bottom: 0; }
-footer#footer ul.menu li { color: var(--text-muted); }
+footer#footer ul.footer-menu:last-child { margin-bottom: 0; }
+footer#footer ul.footer-menu li { color: var(--text-muted); }
 footer#footer a {
   color: var(--text-muted);
   text-decoration: underline;
@@ -569,23 +597,47 @@ footer#footer a:hover {
 
 /* ============================================================
    16. RESULTS SECTION (server-rendered after submit / view-token)
-   ip2geo-app.css carries the verdict palette (asn-verdict--high/etc),
-   ASN category text colors, threat-CTA box layout, filter chip pills,
-   and other v3.x styles. v4 here adds:
-   - The section-head wrapper around #results
-   - Table cell typography + spacing using v4 tokens
-   - Filter & Export panel framing
-   - Lower-emphasis utility button style
-   - Stats table as a compact monospace summary
    ============================================================ */
+
+/* ---------- 16a. Verdict + ASN category palette ----------
+   Used by the report verdict bar, the threat-CTA box, the results-table
+   ASN category column, and the filter-chip color accents. The palette is
+   tokenised in §1 so every consumer reads from one place. */
+.asn-verdict {
+    font-family: monospace;
+    font-size: 1.4em;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    padding-left: 0.75em;
+    margin-bottom: 0.25em;
+}
+.asn-verdict--high     { color: var(--verdict-high);     border-left: 3px solid var(--verdict-high); }
+.asn-verdict--moderate { color: var(--verdict-moderate); border-left: 3px solid var(--verdict-moderate); }
+.asn-verdict--low      { color: var(--verdict-low);      border-left: 3px solid var(--verdict-low); }
+
+/* ASN category labels in #results-table. Pill variant lives in §18 under
+   .report-inner — it inherits the same color via currentColor. */
+.asn-category {
+    font-family: monospace;
+    font-size: 0.85em;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.asn-category--scanning    { color: var(--verdict-high); }
+.asn-category--cloud       { color: var(--verdict-cloud); }
+.asn-category--vpn         { color: var(--verdict-moderate); }
+.asn-category--residential { color: var(--verdict-low); }
+.asn-category--unknown     { color: #888; }
+
 section#results.block { padding-top: 56px; }
 section#results .section-head { margin-bottom: 16px; }
 
-/* ----- Results table -----
+/* ---------- 16b. Results table ----------
    Density via 13px Geist Sans body, 11px mono uppercase headers.
-   IP / ASN / CC columns swap to mono so digits align. Hover highlights
-   the row in --surface-2. JS-driven .row-stripe still overrides any
-   nth-child stripe (see ip2geo-app.css notes). */
+   IP / ASN / CC columns swap to mono so digits align. JS-driven .row-stripe
+   handles alternation post-filter; the nth-child reset guards against the
+   theme's stripe rule resurrecting after rows hide. */
 section#results .table-wrapper {
   margin: 20px 0 16px;
   border: 1px solid var(--border);
@@ -635,19 +687,59 @@ section#results .table-wrapper {
 }
 #results-table tbody td:nth-child(2) { color: var(--text-muted); }
 
+/* abbr tooltips inside results table */
+#results-table abbr[title] {
+    text-decoration: underline dotted;
+    text-decoration-color: var(--text-muted);
+    cursor: help;
+}
+
 /* No row hover: the table is for scanning and reading, not interaction.
    A row-bg change reads as "this row is selectable/clickable" but rows
    aren't actionable, so the affordance lies. */
 
-/* JS-driven stripe — keep subtle on dark, lighter on light */
-#results-table tbody tr.row-stripe { background-color: rgba(255,255,255,0.03); }
+/* JS-driven stripe (ip2geo-app.js toggles .row-stripe on visible rows,
+   .row-hidden on filtered rows). The nth-child reset stops the theme's
+   default odd-row stripe from leaking back in once rows hide. */
+#results-table tbody tr:nth-child(2n + 1) { background-color: transparent; }
+#results-table tbody tr.row-stripe        { background-color: rgba(255,255,255,0.03); }
+#results-table tbody tr.row-hidden        { display: none; }
 [data-theme="light"] #results-table tbody tr.row-stripe { background-color: rgba(26,19,48,0.03); }
 
-#results-table abbr[title] {
-  text-decoration-color: var(--text-muted);
+/* Column overflow absorption — ASN Org is the prime overflow culprit; State and
+   City are secondary. Truncate at a fixed em cap, expose full text via the
+   markup's title attribute on hover. */
+#results-table .cell-asn-org {
+    max-width: 14em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+#results-table .cell-region,
+#results-table .cell-city {
+    max-width: 10em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-/* ----- Filter & Export panel ----- */
+/* Report table mirror — same density + truncation as the public results table
+   (used in report.php contexts that don't sit under #results-table). */
+.report-table { font-size: 0.85em; }
+.report-table .cell-asn-org {
+    max-width: 14em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Empty filter message — center align inside the table card. */
+#empty-filter-msg {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* ---------- 16c. Filter & Export panel ---------- */
 #filter-export {
   margin: 24px 0 0;
   padding: 14px 20px 16px;
@@ -655,48 +747,187 @@ section#results .table-wrapper {
   border: 1px solid var(--border);
   border-radius: var(--r-md);
 }
+
+/* Accordion summary: chevron + mono uppercase label. */
 #filter-details > summary,
 #report-filter-details > summary {
+  cursor: pointer;
+  padding: 0.4em 0;
+  list-style: none;
   font-family: var(--font-mono);
   font-size: 11px;
+  font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--text-muted);
-  font-weight: 500;
 }
+#filter-details > summary::-webkit-details-marker,
+#report-filter-details > summary::-webkit-details-marker { display: none; }
+#filter-details > summary::before,
+#report-filter-details > summary::before {
+    content: '▸ ';
+    font-size: 0.85em;
+}
+#filter-details[open] > summary::before,
+#report-filter-details[open] > summary::before { content: '▾ '; }
+
 #filter-summary #filter-count,
 #filter-summary #filter-total { color: var(--text); }
 
-/* Filter chips: bring the existing pill-style up to v4 colors. */
-#filter-countries label,
-#filter-categories label,
-#report-filter-countries label,
-#report-filter-categories label {
-  border-color: var(--border);
-  font-family: var(--font-mono);
-  letter-spacing: 0.04em;
+/* Two-column filter layout: action buttons + firewall-rules left, chips right. */
+#filter-layout {
+    display: flex;
+    gap: 2.5em;
+    padding: 0.6em 0 0.5em;
+    flex-wrap: wrap;
+    align-items: flex-start;
 }
-#filter-countries label:has(input:checked),
-#filter-categories label:has(input:checked),
-#report-filter-countries label:has(input:checked),
-#report-filter-categories label:has(input:checked) {
-  border-color: var(--text-muted);
-  background: var(--surface-2);
+
+/* Left: action buttons + firewall rule output */
+#filter-left {
+    flex: 1 1 45%;
+    min-width: 220px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5em;
 }
+
+#action-buttons-primary,
+#export-buttons {
+    display: flex;
+    gap: 0.4em;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+/* Right: filter chips */
+#filter-right {
+    flex: 0 0 auto;
+    display: flex;
+    gap: 1.5em;
+    align-items: flex-start;
+}
+
+/* Section headers above chip columns */
 #filter-countries > strong,
 #filter-categories > strong,
 #report-filter-countries > strong,
 #report-filter-categories > strong {
-  font-family: var(--font-mono);
-  color: var(--text-muted);
-  opacity: 0.9;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-family: var(--font-mono);
+    font-size: 0.65em;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    opacity: 0.9;
+    margin-bottom: 0.5em;
 }
 
-/* ----- Action buttons row (CSV / unresolved / firewall rules) -----
+.chip-hint {
+    font-weight: normal;
+    text-transform: none;
+    letter-spacing: normal;
+    font-style: italic;
+}
+
+/* Scrollable chip container for countries.
+   9.8em lands mid-chip (~5.5 rows), so a partial chip peeks out when
+   there are 6+ countries — natural scroll affordance, no extra markup. */
+#filter-countries .filter-chips {
+    max-height: 9.8em;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3em;
+}
+
+#filter-categories {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3em;
+}
+
+/* Toggle chip labels — inactive state. font-mono so "(N)" counts align. */
+#filter-countries label,
+#filter-categories label,
+#report-filter-countries label,
+#report-filter-categories label {
+    font-family: var(--font-mono);
+    font-size: 0.7em;
+    font-weight: normal;
+    letter-spacing: 0.04em;
+    display: block;
+    padding: 0.3em 0.9em;
+    border: 1px solid var(--border);
+    border-radius: 2em;
+    cursor: pointer;
+    opacity: 0.4;
+    transition: opacity 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+    user-select: none;
+    white-space: nowrap;
+    margin: 0;
+    line-height: 1.5;
+}
+
+/* Active (checked) state */
+#filter-countries label:has(input:checked),
+#filter-categories label:has(input:checked),
+#report-filter-countries label:has(input:checked),
+#report-filter-categories label:has(input:checked) {
+    opacity: 1;
+    border-color: var(--text-muted);
+    background: var(--surface-2);
+}
+
+/* ASN category chip accent colors */
+#filter-categories label.cat-scanning,
+#report-filter-categories label.cat-scanning    { color: var(--verdict-high); }
+#filter-categories label.cat-cloud,
+#report-filter-categories label.cat-cloud       { color: var(--verdict-cloud); }
+#filter-categories label.cat-vpn,
+#report-filter-categories label.cat-vpn         { color: var(--verdict-moderate); }
+#filter-categories label.cat-residential,
+#report-filter-categories label.cat-residential { color: var(--verdict-low); }
+#filter-categories label.cat-unknown,
+#report-filter-categories label.cat-unknown     { color: var(--verdict-unknown); }
+
+/* Active category chip: border color matches accent */
+#filter-categories label.cat-scanning:has(input:checked),
+#report-filter-categories label.cat-scanning:has(input:checked)    { border-color: rgba(224,108,159,0.6); }
+#filter-categories label.cat-cloud:has(input:checked),
+#report-filter-categories label.cat-cloud:has(input:checked)       { border-color: rgba(138,180,212,0.6); }
+#filter-categories label.cat-vpn:has(input:checked),
+#report-filter-categories label.cat-vpn:has(input:checked)         { border-color: rgba(224,168,90,0.6);  }
+#filter-categories label.cat-residential:has(input:checked),
+#report-filter-categories label.cat-residential:has(input:checked) { border-color: rgba(108,184,122,0.6); }
+#filter-categories label.cat-unknown:has(input:checked),
+#report-filter-categories label.cat-unknown:has(input:checked)     { border-color: rgba(170,170,170,0.4); }
+
+/* Zero-count chip: heavily dimmed (JS toggles .chip--empty when count is 0). */
+#filter-countries label.chip--empty,
+#filter-categories label.chip--empty,
+#report-filter-countries label.chip--empty,
+#report-filter-categories label.chip--empty {
+    opacity: 0.15;
+}
+
+/* Hide native checkbox; keep in tab order for a11y. */
+#filter-countries input[type="checkbox"],
+#filter-categories input[type="checkbox"],
+#report-filter-countries input[type="checkbox"],
+#report-filter-categories input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+}
+
+/* ---------- 16d. Action buttons row (CSV / unresolved / firewall rules) ----
    Lower emphasis than the primary lookup button. Transparent fill, hairline
-   border, mono uppercase label. Any child of #filter-left, #export-buttons,
-   or marked .button.small picks this up. The full purple stays reserved
-   for the hero submit + verdict-color CTA. */
+   border, mono uppercase label. */
 .button.small,
 button.button.small {
   min-height: 36px;
@@ -732,7 +963,31 @@ button.button.small:hover {
   }
 }
 
-/* ----- Stats summary table at the foot of the results section ----- */
+/* ---------- 16e. Firewall rules output (.rules-block) ---------- */
+.rules-block {
+    position: relative;
+    margin-top: 0.25em;
+}
+.rules-block pre {
+    background: rgba(255,255,255,0.05);
+    border-radius: 4px;
+    padding: 1em;
+    font-family: monospace;
+    font-size: 0.5em;
+    overflow-x: auto;
+    white-space: pre;
+    max-height: 300px;
+    overflow-y: auto;
+    margin-top: 0;
+}
+.rules-block .copy-rules {
+    position: absolute;
+    top: 0.4em;
+    right: 0.4em;
+    z-index: 1;
+}
+
+/* ---------- 16f. Stats summary table ---------- */
 #stats-table {
   margin-top: 20px;
   font-family: var(--font-mono);
@@ -753,144 +1008,314 @@ button.button.small:hover {
   white-space: nowrap;
 }
 
-/* ----- Threat CTA refinements -----
-   ip2geo-app.css carries the verdict-color border + tint background.
-   v4 brightens the base border to match .free-report-upgrade's weight
-   (tinted-25% base + strong inset bar) so the two CTAs read as equals
-   when stacked on the report page. */
+/* ---------- 16g. Cancel notice (Stripe redirect-back banner) ---------- */
+#cancel-notice {
+    background: rgba(255,255,255,0.07);
+    border-left: 3px solid var(--verdict-moderate);
+    padding: 0.6em 1em;
+    margin-bottom: 1em;
+    font-size: 0.9em;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+#cancel-notice button {
+    background: none;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    font-size: 1.1em;
+    opacity: 0.6;
+    padding: 0 0.25em;
+}
+
+/* ---------- 16h. Threat CTA box ----------
+   Verdict-color border + tinted background; bottom band houses the CTA button.
+   Per-classification color drives both the inset border and the button fill,
+   with a darkening :hover effect for the !important verdict fills. */
 .threat-cta-box {
-  border-radius: var(--r-md);
-  margin: 2em 0;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-left-width: 4px;
+    border-radius: var(--r-md);
+    margin: 2em 0;
+    overflow: hidden;
 }
-.threat-cta-box--high     { border-color: rgba(224,108,159,0.25); }
-.threat-cta-box--moderate { border-color: rgba(224,168,90,0.25); }
-.threat-cta-box--low      { border-color: rgba(108,184,122,0.25); }
+.threat-cta-box--high     { border-left-color: var(--verdict-high);     border-color: rgba(224,108,159,0.25); background: rgba(224,108,159,0.06); }
+.threat-cta-box--moderate { border-left-color: var(--verdict-moderate); border-color: rgba(224,168,90,0.25);  background: rgba(224,168,90,0.06); }
+.threat-cta-box--low      { border-left-color: var(--verdict-low);      border-color: rgba(108,184,122,0.25); background: rgba(108,184,122,0.06); }
+
+.threat-cta-box form {
+    display: contents;
+}
+
+.threat-cta-top {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2em;
+    padding: 1.4em 1.6em;
+}
+
+.threat-cta-left {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.4em;
+    padding: 1.4em 1.6em;
+}
+.threat-cta-left .asn-verdict {
+    margin: 0;
+}
+.threat-cta-reason {
+    font-size: 1em;
+    color: var(--text-muted);
+    margin: 0;
+}
+.threat-cta-stats {
+    font-size: 0.9em;
+    color: var(--text-muted);
+    margin: 0;
+}
+
+.threat-cta-right {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.threat-cta-features {
+    list-style: none;
+    padding: 14px 0 0;
+    margin: 0;
+    font-size: 0.9em;
+    color: var(--text);
+}
+.threat-cta-features li {
+    padding: 0.18em 0;
+    color: var(--text-muted);
+}
+.threat-cta-features li::before {
+    content: '✓  ';
+    opacity: 0.55;
+}
+
+/* Bottom band: button + fine print side by side */
 .threat-cta-bottom {
-  background: var(--surface-2);
-  border-top-color: var(--border);
-}
-/* Scoped under .threat-cta-box to outweigh ip2geo-app.css (loads after v4.css). */
-.threat-cta-box .threat-cta-reason { color: var(--text-muted); opacity: 1; font-size: 1em; }
-.threat-cta-box .threat-cta-stats { color: var(--text-muted); opacity: 1; font-size: 0.9em; }
-.threat-cta-box .threat-cta-fine { color: var(--text-muted); opacity: 0.8; }
-.threat-cta-box .threat-cta-features { color: var(--text); opacity: 1; font-size: 0.9em; padding: 14px 0 0; }
-.threat-cta-box .threat-cta-features li { color: var(--text-muted); }
-
-/* ----- Community Block List callout (under the iptables/ufw/nginx buttons) -----
-   Inline opacity:0.7 on the wrapper used to dim the link too, killing affordance.
-   Now: prose stays muted, link uses accent + underline so it reads as a CTA. */
-.cbl-callout {
-  margin: 12px 0 0;
-  font-size: 13px;
-  color: var(--text-muted);
-}
-.cbl-link {
-  color: var(--accent-purple);
-  text-decoration: underline;
-  text-decoration-color: var(--accent-purple);
-  text-underline-offset: 5px;
-  font-weight: 500;
-  white-space: nowrap;
-}
-.cbl-link:hover {
-  color: var(--magenta);
-  text-decoration-color: var(--magenta);
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 1.4em;
+    padding: 0.85em 1.6em;
+    border-top: 1px solid var(--border);
+    background: var(--surface-2);
 }
 
-/* ----- Recent lookups widget (opt-out localStorage) -----
-   v4 token swap on top of the existing #recent-lookups markup in ip2geo-app.css.
-   Scoped under .hero (or #recent-lookups for class children) to outweigh
-   ip2geo-app.css, which loads after v4.css and would otherwise win at equal
-   specificity (same pattern as the threat-CTA fix). */
-.hero #recent-lookups {
-  margin: 1.25em 0 0;
-  padding: 0;
-  border: none;
-  background: transparent;
+/* Prominent CTA button — verdict-color fill */
+#cta-button {
+    flex-shrink: 0;
+    font-weight: bold;
+    letter-spacing: 0.04em;
+    border-color: transparent !important;
+    color: #111 !important;
+    margin: 0;
+    transition: filter 100ms ease-out, transform 100ms ease-out;
 }
-.hero #recent-lookups-header {
-  align-items: center;
-  margin-bottom: 12px;
-}
-.hero #recent-lookups-header h3 {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  opacity: 1;
-  margin: 0;
-}
-.hero #recent-lookups-header h3 small {
-  font-family: var(--font-sans);
-  font-size: 11px;
-  letter-spacing: 0;
-  text-transform: none;
-  color: var(--text-muted);
-  opacity: 0.7;
-  margin-left: 8px;
-}
-.hero #recent-lookups-list {
-  gap: 8px;
-}
-.hero #recent-lookups-list .recent-lookup-item {
-  background: var(--surface-2);
-  border: 1px solid var(--border) !important;
-  border-radius: 999px !important;
-  color: var(--text) !important;
-  font-family: var(--font-sans);
-  font-size: 13px;
-  padding: 6px 14px;
-  transition: border-color 0.12s, background 0.12s;
-}
-.hero #recent-lookups-list .recent-lookup-item:hover,
-.hero #recent-lookups-list .recent-lookup-item:focus {
-  background: var(--surface-2);
-  border-color: var(--accent-purple) !important;
-  color: var(--text) !important;
-}
-#recent-lookups .recent-lookup-count {
-  font-family: var(--font-mono);
-  font-feature-settings: "tnum" 1;
-  color: var(--text);
-}
-#recent-lookups .recent-lookup-time {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--text-muted);
-  opacity: 1;
+.threat-cta-box--high     #cta-button { background-color: var(--verdict-high)     !important; }
+.threat-cta-box--moderate #cta-button { background-color: var(--verdict-moderate) !important; }
+.threat-cta-box--low      #cta-button { background-color: var(--verdict-low)      !important; }
+
+/* brightness(1.15) lifts each verdict color by ~15% — a clear interaction
+   signal that works for all three verdict variants without per-color rules. */
+.threat-cta-box #cta-button:hover { filter: brightness(1.15); }
+.threat-cta-box #cta-button:active { transform: translateY(1px); }
+
+.threat-cta-fine {
+    font-size: 0.75em;
+    color: var(--text-muted);
+    opacity: 0.8;
+    margin: 0;
+    line-height: 1.55;
 }
 
-/* Empty filter message — center align inside the table card. */
-#empty-filter-msg {
-  color: var(--text-muted);
-  font-size: 13px;
+@media (max-width: 767px) {
+    .threat-cta-top {
+        grid-template-columns: 1fr;
+        gap: 1.2em;
+    }
+    .threat-cta-bottom {
+        flex-direction: column-reverse;
+        align-items: flex-start;
+        gap: 0.6em;
+    }
 }
 
-/* CTA button hover — works for HIGH (pink), MODERATE (amber), LOW (green)
-   variants without needing per-verdict overrides. brightness(0.9) darkens
-   each verdict color by ~10%, which reads as a clear interaction signal
-   on top of the !important verdict-color fills from ip2geo-app.css. */
-.threat-cta-box #cta-button {
-  transition: filter 100ms ease-out, transform 100ms ease-out;
+/* ---------- 16i. Recent lookups widget (opt-in localStorage) ----------
+   Pill-chip aesthetic. Each lookup is a compact rounded chip with count +
+   relative time; the IP preview moves to a title-attribute tooltip so chips
+   stay scannable. The widget only renders inside .hero, so no scoping is
+   needed in the selectors here. */
+#recent-lookups {
+    margin: 1.25em 0 0;
+    padding: 0;
+    border: none;
+    background: transparent;
 }
-.threat-cta-box #cta-button:hover {
-  filter: brightness(1.15);
+#recent-lookups-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    margin-bottom: 12px;
 }
-.threat-cta-box #cta-button:active {
-  transform: translateY(1px);
+#recent-lookups-header h3 {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.3;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin: 0;
+}
+#recent-lookups-header h3 small {
+    font-family: var(--font-sans);
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: 0;
+    text-transform: none;
+    margin-left: 8px;
+    color: var(--text-muted);
+    opacity: 0.7;
+}
+#recent-lookups-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+#recent-lookups-list li {
+    margin: 0;
+    padding: 0;
+}
+#recent-lookups-list .recent-lookup-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    height: auto;
+    line-height: 1.4;
+    padding: 6px 14px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    color: var(--text);
+    font: inherit;
+    font-family: var(--font-sans);
+    font-size: 13px;
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: 0;
+    cursor: pointer;
+    transition: border-color 0.12s, background 0.12s;
+}
+#recent-lookups-list .recent-lookup-item:hover,
+#recent-lookups-list .recent-lookup-item:focus {
+    background: var(--surface-2);
+    border-color: var(--accent-purple);
+    color: var(--text);
+    outline: none;
+}
+.recent-lookup-count {
+    font-family: var(--font-mono);
+    font-feature-settings: "tnum" 1;
+    font-weight: 600;
+    color: var(--text);
+}
+.recent-lookup-dot {
+    opacity: 0.3;
+}
+.recent-lookup-time {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+/* ---------- 16j. Toast with undo (privacy-action confirm) ---------- */
+#rl-toast {
+    position: fixed;
+    left: 50%;
+    bottom: 1.5em;
+    transform: translate(-50%, calc(100% + 2em));
+    display: flex;
+    align-items: center;
+    gap: 0.85em;
+    padding: 0.7em 1em 0.7em 1.1em;
+    background: rgba(28, 28, 32, 0.96);
+    color: #f4f4f6;
+    border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 6px;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.35);
+    font-size: 0.9em;
+    z-index: 2147483646;
+    transition: transform 0.22s ease;
+    max-width: calc(100vw - 2em);
+}
+#rl-toast.rl-toast-visible {
+    transform: translate(-50%, 0);
+}
+#rl-toast-msg {
+    line-height: 1.3;
+}
+#rl-toast #rl-toast-undo {
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.25);
+    color: inherit;
+    font: inherit;
+    font-weight: 600;
+    height: auto;
+    padding: 0.35em 0.85em;
+    border-radius: 3px;
+    text-transform: none;
+    letter-spacing: normal;
+    line-height: 1.3;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s;
+}
+#rl-toast #rl-toast-undo:hover,
+#rl-toast #rl-toast-undo:focus {
+    background: rgba(255,255,255,0.08);
+    border-color: rgba(255,255,255,0.45);
+    outline: none;
+}
+
+/* ---------- 16k. Filter mobile responsive ---------- */
+@media (max-width: 767px) {
+    #filter-details:not([open]) #filter-layout { display: none; }
+    #filter-layout {
+        flex-direction: column;
+        gap: 1em;
+    }
+    #filter-right {
+        flex-wrap: wrap;
+        gap: 1em;
+    }
+    #report-filter-layout {
+        flex-direction: column;
+        gap: 1em;
+    }
 }
 
 /* ============================================================
-   17. RESPONSIVE
+   17. RESPONSIVE — GLOBAL
    ============================================================ */
 @media (max-width: 768px) {
   .nav-inner { padding: 0 20px; gap: 16px; }
   .nav-links { gap: 16px; }
   .nav-links a { font-size: 13px; }
   main { padding: 0 20px; }
-  footer#footer .inner { padding: 0 20px; }
+  footer#footer .footer-inner { padding: 0 20px; }
 
   .section-head { gap: 16px; }
   .section-head h1 { font-size: 30px; }
@@ -921,11 +1346,10 @@ button.button.small:hover {
 }
 
 /* ============================================================
-   18. REPORT PAGE (report.php first-pass reskin)
-   Reuses #results-table styling, swaps stat-pill / email-notice /
-   community-banner from v3 tinted-bg + colored-border to v4 surfaces.
-   Inline styles in report.php (the 90-line <style> block) still apply
-   first; this overrides where v4 tokens improve consistency.
+   18. REPORT PAGE (report.php)
+   Reuses the #results-table / palette tokens above and adds report-only
+   structure: range groups, block-rules tabs, format previews, hosting
+   callouts, the report-filter mirror, and the marketing CTAs.
    ============================================================ */
 .report-section {
   padding: 56px 0 64px;
@@ -940,9 +1364,7 @@ button.button.small:hover {
   .report-inner { padding: 0 20px; }
 }
 
-/* Header rows: H2 + meta + verdict badge. v3 used h2 freely; the v4
-   weight scale lives on .section-head h1/h2 — keep the markup but
-   restyle the loose H2 + H3 used inside the report. */
+/* Header rows: H2 + meta + verdict badge. */
 .report-inner > h2,
 .report-header-row h2 {
   font-family: var(--font-sans);
@@ -976,7 +1398,7 @@ button.button.small:hover {
   border-radius: var(--r-sm);
 }
 
-/* Stat-pill: was rgba whites + tiny opacity. v4: surface-2 with hairline. */
+/* Stat-pill: surface-2 with hairline. */
 .report-inner .stat-pill {
   background: var(--surface-2);
   border: 1px solid var(--border);
@@ -1000,8 +1422,7 @@ button.button.small:hover {
   opacity: 1;
 }
 
-/* Email notice + community banner: from v3 colored-border-left to v4
-   surface card with accent-purple inset bar. Same hierarchy, v4 tokens. */
+/* Email notice + community banner: surface card with accent-purple inset bar. */
 .report-inner .report-email-notice,
 .report-inner .community-intel-banner,
 .report-inner #community-consent-banner {
@@ -1059,12 +1480,8 @@ button.button.small:hover {
 }
 .report-inner tbody tr:last-child td { border-bottom: 0; }
 
-/* Section heads inside the report. Use the canonical .section-head pattern
-   (H_ left + 0X / LABEL right + 4px purple rule above the tag) for ASN
-   Ranges / Block Rules / Top Threat Sources subsections. The wrapper
-   provides the section break — kill the default .report-inner h3 margin
-   when an h3 lives inside .section-head, and bump specificity past the
-   later .report-inner h3 rule. */
+/* Section heads inside the report — canonical .section-head pattern (H_ left
+   + 0X / LABEL right + 4px purple rule above the tag). */
 .report-inner .section-head h3 {
   font-size: 28px;
   font-weight: 900;
@@ -1074,10 +1491,9 @@ button.button.small:hover {
 }
 
 /* Generous breathing room between major report subsections. The default
-   .section-head margin-bottom (20px) is sized for top-level pages; in a
-   long report the gap needs to read as a section break, not a paragraph
-   break. DESIGN.md spec: 96-128px between sections. 80px desktop is the
-   compromise that keeps the page from sprawling on smaller screens. */
+   .section-head margin (20px) is sized for top-level pages; in a long
+   report the gap needs to read as a section break, not a paragraph break.
+   DESIGN.md spec: 96-128px between sections; 80px is the desktop compromise. */
 .report-inner .section-head {
   margin-top: 80px;
   margin-bottom: 24px;
@@ -1089,10 +1505,9 @@ button.button.small:hover {
   }
 }
 
-/* Filled verdict pills inside Top Threat Sources. The per-classification
-   color (.asn-category--scanning etc.) drives both bg + border via
-   currentColor + color-mix, so the verdict palette stays the single
-   source of truth. */
+/* Filled verdict pills inside Top Threat Sources. The per-classification color
+   (.asn-category--scanning etc.) drives both bg + border via currentColor +
+   color-mix, so the verdict palette stays the single source of truth. */
 .report-inner .asn-category {
   display: inline-block;
   font-family: var(--font-mono);
@@ -1106,12 +1521,47 @@ button.button.small:hover {
   background: color-mix(in srgb, currentColor 12%, transparent);
 }
 
+/* ---------- 18a. Ranges + Block Rules layout ---------- */
+.ranges-stack {
+    margin-bottom: 2em;
+}
+.block-rules-fullwidth {
+    margin-bottom: 2em;
+}
+
+.ranges-rules-grid {
+    display: flex !important;
+    gap: 2.5em;
+    align-items: flex-start;
+    margin-bottom: 2em;
+}
+.ranges-col {
+    flex: 2;
+    min-width: 0;
+    overflow: hidden;
+}
+.rules-col {
+    flex: 1;
+    min-width: 0;
+    position: sticky;
+    top: 2em;
+    align-self: flex-start;
+}
+
+/* In the right column, stack download buttons vertically full-width. */
+.rules-col .block-rules-panel {
+    flex-direction: column;
+    gap: 0.45em;
+}
+.rules-col .block-rules-panel .button {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    text-align: center;
+}
+
 /* Block Rules + Hosting Callout side-by-side at desktop, stacked below.
-   Activates ONLY in stack mode (when .block-rules-fullwidth is the
-   parent — the use_columns mode already runs its own .ranges-rules-grid
-   so a nested 2-col grid would over-cramp). The rail is the natural home
-   for the "No console/SSH access?" callout — it's an alternative path,
-   not the next sequential step after copying rules. */
+   Activates ONLY in stack mode (.block-rules-fullwidth parent). */
 .report-inner .block-rules-grid > .block-rules-grid-main,
 .report-inner .block-rules-grid > .block-rules-grid-rail { min-width: 0; }
 @media (min-width: 960px) {
@@ -1123,21 +1573,193 @@ button.button.small:hover {
   }
 }
 
-/* Block-rules tabs */
-.report-inner .block-rules-tab {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-muted);
-  border-color: var(--border) !important;
+/* ---------- 18b. ASN range groups + CIDR chips ---------- */
+.asn-range-group {
+    margin-bottom: 1em;
+    padding-bottom: 1em;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
 }
-.report-inner .block-rules-tab.active {
-  color: var(--text);
-  border-color: var(--accent-purple) !important;
+.asn-range-group:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+    margin-bottom: 0;
+}
+.asn-range-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.35em;
+    margin-bottom: 0.5em;
+}
+.asn-range-org {
+    font-size: 0.88em;
+    opacity: 0.65;
+}
+.asn-range-count {
+    font-size: 0.72em;
+    opacity: 0.4;
+}
+.cidr-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35em;
+}
+.cidr-chip {
+    font-family: var(--font-mono);
+    font-size: 0.78em;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 3px;
+    padding: 0.2em 0.5em;
+    white-space: nowrap;
+    line-height: 1.4;
+    user-select: all;
 }
 
-/* AbuseIPDB callout */
+/* Stack ranges/rules columns on tablet and below */
+@media (max-width: 900px) {
+    .ranges-rules-grid {
+        flex-direction: column;
+        gap: 0;
+    }
+    .rules-col {
+        position: static;
+        margin-top: 3.5em;
+    }
+    .rules-col .block-rules-panel {
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+    .rules-col .block-rules-panel .button {
+        display: inline-block;
+        width: auto;
+    }
+}
+
+/* ---------- 18c. Block-rules tabs + panel ---------- */
+.block-rules-tablist {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 1em;
+}
+.block-rules-tab {
+    cursor: pointer;
+    padding: 0.3em 1.2em 0.4em;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: bold;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    white-space: nowrap;
+    opacity: 0.45;
+    border-bottom: 2px solid transparent;
+    border-color: var(--border);
+    margin-bottom: -1px;
+    user-select: none;
+    transition: opacity 0.15s ease, border-color 0.15s ease;
+    outline: none;
+}
+.block-rules-tab.active {
+    opacity: 1;
+    color: var(--text);
+    border-bottom-color: var(--accent-purple);
+}
+.block-rules-tab:not(.active):not(.brt-disabled):hover {
+    opacity: 0.7;
+}
+.block-rules-tab:focus-visible {
+    outline: 2px solid rgba(255,255,255,0.5);
+    outline-offset: 2px;
+}
+.block-rules-tab.brt-disabled {
+    opacity: 0.2;
+    cursor: not-allowed;
+}
+.block-rules-panel {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5em;
+    padding: 12px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    margin: 12px 0;
+}
+.block-rules-panel .button {
+    margin: 0;
+}
+
+/* The block-rules-panel `display: flex` above beats the browser's UA
+   `[hidden] { display: none }` on specificity, so JS toggling `panel.hidden`
+   would otherwise be a no-op. Restore the hidden semantics here. */
+.report-inner .block-rules-panel[hidden] { display: none; }
+
+/* ---------- 18d. Format-block (CIDR / iptables / ufw / nginx preview) ---------- */
+.format-entry {
+    width: 100%;
+    margin-bottom: 0.5em;
+}
+.format-toggle {
+    font-family: var(--mono, var(--font-mono));
+    font-size: 0.82em;
+    text-align: left;
+    width: 100%;
+}
+.format-block {
+    margin-top: 0.4em;
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    background: var(--surface);
+    overflow: hidden;
+}
+.format-block pre,
+.block-rules-panel pre {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text);
+    padding: 14px 16px;
+    margin: 0;
+    overflow-x: auto;
+}
+.block-script-preview {
+    margin: 0;
+    padding: 0.75em 1em;
+    font-size: 0.78em;
+    line-height: 1.55;
+    max-height: 280px;
+    overflow-y: auto;
+    white-space: pre;
+}
+.format-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    padding: 0.5em 0.75em;
+    background: rgba(255,255,255,0.04);
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.format-actions .copy-btn,
+.format-actions .button.small {
+    flex: 1;
+    text-align: center;
+    justify-content: center;
+}
+.copy-btn {
+    cursor: pointer;
+    color: inherit;
+    background: transparent;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.cidr-explainer {
+    font-size: 0.82em;
+    opacity: 0.7;
+    margin: 0 0 0.75em;
+    font-style: italic;
+}
+
+/* ---------- 18e. AbuseIPDB + hosting callouts ---------- */
 .report-inner .abuseipdb-callout {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -1146,48 +1768,106 @@ button.button.small:hover {
   padding: 14px 18px;
   margin: 16px 0 20px;
   font-size: 14px;
+  color: rgba(138,180,212,0.9);
 }
 
-/* Format blocks (collapsible CIDR, iptables, ufw, nginx output) */
-.report-inner .format-block,
-.report-inner .block-rules-panel {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  margin: 12px 0;
+.hosting-callout {
+    margin-bottom: 1.25em;
+    padding: 0.7em 1em;
+    font-size: 0.86em;
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    background: rgba(255,255,255,0.04);
+    line-height: 1.5;
+}
+.report-inner .hosting-callout { margin-top: 1.25em; }
+.hosting-callout-links {
+    margin: 0.4em 0 0;
+    padding-left: 1.4em;
+}
+.hosting-callout-links li { margin-bottom: 0.2em; }
+.hosting-note {
+    opacity: 0.6;
+    font-size: 0.92em;
+}
+.report-inner .hosting-note { margin: 10px 0 0; }
+.report-inner .hosting-prose-fine {
+  font-size: 0.9em;
+  color: var(--text-muted);
+  opacity: 0.85;
+  margin-bottom: 8px;
 }
 
-/* Panel needs horizontal inset so the .cidr-explainer intro text doesn't
-   hug the panel edge. ip2geo-app.css declares padding: 0.25em 0 — that
-   zero horizontal padding made the italic line read as if it leaked out
-   of the card. format-block children naturally inset by the same amount,
-   reading as cards-inside-card. */
-.report-inner .block-rules-panel {
-  padding: 12px 16px;
+/* ---------- 18f. Free-report upgrade CTA ---------- */
+.free-report-upgrade {
+    margin: 1.5em 0 2em;
+    padding: 1.2em 1.4em;
+    border: 1px solid rgba(224,168,90,0.25);
+    border-left-width: 3px;
+    border-left-color: var(--verdict-moderate);
+    border-radius: var(--r-md);
+    background: rgba(224,168,90,0.07);
+}
+.free-report-upgrade__headline {
+    margin: 0 0 0.5em;
+    font-weight: bold;
+}
+.free-report-upgrade__features {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 1em;
+    font-size: 0.88em;
+}
+.free-report-upgrade__features li {
+    padding: 0.2em 0;
+}
+.free-report-upgrade__features li::before {
+    content: '✓  ';
+    opacity: 0.45;
+}
+.free-report-upgrade__fine {
+    margin: 0.6em 0 0;
+    font-size: 0.82em;
+    opacity: 0.55;
 }
 
-/* The block-rules-panel rule in ip2geo-app.css sets display: flex, which
-   beats the browser's UA `[hidden] { display: none }` on specificity, so
-   the JS that toggles `panel.hidden` was a no-op. Restore the hidden
-   semantics with a class-scoped attribute selector. */
-.report-inner .block-rules-panel[hidden] { display: none; }
-.report-inner .format-block pre,
-.report-inner .block-rules-panel pre {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--text);
-  padding: 14px 16px;
-  margin: 0;
-  overflow-x: auto;
+/* ---------- 18g. Report-page block-script filter (mirror of the home filter) ---------- */
+#report-filter {
+    margin-bottom: 2em;
 }
 
-/* Inline-style sweep — classes backing the styles previously hardcoded
-   on the markup in report.php / report_functions.php. */
+#report-filter-layout {
+    display: flex;
+    gap: 1.5em;
+    padding: 0.6em 0 0.5em;
+    flex-wrap: wrap;
+    align-items: flex-start;
+}
 
-/* Threat-CTA-left padding (was inline style="padding:1.4em 1.6em") */
-.threat-cta-box .threat-cta-left { padding: 1.4em 1.6em; }
+#report-filter-categories {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3em;
+}
 
-/* Free-report top-IPs table (was a chain of th/td inline styles) */
+#report-filter-countries {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3em;
+}
+
+#report-filter-countries .filter-chips {
+    max-height: 9.8em;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3em;
+}
+
+/* ---------- 18h. Inline-style sweep — classes backing the styles previously
+   hardcoded on the markup in report.php / report_functions.php. ---------- */
+
+/* Free-report top-IPs table */
 .report-inner .report-table-wrap { overflow-x: auto; }
 .report-inner .report-free-table {
   width: 100%;
@@ -1203,11 +1883,9 @@ button.button.small:hover {
 .report-inner .report-free-table .col-num { color: var(--text-muted); opacity: 0.7; }
 .report-inner .report-free-table .col-mono { font-family: var(--font-mono); font-feature-settings: "tnum" 1; }
 
-/* Global col-mono — this is the canonical "monospace digits, aligned"
-   class. Used unwrapped in report.php Top Threat Sources (IP, hits) and
-   intel.php (CIDR), where there's no per-table wrapper class to scope
-   against. The .report-free-table and .intel-table scoped rules above
-   stay as redundant overrides; harmless. */
+/* Global col-mono — the canonical "monospace digits, aligned" class. Used
+   unwrapped in report.php Top Threat Sources (IP, hits) and intel.php (CIDR),
+   where there's no per-table wrapper class to scope against. */
 .col-mono { font-family: var(--font-mono); font-feature-settings: "tnum" 1; }
 .report-inner .report-free-table .col-asn { font-size: 0.85em; }
 .report-inner .report-free-table .col-asn .asn-org { opacity: 0.6; margin-left: 4px; }
@@ -1218,7 +1896,7 @@ button.button.small:hover {
 /* Generic dim-dash placeholder (was inline span style="opacity:0.4">—</span>) */
 .dim-dash { opacity: 0.4; }
 
-/* Small note above tables (font-size:0.85em; opacity:0.65) */
+/* Small note above tables */
 .report-inner .report-table-note {
   font-size: 0.85em;
   color: var(--text-muted);
@@ -1323,8 +2001,7 @@ button.button.small:hover {
   margin: 8px 0;
 }
 
-/* Demo banner — reuse for both the "Demo Report" and any preview banner.
-   Replaces the inline-style amber banner. */
+/* Demo banner — reuse for both "Demo Report" and any preview banner. */
 .report-inner .demo-banner {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -1374,16 +2051,6 @@ button.button.small:hover {
 .report-inner .community-banner-prose-tight { margin: 8px 0 5px; opacity: 0.85; }
 .report-inner .community-banner-list { margin: 0; padding-left: 24px; }
 .report-inner .community-banner-refresh-row { margin: 12px 0 0; }
-
-/* Hosting paste-helper callout */
-.report-inner .hosting-callout { margin-top: 1.25em; }
-.report-inner .hosting-note { margin: 10px 0 0; }
-.report-inner .hosting-prose-fine {
-  font-size: 0.9em;
-  color: var(--text-muted);
-  opacity: 0.85;
-  margin-bottom: 8px;
-}
 
 /* Generic fine print at the bottom of report sections (e.g. data-retention notes) */
 .report-inner .report-fine-print {
@@ -1446,10 +2113,10 @@ button.button.small:hover {
 
 /* ============================================================
    19. MARKETING / UTILITY PAGES
-   Long-form prose (changelog, legal, privacy), the community
-   block list (intel.php), and the resend-email form
-   (send-report-link.php). Scoped under .report-inner so they
-   inherit the same content rhythm as the report page.
+   Long-form prose (changelog, legal, privacy), the community block list
+   (intel.php), and the resend-email form (send-report-link.php). Scoped
+   under .report-inner so they inherit the same content rhythm as the
+   report page.
    ============================================================ */
 
 /* Subtitle line directly under a section-head H1 (e.g. intel "Past 7 days") */
@@ -1459,8 +2126,7 @@ button.button.small:hover {
   font-size: 14px;
 }
 
-/* Long-form prose: changelog, legal, privacy, etc. Tightens vertical
-   rhythm and gives <h3> headings a consistent feel across pages. */
+/* Long-form prose: changelog, legal, privacy, etc. */
 .report-inner .prose h3 {
   margin: 1.6em 0 0.4em;
   font-size: 20px;
@@ -1491,7 +2157,7 @@ button.button.small:hover {
   color: var(--text);
 }
 
-/* Subtle inline link (was style="opacity:0.7;font-size:0.9em") */
+/* Subtle inline link */
 .report-inner .link-muted {
   font-size: 13px;
   color: var(--text-muted);
@@ -1546,13 +2212,13 @@ button.button.small:hover {
   margin: 2em 0 1.5em;
 }
 
-/* Form-level error message (was style="color:#e06c75") */
+/* Form-level error message */
 .report-inner .form-error {
   color: var(--magenta);
   margin: 0 0 1em;
 }
 
-/* Mono-display token (was style="font-size:0.9em;opacity:0.7;font-family:monospace") */
+/* Mono-display token */
 .report-inner .token-display {
   font-family: var(--font-mono);
   font-size: 13px;
@@ -1564,3 +2230,28 @@ button.button.small:hover {
 .report-inner .resend-form { max-width: 420px; }
 .report-inner .resend-form .field { margin-bottom: 1em; }
 .report-inner .form-actions { margin-top: 1em; }
+
+/* ============================================================
+   20. COMMUNITY BLOCK LIST CALLOUT
+   The "No console/SSH access?" link below the iptables/ufw/nginx buttons.
+   Inline opacity:0.7 on the wrapper used to dim the link too, killing
+   affordance — prose stays muted, link uses accent + underline so it reads
+   as a CTA.
+   ============================================================ */
+.cbl-callout {
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.cbl-link {
+  color: var(--accent-purple);
+  text-decoration: underline;
+  text-decoration-color: var(--accent-purple);
+  text-underline-offset: 5px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.cbl-link:hover {
+  color: var(--magenta);
+  text-decoration-color: var(--magenta);
+}

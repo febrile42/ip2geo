@@ -41,11 +41,8 @@ $view_token_val  = $view_token_mode ? preg_replace('/[^a-f0-9\-]/', '', trim($_G
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<link rel="preconnect" href="https://fonts.bunny.net" crossorigin>
 		<link rel="stylesheet" href="https://fonts.bunny.net/css?family=geist:400,500,700,900|geist-mono:400,500&display=swap">
-		<!-- ip2geo-app.css loads FIRST so v4.css wins at equal specificity.
-		     This kills the load-order trap that previously required scoping
-		     v4 overrides under .hero / .threat-cta-box etc. -->
-		<link rel="stylesheet" href="assets/css/ip2geo-app.css" />
 		<link rel="stylesheet" href="assets/css/v4.css" />
+		<link rel="stylesheet" href="assets/css/ip2geo-print.css" media="print" />
 		<link rel="icon" href="/favicon.ico" />
 		<script>
 		// Apply saved theme before paint to avoid a flash. Dark default.

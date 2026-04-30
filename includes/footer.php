@@ -6,17 +6,17 @@ defined('APP_VERSION') || define('APP_VERSION', '3.5.1');
 $_footer_data_date = $GLOBALS['db_data_date'] ?? null;
 ?>
 <!-- Footer -->
-<footer id="footer" class="wrapper style1-alt">
-    <div class="inner">
-        <ul class="menu">
+<footer id="footer">
+    <div class="footer-inner">
+        <ul class="footer-menu">
             <li>This product includes GeoLite2 data created by MaxMind, available from <a href="http://www.maxmind.com" target="_blank">http://www.maxmind.com</a>.</li>
         </ul>
-        <ul class="menu">
+        <ul class="footer-menu">
             <li><a href="/changelog.php">v<?php echo APP_VERSION; ?></a> &ndash; &copy;<?php echo date('Y'); ?></li>
             <?php if ($_footer_data_date): ?><li>Data: <?php echo htmlspecialchars((string)$_footer_data_date, ENT_QUOTES, 'UTF-8'); ?></li><?php endif; ?>
             <li><a href="/privacy.php">Privacy Policy</a></li>
             <li><a href="/legal.php">Refund Policy</a></li>
-            <li><a href="&#109;&#97;&#105;&#108;&#116;&#111;&#58;&#115;&#117;&#112;&#112;&#111;&#114;&#116;&#64;&#105;&#112;&#50;&#103;&#101;&#111;&#46;&#111;&#114;&#103;">&#115;&#117;&#112;&#112;&#111;&#114;&#116;&#64;&#105;&#112;&#50;&#103;&#101;&#111;&#46;&#111;&#114;&#103;</a></li>
+            <li><a href="&#109;&#97;&#105;&#108;&#116;&#111;&#58;&#115;&#117;&#112;&#112;&#111;&#114;&#64;&#105;&#112;&#50;&#103;&#101;&#111;&#46;&#111;&#114;&#103;">&#115;&#117;&#112;&#112;&#111;&#114;&#116;&#64;&#105;&#112;&#50;&#103;&#101;&#111;&#46;&#111;&#114;&#103;</a></li>
         </ul>
     </div>
 </footer>

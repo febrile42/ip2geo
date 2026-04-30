@@ -45,7 +45,6 @@ function render_page_open(string $title, string $meta_desc = '', array $og = [],
     <?php endif; ?>
     <link rel="preconnect" href="https://fonts.bunny.net" crossorigin>
     <link rel="stylesheet" href="https://fonts.bunny.net/css?family=geist:400,500,700,900|geist-mono:400,500&display=swap">
-    <link rel="stylesheet" href="/assets/css/ip2geo-app.css" />
     <link rel="stylesheet" href="/assets/css/v4.css" />
     <link rel="stylesheet" href="/assets/css/ip2geo-print.css" media="print" />
     <link rel="icon" href="/favicon.ico" />
