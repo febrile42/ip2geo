@@ -615,9 +615,9 @@ section#results .table-wrapper {
 }
 #results-table tbody td:nth-child(2) { color: var(--text-muted); }
 
-#results-table tbody tr:hover {
-  background: var(--surface-2);
-}
+/* No row hover: the table is for scanning and reading, not interaction.
+   A row-bg change reads as "this row is selectable/clickable" but rows
+   aren't actionable, so the affordance lies. */
 
 /* JS-driven stripe — keep subtle on dark, lighter on light */
 #results-table tbody tr.row-stripe { background-color: rgba(255,255,255,0.03); }
