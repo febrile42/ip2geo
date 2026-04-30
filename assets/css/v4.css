@@ -1156,6 +1156,12 @@ button.button.small:hover {
   border-radius: var(--r-md);
   margin: 12px 0;
 }
+
+/* The block-rules-panel rule in ip2geo-app.css sets display: flex, which
+   beats the browser's UA `[hidden] { display: none }` on specificity, so
+   the JS that toggles `panel.hidden` was a no-op. Restore the hidden
+   semantics with a class-scoped attribute selector. */
+.report-inner .block-rules-panel[hidden] { display: none; }
 .report-inner .format-block pre,
 .report-inner .block-rules-panel pre {
   font-family: var(--font-mono);
