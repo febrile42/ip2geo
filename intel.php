@@ -27,7 +27,7 @@ $is_download  = ($fmt !== '' && in_array($fmt, $valid_formats, true));
 // ── APCu page cache (HTML only; downloads always bypass) ─────────────────────
 // Cache key includes today's date — auto-invalidates at UTC midnight.
 // TTL of 900 s (15 min) guards against stale data within the same day.
-$_cache_key = 'intel_page_7d_' . $date_str;
+$_cache_key = 'intel_page_7d_v2_' . $date_str;
 if (!$is_download && function_exists('apcu_fetch')) {
     $cached = apcu_fetch($_cache_key, $_cache_hit);
     if ($_cache_hit) {
