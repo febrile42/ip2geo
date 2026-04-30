@@ -175,141 +175,98 @@ if ($is_download && $has_data && !empty($cidrs)) {
 
 // ── Start output buffer for HTML page cache ───────────────────────────────────
 ob_start();
+require __DIR__ . '/includes/page-chrome.php';
+render_page_open(
+    'Community Block List — ip2geo.org',
+    'Weekly community-sourced IP block list derived from opted-in ip2geo threat reports. Download CIDR ranges for iptables, ufw, nginx, or plain text.'
+);
 ?>
-<!DOCTYPE HTML>
-<!--
-    Hyperspace by HTML5 UP
-    html5up.net | @ajlkn
-    Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
--->
-<html lang="en">
-    <head>
-        <!-- Umami (production only) -->
-        <?php if ($_SERVER['HTTP_HOST'] === 'ip2geo.org'): ?>
-        <script defer src="https://cloud.umami.is/script.js" data-website-id="656d7a15-6282-4079-af1e-b8ed857fba2e"></script>
-        <?php endif; ?>
-        <title>Community Block List &mdash; ip2geo.org</title>
-        <meta charset="utf-8" />
-        <meta name="description" content="Weekly community-sourced IP block list derived from opted-in ip2geo threat reports. Download CIDR ranges for iptables, ufw, nginx, or plain text." />
-        <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-        <link rel="stylesheet" href="assets/css/main.css" />
-        <link rel="icon" href="/favicon.ico" />
-        <noscript><link rel="stylesheet" href="assets/css/noscript.css" /></noscript>
-    </head>
-    <body class="is-preload">
+<section class="report-section">
+    <div class="report-inner">
+        <div class="section-head">
+            <h1>Community Block List</h1>
+            <span class="section-tag">/ Intel</span>
+        </div>
+        <p class="section-subtitle">Past 7 days &mdash; updates as users contribute</p>
 
-        <!-- Header -->
-        <header id="header">
-            <a href="/" class="title">ip2geo.org</a>
-            <nav>
-                <ul>
-                    <li><a href="/">Home</a></li>
-                </ul>
-            </nav>
-        </header>
+        <?php if (!$has_data): ?>
 
-        <!-- Wrapper -->
-        <div id="wrapper">
+        <p>Not enough data yet this week. Check back soon.</p>
+        <p class="report-fine-print">
+            The community feed requires at least 5 opted-in threat reports for the current week.
+            As more users run reports and share their data, this page will populate automatically.
+        </p>
 
-            <!-- Main -->
-            <section id="main" class="wrapper">
-                <div class="inner">
-                    <h1 class="major">Community Block List</h1>
-                    <p style="opacity:0.7;margin-top:-0.5em">Past 7 days &mdash; updates as users contribute</p>
+        <?php elseif (!empty($cidrs)): ?>
 
-                    <?php if (!$has_data): ?>
+        <p>
+            Derived from <strong><?php echo number_format($total_reports); ?></strong> opted-in
+            ip2geo threat reports this week. Updated continuously.
+            <a href="/privacy.php" class="link-muted">Privacy policy</a>
+        </p>
 
-                    <p>Not enough data yet this week. Check back soon.</p>
-                    <p style="opacity:0.7;font-size:0.9em">
-                        The community feed requires at least 5 opted-in threat reports for the current week.
-                        As more users run reports and share their data, this page will populate automatically.
-                    </p>
-
-                    <?php elseif (!empty($cidrs)): ?>
-
-                    <p>
-                        Derived from <strong><?php echo number_format($total_reports); ?></strong> opted-in
-                        ip2geo threat reports this week. Updated continuously.
-                        <a href="/privacy.php" style="opacity:0.7;font-size:0.9em">Privacy policy</a>
-                    </p>
-
-                    <div style="display:flex;gap:0.6em;flex-wrap:wrap;margin-bottom:1.5em">
-                        <a href="/intel.php?format=iptables" class="button small">&#8595; iptables</a>
-                        <a href="/intel.php?format=ufw"      class="button small">&#8595; ufw</a>
-                        <a href="/intel.php?format=nginx"    class="button small">&#8595; nginx</a>
-                        <a href="/intel.php?format=txt"      class="button small alt">&#8595; plain .txt</a>
-                    </div>
-
-                    <div class="table-wrapper" style="overflow-x:auto">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th scope="col" style="font-family:monospace">CIDR</th>
-                                <th scope="col">ASN Org</th>
-                                <th scope="col" title="Opted-in reports containing this range in the past 7 days">Reports</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                        <?php foreach ($cidrs as $row):
-                            $cidr_slug = 'cidr-' . preg_replace('/[.\/:]+/', '-', $row['cidr']);
-                        ?>
-                            <tr id="<?php echo htmlspecialchars($cidr_slug, ENT_QUOTES, 'UTF-8'); ?>">
-                                <td style="font-family:monospace"><?php echo htmlspecialchars($row['cidr'], ENT_QUOTES, 'UTF-8'); ?></td>
-                                <td><?php echo htmlspecialchars(($row['asn'] ?? '') . ($row['org'] ? ' ' . $row['org'] : ''), ENT_QUOTES, 'UTF-8'); ?></td>
-                                <td><?php echo (int)$row['report_count']; ?></td>
-                            </tr>
-                        <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                    </div>
-
-                    <p style="font-size:0.8em;opacity:0.6;margin-top:0.5em">
-                        Top <?php echo count($cidrs); ?> ranges by report count.
-                        Included only if: reported by 3+ independent users, prefix /16 or more specific (max 65,536 addresses), and hit density &ge;0.1% of the range.
-                        Ranges from cloud and ISP infrastructure may still appear &mdash; review carefully before applying to production.
-                        Residential IPs are never collected. Data retained for 52 weeks.
-                    </p>
-
-                    <?php else: ?>
-
-                    <p>
-                        We have <strong><?php echo number_format($total_reports); ?></strong> opted-in
-                        ip2geo threat reports this week, but no ranges currently meet the confidence threshold.
-                        <a href="/privacy.php" style="opacity:0.7;font-size:0.9em">Privacy policy</a>
-                    </p>
-                    <p style="opacity:0.7;font-size:0.9em">
-                        To appear here, a CIDR must be seen in 3 or more independent reports, have a prefix of /16 or more specific
-                        (at most 65,536 addresses), and show a hit density of at least 0.1% of its range.
-                        The list will populate as more users contribute reports this week.
-                    </p>
-
-                    <?php endif; ?>
-
-                    <hr />
-                    <p>
-                        <a href="/report.php?token=00000000-0000-0000-0000-000000000000" class="button small alt">See a sample report &rarr;</a>
-                        &nbsp;
-                        <a href="/" class="button small alt">Analyze your own logs &rarr;</a>
-                    </p>
-                </div>
-            </section>
-
+        <div class="button-row">
+            <a href="/intel.php?format=iptables" class="button small">&#8595; iptables</a>
+            <a href="/intel.php?format=ufw"      class="button small">&#8595; ufw</a>
+            <a href="/intel.php?format=nginx"    class="button small">&#8595; nginx</a>
+            <a href="/intel.php?format=txt"      class="button small alt">&#8595; plain .txt</a>
         </div>
 
-    <?php require __DIR__ . '/includes/footer.php'; ?>
+        <div class="table-wrapper table-wrapper--scroll">
+        <table class="intel-table">
+            <thead>
+                <tr>
+                    <th scope="col" class="col-mono">CIDR</th>
+                    <th scope="col">ASN Org</th>
+                    <th scope="col" title="Opted-in reports containing this range in the past 7 days">Reports</th>
+                </tr>
+            </thead>
+            <tbody>
+            <?php foreach ($cidrs as $row):
+                $cidr_slug = 'cidr-' . preg_replace('/[.\/:]+/', '-', $row['cidr']);
+            ?>
+                <tr id="<?php echo htmlspecialchars($cidr_slug, ENT_QUOTES, 'UTF-8'); ?>">
+                    <td class="col-mono"><?php echo htmlspecialchars($row['cidr'], ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td><?php echo htmlspecialchars(($row['asn'] ?? '') . ($row['org'] ? ' ' . $row['org'] : ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td><?php echo (int)$row['report_count']; ?></td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+        </div>
 
-        <!-- Scripts -->
-        <script src="assets/js/jquery.min.js"></script>
-        <script src="assets/js/jquery.scrollex.min.js"></script>
-        <script src="assets/js/jquery.scrolly.min.js"></script>
-        <script src="assets/js/browser.min.js"></script>
-        <script src="assets/js/breakpoints.min.js"></script>
-        <script src="assets/js/util.js"></script>
-        <script src="assets/js/main.js"></script>
+        <p class="report-fine-print">
+            Top <?php echo count($cidrs); ?> ranges by report count.
+            Included only if: reported by 3+ independent users, prefix /16 or more specific (max 65,536 addresses), and hit density &ge;0.1% of the range.
+            Ranges from cloud and ISP infrastructure may still appear &mdash; review carefully before applying to production.
+            Residential IPs are never collected. Data retained for 52 weeks.
+        </p>
 
-    </body>
-</html>
+        <?php else: ?>
+
+        <p>
+            We have <strong><?php echo number_format($total_reports); ?></strong> opted-in
+            ip2geo threat reports this week, but no ranges currently meet the confidence threshold.
+            <a href="/privacy.php" class="link-muted">Privacy policy</a>
+        </p>
+        <p class="report-fine-print">
+            To appear here, a CIDR must be seen in 3 or more independent reports, have a prefix of /16 or more specific
+            (at most 65,536 addresses), and show a hit density of at least 0.1% of its range.
+            The list will populate as more users contribute reports this week.
+        </p>
+
+        <?php endif; ?>
+
+        <hr class="section-rule" />
+        <div class="button-row">
+            <a href="/report.php?token=00000000-0000-0000-0000-000000000000" class="button small alt">See a sample report &rarr;</a>
+            <a href="/" class="button small alt">Analyze your own logs &rarr;</a>
+        </div>
+    </div>
+</section>
 <?php
+render_page_close();
+
 // ── Store rendered HTML in APCu (15-min TTL) ──────────────────────────────────
 $_html = ob_get_clean();
 if ($_html === false || $_html === '') {

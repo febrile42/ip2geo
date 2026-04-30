@@ -1,4 +1,3 @@
-<!DOCTYPE HTML>
 <?php
 /**
  * Resend the report link email to the address stored at checkout.
@@ -10,6 +9,7 @@
 
 require __DIR__ . '/config.php';
 require __DIR__ . '/email_helper.php';
+require __DIR__ . '/includes/page-chrome.php';
 require __DIR__ . '/vendor/autoload.php';
 
 $token = isset($_GET['token']) ? trim($_GET['token']) : '';
@@ -90,86 +90,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $error === '' && $resend_enabled) {
 if ($con) mysqli_close($con);
 
 $masked = $stored_email ? mask_email($stored_email) : null;
+
+render_page_open('Resend Report Link — ip2geo.org', 'Resend a paid Threat Report link to the email on file.', [], [
+    ['label' => 'New Lookup', 'href' => '/'],
+]);
 ?>
-<html>
-    <head>
-        <!-- Umami (production only) -->
-        <?php if ($_SERVER['HTTP_HOST'] === 'ip2geo.org'): ?>
-        <script defer src="https://cloud.umami.is/script.js" data-website-id="656d7a15-6282-4079-af1e-b8ed857fba2e"></script>
-        <?php endif; ?>
-        <title>Resend Report Link — ip2geo.org</title>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-        <link rel="stylesheet" href="assets/css/main.css" />
-        <link rel="icon" href="/favicon.ico" />
-        <noscript><link rel="stylesheet" href="assets/css/noscript.css" /></noscript>
-    </head>
-    <body class="is-preload">
-
-        <!-- Header -->
-        <header id="header">
-            <a href="/" class="title">ip2geo.org</a>
-            <nav>
-                <ul>
-                    <li><a href="/">Home</a></li>
-                </ul>
-            </nav>
-        </header>
-
-        <!-- Wrapper -->
-        <div id="wrapper">
-            <section id="main" class="wrapper">
-                <div class="inner">
-                    <h1 class="major">Resend Report Link</h1>
-
-                    <?php if ($error !== ''): ?>
-                    <p style="color:#e06c75"><?php echo htmlspecialchars($error, ENT_QUOTES, 'UTF-8'); ?></p>
-                    <p><a href="/" class="button small">← Back to ip2geo</a></p>
-
-                    <?php elseif ($success): ?>
-                    <p>Report link sent to <strong><?php echo htmlspecialchars(mask_email($stored_email), ENT_QUOTES, 'UTF-8'); ?></strong>. Check your inbox.</p>
-                    <p style="font-size:0.9em;opacity:0.7"><?php echo $expires_fmt !== null ? 'The link expires on ' . htmlspecialchars($expires_fmt, ENT_QUOTES, 'UTF-8') . '.' : 'This report does not expire.'; ?> If it doesn't arrive within a few minutes, check your spam folder or contact <a href="&#109;&#97;&#105;&#108;&#116;&#111;&#58;&#115;&#117;&#112;&#112;&#111;&#114;&#116;&#64;&#105;&#112;&#50;&#103;&#101;&#111;&#46;&#111;&#114;&#103;">&#115;&#117;&#112;&#112;&#111;&#114;&#116;&#64;&#105;&#112;&#50;&#103;&#101;&#111;&#46;&#111;&#114;&#103;</a>.</p>
-                    <p><a href="/report.php?token=<?php echo urlencode($token); ?>" class="button small">View your report</a></p>
-
-                    <?php elseif (!$resend_enabled): ?>
-                    <p>Email delivery is not configured. Contact <a href="&#109;&#97;&#105;&#108;&#116;&#111;&#58;&#115;&#117;&#112;&#112;&#111;&#114;&#116;&#64;&#105;&#112;&#50;&#103;&#101;&#111;&#46;&#111;&#114;&#103;">&#115;&#117;&#112;&#112;&#111;&#114;&#116;&#64;&#105;&#112;&#50;&#103;&#101;&#111;&#46;&#111;&#114;&#103;</a> with your report token and we will send you the link manually.</p>
-                    <p style="font-size:0.9em;opacity:0.7;font-family:monospace"><?php echo htmlspecialchars($token, ENT_QUOTES, 'UTF-8'); ?></p>
-
-                    <?php else: ?>
-                    <?php if ($masked): ?>
-                    <p>We have an address on file for this report. Enter the same address to resend the link.</p>
-                    <p style="font-size:0.9em;opacity:0.7">On file: <strong><?php echo htmlspecialchars($masked, ENT_QUOTES, 'UTF-8'); ?></strong></p>
-                    <?php else: ?>
-                    <p>Enter your email address and we'll send you the link to your report<?php echo $expires_fmt !== null ? '. It expires on <strong>' . htmlspecialchars($expires_fmt, ENT_QUOTES, 'UTF-8') . '</strong>' : ''; ?>.</p>
-                    <?php endif; ?>
-
-                    <form method="post" action="/send-report-link.php?token=<?php echo urlencode($token); ?>" style="max-width:420px">
-                        <div class="fields">
-                            <div class="field">
-                                <label for="email">Email address</label>
-                                <input type="email" name="email" id="email" placeholder="you@example.com" required
-                                       value="<?php echo htmlspecialchars($_POST['email'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
-                            </div>
-                        </div>
-                        <ul class="actions" style="margin-top:1em">
-                            <li><input type="submit" value="Send link" class="primary"></li>
-                        </ul>
-                    </form>
-                    <?php endif; ?>
-                </div>
-            </section>
+<section class="report-section">
+    <div class="report-inner">
+        <div class="section-head">
+            <h1>Resend Report Link</h1>
+            <span class="section-tag">/ Email</span>
         </div>
 
-    <?php require __DIR__ . '/includes/footer.php'; ?>
+        <?php if ($error !== ''): ?>
+            <p class="form-error"><?php echo htmlspecialchars($error, ENT_QUOTES, 'UTF-8'); ?></p>
+            <p><a href="/" class="button small">&larr; Back to ip2geo</a></p>
 
-        <!-- Scripts -->
-        <script src="assets/js/jquery.min.js"></script>
-        <script src="assets/js/jquery.scrollex.min.js"></script>
-        <script src="assets/js/jquery.scrolly.min.js"></script>
-        <script src="assets/js/browser.min.js"></script>
-        <script src="assets/js/breakpoints.min.js"></script>
-        <script src="assets/js/util.js"></script>
-        <script src="assets/js/main.js"></script>
+        <?php elseif ($success): ?>
+            <p>Report link sent to <strong><?php echo htmlspecialchars(mask_email($stored_email), ENT_QUOTES, 'UTF-8'); ?></strong>. Check your inbox.</p>
+            <p class="report-fine-print"><?php echo $expires_fmt !== null ? 'The link expires on ' . htmlspecialchars($expires_fmt, ENT_QUOTES, 'UTF-8') . '.' : 'This report does not expire.'; ?> If it doesn't arrive within a few minutes, check your spam folder or contact <a href="&#109;&#97;&#105;&#108;&#116;&#111;&#58;&#115;&#117;&#112;&#112;&#111;&#114;&#116;&#64;&#105;&#112;&#50;&#103;&#101;&#111;&#46;&#111;&#114;&#103;">&#115;&#117;&#112;&#112;&#111;&#114;&#116;&#64;&#105;&#112;&#50;&#103;&#101;&#111;&#46;&#111;&#114;&#103;</a>.</p>
+            <p><a href="/report.php?token=<?php echo urlencode($token); ?>" class="button small">View your report</a></p>
 
-    </body>
-</html>
+        <?php elseif (!$resend_enabled): ?>
+            <p>Email delivery is not configured. Contact <a href="&#109;&#97;&#105;&#108;&#116;&#111;&#58;&#115;&#117;&#112;&#112;&#111;&#114;&#116;&#64;&#105;&#112;&#50;&#103;&#101;&#111;&#46;&#111;&#114;&#103;">&#115;&#117;&#112;&#112;&#111;&#114;&#64;&#105;&#112;&#50;&#103;&#101;&#111;&#46;&#111;&#114;&#103;</a> with your report token and we will send you the link manually.</p>
+            <p class="token-display"><?php echo htmlspecialchars($token, ENT_QUOTES, 'UTF-8'); ?></p>
+
+        <?php else: ?>
+            <?php if ($masked): ?>
+                <p>We have an address on file for this report. Enter the same address to resend the link.</p>
+                <p class="report-fine-print">On file: <strong><?php echo htmlspecialchars($masked, ENT_QUOTES, 'UTF-8'); ?></strong></p>
+            <?php else: ?>
+                <p>Enter your email address and we'll send you the link to your report<?php echo $expires_fmt !== null ? '. It expires on <strong>' . htmlspecialchars($expires_fmt, ENT_QUOTES, 'UTF-8') . '</strong>' : ''; ?>.</p>
+            <?php endif; ?>
+
+            <form class="resend-form" method="post" action="/send-report-link.php?token=<?php echo urlencode($token); ?>">
+                <div class="field">
+                    <label for="email">Email address</label>
+                    <input type="email" name="email" id="email" placeholder="you@example.com" required
+                           value="<?php echo htmlspecialchars($_POST['email'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="button">Send link</button>
+                </div>
+            </form>
+        <?php endif; ?>
+    </div>
+</section>
+<?php render_page_close(); ?>

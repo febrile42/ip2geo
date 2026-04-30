@@ -301,7 +301,8 @@ main {
   letter-spacing: 0.06em;
   margin-bottom: 6px;
 }
-.field input[type="text"] {
+.field input[type="text"],
+.field input[type="email"] {
   width: 100%;
   padding: 10px 12px;
   background: var(--surface);
@@ -311,9 +312,12 @@ main {
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
 }
-.field input[type="text"]:focus { outline: none; border-color: var(--accent-purple); }
-.field input[type="text"]::placeholder { color: var(--text-muted); opacity: 1; transition: opacity 80ms ease-out; }
-.field input[type="text"]:focus::placeholder { opacity: 0; }
+.field input[type="text"]:focus,
+.field input[type="email"]:focus { outline: none; border-color: var(--accent-purple); }
+.field input[type="text"]::placeholder,
+.field input[type="email"]::placeholder { color: var(--text-muted); opacity: 1; transition: opacity 80ms ease-out; }
+.field input[type="text"]:focus::placeholder,
+.field input[type="email"]:focus::placeholder { opacity: 0; }
 .field-hint { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
 
 .actions {
@@ -1341,3 +1345,126 @@ button.button.small:hover {
 .report-inner .inline-after { margin-left: 8px; }
 .report-inner .inline-after-lg { margin-left: 16px; }
 .report-inner .margin-top-1 { margin-top: 1em; }
+
+/* ============================================================
+   19. MARKETING / UTILITY PAGES
+   Long-form prose (changelog, legal, privacy), the community
+   block list (intel.php), and the resend-email form
+   (send-report-link.php). Scoped under .report-inner so they
+   inherit the same content rhythm as the report page.
+   ============================================================ */
+
+/* Subtitle line directly under a section-head H1 (e.g. intel "Past 7 days") */
+.report-inner .section-subtitle {
+  margin: -4px 0 24px;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+/* Long-form prose: changelog, legal, privacy, etc. Tightens vertical
+   rhythm and gives <h3> headings a consistent feel across pages. */
+.report-inner .prose h3 {
+  margin: 1.6em 0 0.4em;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 0.01em;
+}
+.report-inner .prose h3:first-child { margin-top: 0; }
+.report-inner .prose p {
+  margin: 0 0 1em;
+  color: var(--text);
+  line-height: 1.65;
+}
+.report-inner .prose ol,
+.report-inner .prose ul {
+  margin: 0 0 1em 1.4em;
+  color: var(--text);
+  line-height: 1.65;
+}
+.report-inner .prose li { margin: 0.2em 0; }
+.report-inner .prose code {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  padding: 1px 5px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text);
+}
+.report-inner .prose a { color: var(--accent-purple); }
+.report-inner .prose a:hover { color: var(--magenta); }
+
+/* Subtle inline link (was style="opacity:0.7;font-size:0.9em") */
+.report-inner .link-muted {
+  font-size: 13px;
+  color: var(--text-muted);
+  text-decoration: underline;
+  text-decoration-color: var(--border);
+}
+.report-inner .link-muted:hover { color: var(--accent-purple); }
+
+/* Horizontal button row with consistent gap + wrap */
+.report-inner .button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 1.5em 0;
+}
+
+/* Horizontal-scroll wrapper for tables wider than the inner column */
+.report-inner .table-wrapper--scroll { overflow-x: auto; }
+
+/* Community block list table (intel.php) */
+.report-inner .intel-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.5em 0 0;
+  font-size: 14px;
+}
+.report-inner .intel-table th,
+.report-inner .intel-table td {
+  padding: 10px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+.report-inner .intel-table th {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  background: var(--surface);
+}
+.report-inner .intel-table td { color: var(--text); }
+.report-inner .intel-table .col-mono {
+  font-family: var(--font-mono);
+  font-feature-settings: "tnum" 1;
+}
+
+/* Hairline separator between body and CTAs */
+.report-inner .section-rule {
+  height: 1px;
+  border: 0;
+  background: var(--border);
+  margin: 2em 0 1.5em;
+}
+
+/* Form-level error message (was style="color:#e06c75") */
+.report-inner .form-error {
+  color: var(--magenta);
+  margin: 0 0 1em;
+}
+
+/* Mono-display token (was style="font-size:0.9em;opacity:0.7;font-family:monospace") */
+.report-inner .token-display {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text-muted);
+  word-break: break-all;
+}
+
+/* Resend-link form: constrain width + space the submit button */
+.report-inner .resend-form { max-width: 420px; }
+.report-inner .resend-form .field { margin-bottom: 1em; }
+.report-inner .form-actions { margin-top: 1em; }

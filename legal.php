@@ -1,75 +1,34 @@
-<!DOCTYPE HTML>
-<!--
-	Hyperspace by HTML5 UP
-	html5up.net | @ajlkn
-	Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
--->
-<html>
-	<head>
-		<!-- Umami (production only) -->
-		<?php if ($_SERVER['HTTP_HOST'] === 'ip2geo.org'): ?>
-		<script defer src="https://cloud.umami.is/script.js" data-website-id="656d7a15-6282-4079-af1e-b8ed857fba2e"></script>
-		<?php endif; ?>
-		<title>ip2geo.org Legal &amp; Refund Policy</title>
-		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-		<link rel="stylesheet" href="assets/css/main.css" />
-		<link rel="icon" href="/favicon.ico" />
-		<noscript><link rel="stylesheet" href="assets/css/noscript.css" /></noscript>
-	</head>
-	<body class="is-preload">
+<?php
+require __DIR__ . '/includes/page-chrome.php';
+render_page_open('Legal & Refund Policy — ip2geo.org', 'Legal terms and refund policy for ip2geo.org Threat Reports.');
+?>
+<section class="report-section">
+    <div class="report-inner">
+        <div class="section-head">
+            <h1>Legal &amp; Refund Policy</h1>
+            <span class="section-tag">/ Terms</span>
+        </div>
 
-		<!-- Header -->
-			<header id="header">
-				<a href="/" class="title">ip2geo.org</a>
-				<nav>
-					<ul>
-						<li><a href="/">Home</a></li>
-					</ul>
-				</nav>
-			</header>
+        <div class="prose">
+            <h3>Data Disclaimer</h3>
+            <p>All geolocation and threat data provided by ip2geo.org is aggregated from publicly available sources and is provided "as is" without warranty of any kind, express or implied, including accuracy, completeness, or fitness for a particular purpose. ip2geo.org does not independently verify this data and makes no representation that any result is correct or current. You are solely responsible for any decisions or actions taken based on information obtained through this service.</p>
 
-		<!-- Wrapper -->
-			<div id="wrapper">
+            <h3>Refund Policy</h3>
+            <p>Threat Reports are generated immediately upon payment. Because the report is delivered digitally at the moment of purchase, all sales are final. Refunds are not granted due to dissatisfaction with data accuracy or report contents.</p>
+            <p>If a technical failure prevents your report from generating, contact <a href="&#109;&#97;&#105;&#108;&#116;&#111;&#58;&#115;&#117;&#112;&#112;&#111;&#114;&#116;&#64;&#105;&#112;&#50;&#103;&#101;&#111;&#46;&#111;&#114;&#103;">&#115;&#117;&#112;&#112;&#111;&#114;&#116;&#64;&#105;&#112;&#50;&#103;&#101;&#111;&#46;&#111;&#114;&#103;</a> within 7 days of purchase and we will issue a full refund promptly.</p>
 
-				<!-- Main -->
-					<section id="main" class="wrapper">
-						<div class="inner">
-							<h1 class="major">Legal &amp; Refund Policy</h1>
+            <h3>Cancellation Policy</h3>
+            <p>Threat Reports are one-time purchases. There is no subscription and nothing to cancel.</p>
 
-							<h3>Data Disclaimer</h3>
-							<p>All geolocation and threat data provided by ip2geo.org is aggregated from publicly available sources and is provided "as is" without warranty of any kind, express or implied, including accuracy, completeness, or fitness for a particular purpose. ip2geo.org does not independently verify this data and makes no representation that any result is correct or current. You are solely responsible for any decisions or actions taken based on information obtained through this service.</p>
+            <h3>Dispute Policy</h3>
+            <p>If you have a problem with your purchase, please contact <a href="&#109;&#97;&#105;&#108;&#116;&#111;&#58;&#115;&#117;&#112;&#112;&#111;&#114;&#116;&#64;&#105;&#112;&#50;&#103;&#101;&#111;&#46;&#111;&#114;&#103;">&#115;&#117;&#112;&#112;&#111;&#114;&#116;&#64;&#105;&#112;&#50;&#103;&#101;&#111;&#46;&#111;&#114;&#103;</a> before filing a dispute with your payment provider. Legitimate issues are resolved promptly.</p>
 
-							<h3>Refund Policy</h3>
-							<p>Threat Reports are generated immediately upon payment. Because the report is delivered digitally at the moment of purchase, all sales are final. Refunds are not granted due to dissatisfaction with data accuracy or report contents.</p>
-							<p>If a technical failure prevents your report from generating, contact <a href="&#109;&#97;&#105;&#108;&#116;&#111;&#58;&#115;&#117;&#112;&#112;&#111;&#114;&#116;&#64;&#105;&#112;&#50;&#103;&#101;&#111;&#46;&#111;&#114;&#103;">&#115;&#117;&#112;&#112;&#111;&#114;&#116;&#64;&#105;&#112;&#50;&#103;&#101;&#111;&#46;&#111;&#114;&#103;</a> within 7 days of purchase and we will issue a full refund promptly.</p>
+            <h3>Limitation of Liability</h3>
+            <p>ip2geo.org and its operator shall not be liable for any direct, indirect, incidental, or consequential damages arising from your use of, or reliance on, any data or report provided by this service.</p>
 
-							<h3>Cancellation Policy</h3>
-							<p>Threat Reports are one-time purchases. There is no subscription and nothing to cancel.</p>
-
-							<h3>Dispute Policy</h3>
-							<p>If you have a problem with your purchase, please contact <a href="&#109;&#97;&#105;&#108;&#116;&#111;&#58;&#115;&#117;&#112;&#112;&#111;&#114;&#116;&#64;&#105;&#112;&#50;&#103;&#101;&#111;&#46;&#111;&#114;&#103;">&#115;&#117;&#112;&#112;&#111;&#114;&#116;&#64;&#105;&#112;&#50;&#103;&#101;&#111;&#46;&#111;&#114;&#103;</a> before filing a dispute with your payment provider. Legitimate issues are resolved promptly.</p>
-
-							<h3>Limitation of Liability</h3>
-							<p>ip2geo.org and its operator shall not be liable for any direct, indirect, incidental, or consequential damages arising from your use of, or reliance on, any data or report provided by this service.</p>
-
-							<h3>Contact</h3>
-							<p>For questions about a purchase or this policy, email <a href="&#109;&#97;&#105;&#108;&#116;&#111;&#58;&#115;&#117;&#112;&#112;&#111;&#114;&#116;&#64;&#105;&#112;&#50;&#103;&#101;&#111;&#46;&#111;&#114;&#103;">&#115;&#117;&#112;&#112;&#111;&#114;&#116;&#64;&#105;&#112;&#50;&#103;&#101;&#111;&#46;&#111;&#114;&#103;</a>.</p>
-						</div>
-					</section>
-
-			</div>
-
-	<?php require __DIR__ . '/includes/footer.php'; ?>
-
-		<!-- Scripts -->
-			<script src="assets/js/jquery.min.js"></script>
-			<script src="assets/js/jquery.scrollex.min.js"></script>
-			<script src="assets/js/jquery.scrolly.min.js"></script>
-			<script src="assets/js/browser.min.js"></script>
-			<script src="assets/js/breakpoints.min.js"></script>
-			<script src="assets/js/util.js"></script>
-			<script src="assets/js/main.js"></script>
-
-	</body>
-</html>
+            <h3>Contact</h3>
+            <p>For questions about a purchase or this policy, email <a href="&#109;&#97;&#105;&#108;&#116;&#111;&#58;&#115;&#117;&#112;&#112;&#111;&#114;&#116;&#64;&#105;&#112;&#50;&#103;&#101;&#111;&#46;&#111;&#114;&#103;">&#115;&#117;&#112;&#112;&#111;&#114;&#116;&#64;&#105;&#112;&#50;&#103;&#101;&#111;&#46;&#111;&#114;&#103;</a>.</p>
+        </div>
+    </div>
+</section>
+<?php render_page_close(); ?>
