@@ -779,17 +779,20 @@ button.button.small:hover {
 
 /* ----- Recent lookups widget (opt-out localStorage) -----
    v4 token swap on top of the existing #recent-lookups markup in ip2geo-app.css.
-   Header tag follows the section-tag mono pattern; pills use --surface-2 +
-   --border, lift to --accent-purple on hover. Matches the asymmetric hero
-   rhythm without adding panel chrome. */
-#recent-lookups {
+   Scoped under .hero (or #recent-lookups for class children) to outweigh
+   ip2geo-app.css, which loads after v4.css and would otherwise win at equal
+   specificity (same pattern as the threat-CTA fix). */
+.hero #recent-lookups {
   margin: 1.25em 0 0;
+  padding: 0;
+  border: none;
+  background: transparent;
 }
-#recent-lookups-header {
+.hero #recent-lookups-header {
   align-items: center;
   margin-bottom: 12px;
 }
-#recent-lookups-header h3 {
+.hero #recent-lookups-header h3 {
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 500;
@@ -799,7 +802,7 @@ button.button.small:hover {
   opacity: 1;
   margin: 0;
 }
-#recent-lookups-header h3 small {
+.hero #recent-lookups-header h3 small {
   font-family: var(--font-sans);
   font-size: 11px;
   letter-spacing: 0;
@@ -808,10 +811,10 @@ button.button.small:hover {
   opacity: 0.7;
   margin-left: 8px;
 }
-#recent-lookups-list {
+.hero #recent-lookups-list {
   gap: 8px;
 }
-#recent-lookups-list .recent-lookup-item {
+.hero #recent-lookups-list .recent-lookup-item {
   background: var(--surface-2);
   border: 1px solid var(--border) !important;
   border-radius: 999px !important;
@@ -821,18 +824,18 @@ button.button.small:hover {
   padding: 6px 14px;
   transition: border-color 0.12s, background 0.12s;
 }
-#recent-lookups-list .recent-lookup-item:hover,
-#recent-lookups-list .recent-lookup-item:focus {
+.hero #recent-lookups-list .recent-lookup-item:hover,
+.hero #recent-lookups-list .recent-lookup-item:focus {
   background: var(--surface-2);
   border-color: var(--accent-purple) !important;
   color: var(--text) !important;
 }
-.recent-lookup-count {
+#recent-lookups .recent-lookup-count {
   font-family: var(--font-mono);
   font-feature-settings: "tnum" 1;
   color: var(--text);
 }
-.recent-lookup-time {
+#recent-lookups .recent-lookup-time {
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--text-muted);
