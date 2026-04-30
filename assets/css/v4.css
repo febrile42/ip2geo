@@ -95,6 +95,7 @@ a:hover { text-decoration-color: var(--accent-purple); color: var(--accent-purpl
 .block-body a,
 .about-grid p a,
 .about-prose a,
+.report-inner .prose a,
 .field-hint a,
 footer a {
   color: var(--accent-purple);
@@ -107,6 +108,7 @@ footer a {
 .block-body a:hover,
 .about-grid p a:hover,
 .about-prose a:hover,
+.report-inner .prose a:hover,
 .field-hint a:hover,
 footer a:hover {
   color: var(--accent-purple);
