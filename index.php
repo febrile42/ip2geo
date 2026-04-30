@@ -114,7 +114,7 @@ if ($view_token_mode) {
 						<div class="form-side">
 							<div class="field">
 								<label for="countries_filter">Countries to exclude</label>
-								<input type="text" id="countries_filter" name="countries_filter" placeholder="US CA GB" value="<?php if (isset($_POST['countries_filter'])) { echo htmlspecialchars(strtoupper($_POST['countries_filter']), ENT_QUOTES, 'UTF-8'); } ?>" />
+								<input type="text" id="countries_filter" name="countries_filter" placeholder="e.g. US CA GB" value="<?php if (isset($_POST['countries_filter'])) { echo htmlspecialchars(strtoupper($_POST['countries_filter']), ENT_QUOTES, 'UTF-8'); } ?>" />
 								<div class="field-hint"><a href="https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2" target="_blank" rel="noopener noreferrer">2-letter ISO codes</a> separated by spaces. Use to filter out non-suspicious IPs.</div>
 							</div>
 
