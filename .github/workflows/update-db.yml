@@ -12,9 +12,6 @@ jobs:
   update-geoip:
     name: Update GeoLite2-City Database
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
 
     steps:
       - name: Run update script on server
@@ -85,94 +82,6 @@ jobs:
             echo "Functional test failed: 8.8.8.8 did not resolve to US after update"
             exit 1
           fi
-
-      - name: Checkout develop (for Spamhaus auto-sync step)
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
-        with:
-          ref: develop
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Spamhaus ASN-DROP — regenerate auto-sync block on develop
-        run: |
-          set -euo pipefail
-
-          CLASSIFICATION_FILE="asn_classification.php"
-          BEGIN_MARKER="// --- BEGIN AUTO-SYNC SPAMHAUS ASN-DROP (do not hand-edit) ---"
-          END_MARKER="// --- END AUTO-SYNC SPAMHAUS ASN-DROP ---"
-
-          # Spamhaus ASN-DROP — current bad-actor AS list (NDJSON, one object per line)
-          SPAMHAUS_ASNS=$(curl -sf https://www.spamhaus.org/drop/asndrop.json \
-            | jq -r '"AS" + (.asn | tostring)' \
-            | sort -u)
-
-          if [ -z "$SPAMHAUS_ASNS" ]; then
-            echo "Spamhaus fetch returned no ASNs — aborting to avoid emptying the auto-sync block."
-            exit 1
-          fi
-
-          # Manual entries = ASNs in $known_asns ABOVE the BEGIN marker.
-          # Anything below the marker is owned by this workflow and gets replaced.
-          # index() (substring) not ~ (regex) so parens in BEGIN_MARKER don't break the match.
-          MANUAL_ASNS=$(awk -v begin="$BEGIN_MARKER" '
-            index($0, begin) { exit }
-            { print }
-          ' "$CLASSIFICATION_FILE" | grep -oP "'AS\d+'" | tr -d "'" | sort -u)
-
-          # Auto-sync block content = Spamhaus DROP minus anything classified manually.
-          BLOCK_ASNS=$(comm -23 \
-            <(echo "$SPAMHAUS_ASNS") \
-            <(echo "$MANUAL_ASNS") \
-            | sort -t S -k2 -n)
-
-          BLOCK_FILE=$(mktemp)
-          {
-            echo "    $BEGIN_MARKER"
-            echo "    // Synced monthly from https://www.spamhaus.org/drop/asndrop.json by"
-            echo "    // .github/workflows/update-db.yml. To override an entry's classification,"
-            echo "    // move it OUT of this block into the appropriate manual section above."
-            echo "    // Last sync: $(date -u +%Y-%m-%d)"
-            while IFS= read -r asn; do
-              [ -n "$asn" ] && echo "    '$asn' => 'scanning',"
-            done <<< "$BLOCK_ASNS"
-            echo "    $END_MARKER"
-          } > "$BLOCK_FILE"
-
-          # Replace everything between (and including) the BEGIN/END markers with the new block.
-          # Python so we can use a non-greedy DOTALL regex without sed-portability headaches.
-          python3 - "$CLASSIFICATION_FILE" "$BLOCK_FILE" <<'PY'
-          import re, sys
-          fp, block_fp = sys.argv[1], sys.argv[2]
-          src = open(fp).read()
-          new_block = open(block_fp).read().rstrip("\n")
-          pattern = re.compile(
-              r"[ \t]*// --- BEGIN AUTO-SYNC SPAMHAUS ASN-DROP \(do not hand-edit\) ---.*?// --- END AUTO-SYNC SPAMHAUS ASN-DROP ---",
-              re.DOTALL,
-          )
-          if not pattern.search(src):
-              sys.stderr.write("ERROR: BEGIN/END markers not found in " + fp + "\n")
-              sys.exit(2)
-          open(fp, "w").write(pattern.sub(new_block, src))
-          PY
-          rm -f "$BLOCK_FILE"
-
-          # Validate PHP still parses before pushing.
-          php -l "$CLASSIFICATION_FILE"
-
-          if git diff --quiet "$CLASSIFICATION_FILE"; then
-            echo "Spamhaus auto-sync: no changes."
-            exit 0
-          fi
-
-          ADDED=$(git diff "$CLASSIFICATION_FILE" | grep -cE "^\+ +'AS[0-9]+'" || true)
-          REMOVED=$(git diff "$CLASSIFICATION_FILE" | grep -cE "^- +'AS[0-9]+'" || true)
-          echo "Spamhaus auto-sync: +${ADDED} / -${REMOVED}"
-
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add "$CLASSIFICATION_FILE"
-          git commit -m "chore: sync Spamhaus ASN-DROP — +${ADDED} / -${REMOVED} ($(date -u +%Y-%m-%d))"
-          git push origin develop
 
       - name: Prune community stats older than 52 weeks (prod + staging)
         uses: appleboy/ssh-action@029f5b4aeeeb58fdfe1410a5d17f967dacf36262 # v1.0.3

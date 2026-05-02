@@ -8,7 +8,7 @@
  * The $known_asns array is the authoritative source. For ASNs not listed,
  * keyword_classify() provides a best-effort fallback from the org name.
  *
- * Maintenance: the monthly update-db.yml workflow regenerates the auto-sync
+ * Maintenance: the monthly sync-spamhaus.yml workflow regenerates the auto-sync
  * block (between the BEGIN/END markers below) from the Spamhaus ASN-DROP list,
  * commits the result directly to develop, and lets staging redeploy. Manual
  * entries above the BEGIN marker are sacrosanct — the workflow never touches
@@ -81,7 +81,7 @@ $known_asns = [
 
     // --- BEGIN AUTO-SYNC SPAMHAUS ASN-DROP (do not hand-edit) ---
     // Synced monthly from https://www.spamhaus.org/drop/asndrop.json by
-    // .github/workflows/update-db.yml. To override an entry's classification,
+    // .github/workflows/sync-spamhaus.yml. To override an entry's classification,
     // move it OUT of this block into the appropriate manual section above.
     // Last sync: 2026-05-01
     'AS245' => 'scanning',
