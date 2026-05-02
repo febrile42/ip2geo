@@ -36,9 +36,11 @@ jobs:
           BEGIN_MARKER="// --- BEGIN AUTO-SYNC SPAMHAUS ASN-DROP (do not hand-edit) ---"
           END_MARKER="// --- END AUTO-SYNC SPAMHAUS ASN-DROP ---"
 
-          # Spamhaus ASN-DROP — current bad-actor AS list (NDJSON, one object per line)
+          # Spamhaus ASN-DROP — current bad-actor AS list (NDJSON, one object per line).
+          # The first record is a `{"type":"metadata",...}` header with no .asn — filter it
+          # out so we don't materialize an "ASnull" entry into the classification array.
           SPAMHAUS_ASNS=$(curl -sf https://www.spamhaus.org/drop/asndrop.json \
-            | jq -r '"AS" + (.asn | tostring)' \
+            | jq -r 'select(.asn != null) | "AS" + (.asn | tostring)' \
             | sort -u)
 
           if [ -z "$SPAMHAUS_ASNS" ]; then
