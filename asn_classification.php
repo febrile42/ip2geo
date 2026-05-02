@@ -83,7 +83,7 @@ $known_asns = [
     // Synced monthly from https://www.spamhaus.org/drop/asndrop.json by
     // .github/workflows/sync-spamhaus.yml. To override an entry's classification,
     // move it OUT of this block into the appropriate manual section above.
-    // Last sync: 2026-05-01
+    // Last sync: 2026-05-02
     'AS245' => 'scanning',
     'AS2601' => 'scanning',
     'AS2702' => 'scanning',
@@ -171,6 +171,7 @@ $known_asns = [
     'AS51722' => 'scanning',
     'AS53958' => 'scanning',
     'AS54497' => 'scanning',
+    'AS54801' => 'scanning',
     'AS55154' => 'scanning',
     'AS55748' => 'scanning',
     'AS55933' => 'scanning',
