@@ -29,6 +29,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Regenerate Spamhaus auto-sync block
+        id: regen
         run: |
           set -euo pipefail
 
@@ -98,6 +99,7 @@ jobs:
 
           if git diff --quiet "$CLASSIFICATION_FILE"; then
             echo "Spamhaus auto-sync: no changes."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -110,3 +112,22 @@ jobs:
           git add "$CLASSIFICATION_FILE"
           git commit -m "chore: sync Spamhaus ASN-DROP — +${ADDED} / -${REMOVED} ($(date -u +%Y-%m-%d))"
           git push origin develop
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      # GITHUB_TOKEN-driven pushes don't trigger the CI/CD workflow (GitHub
+      # loop-prevention), so the monthly sync would land on develop but staging
+      # would never auto-deploy. Mirror deploy.yml's deploy-staging here so the
+      # sync step is self-contained.
+      - name: Deploy to staging (only if Spamhaus diff produced a commit)
+        if: steps.regen.outputs.changed == 'true'
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT }}
+          script: |
+            cd ${{ secrets.STAGING_PATH }}
+            git fetch origin && git reset --hard origin/develop
+            ~/bin/composer install --no-dev --no-interaction --quiet
+            printf "User-agent: *\nDisallow: /\n" > robots.txt
