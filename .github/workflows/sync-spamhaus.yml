@@ -19,6 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: write
 
     steps:
       - name: Checkout develop
@@ -131,3 +132,98 @@ jobs:
             git fetch origin && git reset --hard origin/develop
             ~/bin/composer install --no-dev --no-interaction --quiet
             printf "User-agent: *\nDisallow: /\n" > robots.txt
+
+      # Auto-promote develop -> main, but only when the entire delta is inside
+      # the Spamhaus auto-sync block. If anything else is unreleased on develop
+      # (manual classification edits, code, docs), bail and let a regular release
+      # PR ship it instead. Runs unconditionally so a previously-stranded sync
+      # commit (e.g. one made before this auto-promote step existed) catches up
+      # on the next run, even when the current run produced no new diff.
+      - name: Auto-promote develop -> main if delta is pure-Spamhaus
+        id: promote
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git fetch origin main develop
+
+          if [ "$(git rev-parse origin/develop)" = "$(git rev-parse origin/main)" ]; then
+            echo "develop is already at main; nothing to promote."
+            echo "promoted=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          OTHER_FILES=$(git diff origin/main..origin/develop --name-only \
+            | grep -v '^asn_classification.php$' || true)
+          if [ -n "$OTHER_FILES" ]; then
+            echo "develop has unreleased non-Spamhaus changes; not auto-promoting:"
+            echo "$OTHER_FILES"
+            echo "promoted=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Strip the entire auto-sync block (including the Last-sync date comment)
+          # from both versions; if the rest of the file is identical, the delta is
+          # pure Spamhaus and safe to auto-promote.
+          strip_block() {
+            awk '/BEGIN AUTO-SYNC SPAMHAUS ASN-DROP/{f=1; next} /END AUTO-SYNC SPAMHAUS ASN-DROP/{f=0; next} !f'
+          }
+          MAIN_STRIPPED=$(git show origin/main:asn_classification.php | strip_block)
+          DEV_STRIPPED=$(git show origin/develop:asn_classification.php | strip_block)
+          if [ "$MAIN_STRIPPED" != "$DEV_STRIPPED" ]; then
+            echo "asn_classification.php has changes outside the auto-sync block; not auto-promoting."
+            echo "promoted=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Pure-Spamhaus delta detected. Opening PR develop -> main."
+
+          DATE=$(date -u +%Y-%m-%d)
+          # Reuse an existing open PR if one was opened by a prior run that couldn't
+          # auto-merge (e.g. branch protection blocked the bot).
+          PR_NUMBER=$(gh pr list --base main --head develop --state open \
+            --json number --jq '.[0].number // empty')
+          if [ -z "$PR_NUMBER" ]; then
+            PR_URL=$(gh pr create \
+              --base main --head develop \
+              --title "chore(spamhaus): promote ${DATE} ASN-DROP sync to main" \
+              --body $'Automated promotion: develop\'s only delta vs main is the auto-sync Spamhaus block.\n\nThe footer\'s "Data: <month>" field tracks data freshness, so no version bump.')
+            PR_NUMBER=$(echo "$PR_URL" | grep -oE '[0-9]+$')
+            echo "Opened PR #${PR_NUMBER}: ${PR_URL}"
+          else
+            echo "Reusing existing PR #${PR_NUMBER}."
+          fi
+
+          if gh pr merge "$PR_NUMBER" --squash; then
+            echo "Merged PR #${PR_NUMBER}."
+            echo "promoted=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Auto-merge failed (likely branch protection). PR #${PR_NUMBER} left open for manual review."
+            echo "promoted=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Deploy to production after auto-promote
+        if: steps.promote.outputs.promoted == 'true'
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT }}
+          script: |
+            cd ${{ secrets.DEPLOY_PATH }}
+            git fetch origin && git reset --hard origin/main
+            ~/bin/composer install --no-dev --no-interaction --quiet
+
+      - name: Smoke test production after auto-promote
+        if: steps.promote.outputs.promoted == 'true'
+        run: |
+          sleep 3
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Host: ip2geo.org" \
+            "http://${{ secrets.DEPLOY_HOST }}")
+          if [ "$STATUS" != "200" ]; then
+            echo "Production smoke test failed: HTTP $STATUS"
+            exit 1
+          fi
+          echo "Production smoke test passed"

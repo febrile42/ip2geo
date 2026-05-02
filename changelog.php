@@ -10,6 +10,9 @@ render_page_open('Changelog — ip2geo.org', 'Release notes for ip2geo.org.');
         </div>
 
         <div class="prose">
+            <h3>4.0.2 — 2026-05-02</h3>
+            <p>Tightened the monthly Bad Guy ASN refresh so it lands in production automatically each month, no manual nudge required. Same data, less waiting.</p>
+
             <h3>4.0.1 — 2026-05-02</h3>
             <p>Discovered the Spamhaus block list wasn't syncing properly on the first of the month. Refactored how that update happens and how Bad Guy ASNs are tracked to keep things up to date.</p>
 
