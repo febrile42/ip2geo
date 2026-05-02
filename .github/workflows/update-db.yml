@@ -12,9 +12,6 @@ jobs:
   update-geoip:
     name: Update GeoLite2-City Database
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
 
     steps:
       - name: Run update script on server
@@ -85,98 +82,6 @@ jobs:
             echo "Functional test failed: 8.8.8.8 did not resolve to US after update"
             exit 1
           fi
-
-      - name: Checkout repo (for Spamhaus diff step)
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
-
-      - name: Spamhaus ASN-DROP diff — open draft PR if gaps found
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-
-          # Close any stale candidate PRs and delete their branches from prior runs
-          STALE_BRANCHES=$(gh api repos/febrile42/ip2geo/git/refs/heads \
-            --jq '.[].ref | select(startswith("refs/heads/asn-classification-update-"))' \
-            | sed 's|refs/heads/||')
-          for STALE in $STALE_BRANCHES; do
-            echo "Cleaning up stale branch: $STALE"
-            gh pr list --head "$STALE" --json number --jq '.[].number' \
-              | xargs -r -I{} gh pr close {} --comment "Superseded by next monthly run." --delete-branch || true
-            git push origin --delete "$STALE" 2>/dev/null || true
-          done
-
-          # Fetch Spamhaus ASN-DROP list (NDJSON format — one JSON object per line)
-          SPAMHAUS_ASNS=$(curl -sf https://www.spamhaus.org/drop/asndrop.json \
-            | jq -r '"AS" + (.asn | tostring)' \
-            | sort -u)
-
-          # Extract ASN keys already in our classification array
-          KNOWN_ASNS=$(grep -oP "'AS\d+'" asn_classification.php \
-            | tr -d "'" \
-            | sort -u)
-
-          # Find ASNs in Spamhaus but missing from our array
-          MISSING=$(comm -23 \
-            <(echo "$SPAMHAUS_ASNS") \
-            <(echo "$KNOWN_ASNS"))
-
-          if [ -z "$MISSING" ]; then
-            echo "Spamhaus diff: no gaps found. Classification array is current."
-            exit 0
-          fi
-
-          echo "Spamhaus diff: found $(echo "$MISSING" | wc -l | tr -d ' ') ASNs not in classification array."
-
-          # Format as PHP array candidate lines for human review
-          MONTH=$(date +"%B %Y")
-          BRANCH="asn-classification-update-$(date +%Y%m)"
-
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout -b "$BRANCH"
-
-          # Append candidate lines to a review file (not to asn_classification.php directly)
-          REVIEW_FILE="asn_classification_candidates.txt"
-          {
-            echo "# Spamhaus ASN-DROP additions — $MONTH"
-            echo "# Review and move appropriate entries into asn_classification.php"
-            echo "# NEVER auto-merged. Human review required."
-            echo ""
-            while IFS= read -r asn; do
-              echo "    '$asn' => 'scanning',  // Spamhaus ASN-DROP — verify and classify"
-            done <<< "$MISSING"
-          } > "$REVIEW_FILE"
-
-          git add -f "$REVIEW_FILE"
-          if git diff --cached --quiet; then
-            echo "Spamhaus diff: candidate file unchanged since last PR — no new action needed."
-            exit 0
-          fi
-          git commit -m "chore: ASN classification candidates from Spamhaus ASN-DROP ($MONTH)"
-          git push origin "$BRANCH"
-
-          PR_BODY_FILE=$(mktemp)
-          printf '%s\n' \
-            '## Spamhaus ASN-DROP diff' \
-            '' \
-            'These ASNs appear in the [Spamhaus ASN-DROP list](https://www.spamhaus.org/drop/asndrop.json)' \
-            'but are not in `asn_classification.php`.' \
-            '' \
-            'Review `asn_classification_candidates.txt` and move confirmed entries into' \
-            '`$known_asns` in `asn_classification.php` with the appropriate category.' \
-            '' \
-            '**Never auto-merge this PR.** Human review required before classification changes ship.' \
-            > "$PR_BODY_FILE"
-
-          gh pr create \
-            --title "ASN classification updates — $MONTH" \
-            --body-file "$PR_BODY_FILE" \
-            --draft \
-            --base develop \
-            --head "$BRANCH"
-
-          rm -f "$PR_BODY_FILE"
 
       - name: Prune community stats older than 52 weeks (prod + staging)
         uses: appleboy/ssh-action@029f5b4aeeeb58fdfe1410a5d17f967dacf36262 # v1.0.3

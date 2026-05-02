@@ -10,6 +10,9 @@ render_page_open('Changelog — ip2geo.org', 'Release notes for ip2geo.org.');
         </div>
 
         <div class="prose">
+            <h3>4.0.1 — 2026-05-02</h3>
+            <p>Discovered the Spamhaus block list wasn't syncing properly on the first of the month. Refactored how that update happens and how Bad Guy ASNs are tracked to keep things up to date.</p>
+
             <h3>4.0.0 — 2026-04-30</h3>
             <p>The whole site got a new look: modern, restrained, brutalist-leaning. &#129304;</p>
             
