@@ -160,6 +160,36 @@ function rank_ips(array $ip_data, int $limit = 25): array {
 }
 
 /**
+ * Build the inline threat-score teaser shown in the lookup CTA box.
+ *
+ * Pure: no DB, no network. Takes the already-enriched top entries plus the
+ * flagged-IP count computed at verdict time.
+ *
+ * IMPORTANT: locked_count comes from $flagged_count (the scanning/proxy IP
+ * count), NOT from the enriched scores. The inline path only enriches the top
+ * 1-2 IPs live, so the rest carry abuse_score = null; counting scores above the
+ * threshold across the (mostly-null) list would read ~0 on a cold cache — the
+ * common first-investigation case. The honest number we already have is the
+ * flagged count.
+ *
+ * @param array $enriched      Top entries; each may have 'ip' (string) and 'abuse_score' (int|null)
+ * @param int   $flagged_count Count of flagged (scanning/proxy) IPs — the locked_count source
+ * @param int   $threshold     Min confidence to reveal a sample score (default 80 = verified-attacker bar)
+ * @return array{samples: array<int,array{ip:string,score:int}>, locked_count:int}
+ */
+function build_teaser(array $enriched, int $flagged_count, int $threshold = 80): array {
+    $samples = [];
+    foreach ($enriched as $e) {
+        $score = $e['abuse_score'] ?? null;
+        if ($score !== null && (int)$score > $threshold) {
+            $samples[] = ['ip' => (string)($e['ip'] ?? ''), 'score' => (int)$score];
+            if (count($samples) >= 2) break; // at most 2 proof scores
+        }
+    }
+    return ['samples' => $samples, 'locked_count' => max(0, $flagged_count)];
+}
+
+/**
  * Generate a rule-based threat narrative paragraph for the paid report.
  *
  * Returns an HTML-safe string suitable for direct echo inside a <p> tag.
