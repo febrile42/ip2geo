@@ -1713,6 +1713,60 @@ button.button.small:hover {
     user-select: all;
 }
 
+/* ---------- 18c. Spamhaus DROP surfaces (free=proof, paid=action) ---------- */
+
+/* Per-IP flag in the Top Threat Sources Category cell. Outlined (not filled) so
+   it reads as a secondary tag next to the filled category pill; the text label
+   "DROP" keeps it legible without relying on color (colorblind-safe). */
+.drop-flag {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.72em;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    color: var(--verdict-high);
+    border: 1px solid color-mix(in srgb, var(--verdict-high) 45%, transparent);
+    border-radius: var(--r-sm);
+    padding: 0.1em 0.4em;
+    line-height: 1.4;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+
+/* Verdict count line under the threat banner (both tiers). Muted prose with the
+   count itself raised in the moderate accent so it carries the eye. */
+.report-drop-count {
+    color: var(--text-muted);
+    font-size: 0.95em;
+}
+.report-drop-count strong {
+    color: var(--verdict-moderate);
+    font-weight: 600;
+}
+
+/* Paid Block-by-Range: the DROP netblock group sits above the ASN ranges. Pink
+   (verdict-high) heading + chips mark it as confirmed criminal infrastructure —
+   a step above the neutral ASN ranges below it. */
+.cidr-group--drop {
+    margin-bottom: 1.5em;
+    padding-bottom: 1.25em;
+    border-bottom: 1px solid var(--border);
+}
+.cidr-group--drop .section-head h3 {
+    color: var(--verdict-high);
+    font-size: 20px;
+}
+.cidr-group--drop .cidr-group-note {
+    font-size: 0.78em;
+    color: var(--text-muted);
+    margin: 0.6em 0 0;
+}
+.cidr-chip--drop {
+    color: var(--verdict-high);
+    border-color: color-mix(in srgb, var(--verdict-high) 38%, transparent);
+    background: color-mix(in srgb, var(--verdict-high) 10%, transparent);
+}
+
 /* Stack ranges/rules columns on tablet and below */
 @media (max-width: 900px) {
     .ranges-rules-grid {
