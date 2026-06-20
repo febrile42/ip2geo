@@ -378,4 +378,11 @@ class ReportFunctionsTest extends TestCase
         $this->assertNull($out[0]['abuse_score']);
         $this->assertNull($out[1]['abuse_score']);
     }
+
+    public function testEnrichEmptyKeyFiveArgsAcceptsLiveFlag(): void
+    {
+        // Mirrors the teaser's cache-only 5-arg call on large submissions.
+        $out = enrich_abuseipdb([['ip' => '1.2.3.4']], null, '', 2, false);
+        $this->assertNull($out[0]['abuse_score']);
+    }
 }

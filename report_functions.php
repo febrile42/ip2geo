@@ -641,10 +641,15 @@ default 0;
 // $timeout is the per-IP curl timeout: 10s on the report path, ~2s on the
 // lookup hot path so a slow AbuseIPDB never stalls the results render.
 //
+// $live=false makes this CACHE-ONLY (no API calls, no quota): used by the inline
+// teaser on large submissions, whose base geo lookup is already slow enough that
+// adding a live call would blow the post-deploy perf budget. Recurring mass
+// scanners still surface from cache at zero latency.
+//
 // Quota: a hard 1000/day cap (abuseipdb_daily_usage) with graceful degrade —
 // over budget returns cached scores where available, null otherwise.
 
-function enrich_abuseipdb(array $ips, $con, string $api_key, int $timeout = 10): array {
+function enrich_abuseipdb(array $ips, $con, string $api_key, int $timeout = 10, bool $live = true): array {
     if ($api_key === '') {
         foreach ($ips as &$entry) $entry['abuse_score'] = null;
         return $ips;
@@ -677,7 +682,7 @@ function enrich_abuseipdb(array $ips, $con, string $api_key, int $timeout = 10):
     $batch_size  = count($need_api);
     $api_results = [];
 
-    if ($batch_size > 0) {
+    if ($live && $batch_size > 0) {
         // Reserve the batch atomically BEFORE any network I/O. A single
         // conditional UPDATE both enforces the 1000/day cap and reserves the
         // slots, so two concurrent lookups can never both pass the cap (closes

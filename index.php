@@ -448,11 +448,17 @@ if ($_POST || $view_token_mode)
 	// render; degrade to the flagged count on timeout/quota. locked_count comes
 	// from $scanning_proxy_count (already computed) — NOT from enrichment, which
 	// only covers the top 1-2. See report_functions.php build_teaser().
+	//
+	// Large submissions already spend the time budget on geo lookups (the 10k
+	// post-deploy perf gate is 6s), so for those we go CACHE-ONLY: no live API
+	// call, zero added latency, but recurring mass scanners still surface from
+	// cache. Smaller lookups (the common fail2ban-paste case) get the live score.
 	$teaser = ['samples' => [], 'locked_count' => $scanning_proxy_count];
 	if ($show_cta && !$view_token_mode && !empty($ip_classified_data)) {
-		$teaser_top = array_slice(rank_ips($ip_classified_data, 25), 0, 2);
-		$teaser_top = enrich_abuseipdb($teaser_top, $con, $abuseipdb_api_key ?? '', 2);
-		$teaser     = build_teaser($teaser_top, $scanning_proxy_count);
+		$teaser_live = (isset($ip_list) ? count($ip_list) : 0) <= 2500;
+		$teaser_top  = array_slice(rank_ips($ip_classified_data, 25), 0, 2);
+		$teaser_top  = enrich_abuseipdb($teaser_top, $con, $abuseipdb_api_key ?? '', 2, $teaser_live);
+		$teaser      = build_teaser($teaser_top, $scanning_proxy_count);
 	}
 
 	arsort($country_counts);
