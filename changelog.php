@@ -10,6 +10,9 @@ render_page_open('Changelog — ip2geo.org', 'Release notes for ip2geo.org.');
         </div>
 
         <div class="prose">
+            <h3>4.3.1 — 2026-06-20</h3>
+            <p>Made note in the <a href="/privacy.php">privacy policy</a> of saving local storage in your local browser, which stays local, we never see it, and is used for local things like theme and recent searches. It's local, everyone, just in case you missed that part. No one is looking at your IP searches.</p>
+
             <h3>4.3.0 — 2026-06-20</h3>
             <p>Threat Reports now flag the attackers squatting in Spamhaus DROP netblocks, and the paid report blocks the whole criminal range. Blocking them one address at a time was a cute idea.</p>
 
