@@ -493,7 +493,7 @@ if ($_POST || $view_token_mode)
 					<?php if (!empty($teaser['samples']) || $teaser['locked_count'] > 0): ?>
 					<p class="threat-cta-scores">
 						<?php if (!empty($teaser['samples'])): ?>
-						<?php foreach ($teaser['samples'] as $s): ?><span class="threat-score"><span class="threat-score-ip"><?php echo htmlspecialchars($s['ip'], ENT_QUOTES, 'UTF-8'); ?></span> <strong><?php echo (int)$s['score']; ?>/100</strong></span><?php endforeach; ?><span class="threat-score-src">AbuseIPDB confidence</span>
+						<span class="threat-score-src">AbuseIPDB confidence</span><?php foreach ($teaser['samples'] as $s): ?><span class="threat-score"><span class="threat-score-ip"><?php echo htmlspecialchars($s['ip'], ENT_QUOTES, 'UTF-8'); ?></span> <strong><?php echo (int)$s['score']; ?>/100</strong></span><?php endforeach; ?>
 						<?php endif; ?>
 						<?php if ($teaser['locked_count'] > 0): ?>
 						<span class="threat-score-locked"><?php echo (int)$teaser['locked_count']; ?> flagged IP<?php echo $teaser['locked_count'] === 1 ? '' : 's'; ?> in this lookup &mdash; full AbuseIPDB scores &amp; whole-network block rules are in the report <span aria-hidden="true">&#128274;</span></span>
