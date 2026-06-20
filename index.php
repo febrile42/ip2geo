@@ -50,13 +50,16 @@ $view_token_val  = $view_token_mode ? preg_replace('/[^a-f0-9\-]/', '', trim($_G
 		<link rel="stylesheet" href="assets/css/ip2geo-print.css" media="print" />
 		<link rel="icon" href="/favicon.ico" />
 		<script>
-		// Apply saved theme before paint to avoid a flash. Dark default.
+		// Apply theme before paint to avoid a flash. An explicit saved choice wins;
+		// otherwise follow the OS setting (prefers-color-scheme). Falls back to the
+		// dark data-theme on <html> only if JS is off.
 		(function() {
 			try {
 				var t = localStorage.getItem('ip2geo-theme');
-				if (t === 'light' || t === 'dark') {
-					document.documentElement.setAttribute('data-theme', t);
+				if (t !== 'light' && t !== 'dark') {
+					t = (window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark';
 				}
+				document.documentElement.setAttribute('data-theme', t);
 			} catch (_) {}
 		})();
 		</script>
