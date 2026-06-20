@@ -622,14 +622,8 @@ function enrich_abuseipdb(array $ips, $con, string $api_key, int $timeout = 10):
 
     $today = date('Y-m-d');
 
-    // Atomic quota check
-    $con->begin_transaction();
-    $usage_row = $con->query(
-        'SELECT calls_made FROM abuseipdb_daily_usage WHERE usage_date = "' . $today . '" FOR UPDATE'
-    )->fetch_assoc();
-    $calls_so_far = $usage_row ? (int)$usage_row['calls_made'] : 0;
-
-    // Separate cached vs uncached IPs
+    // Separate cached vs uncached IPs. Cache hits (queried within 7 days) cost
+    // no quota; only uncached IPs need a live call.
     $need_api = [];
     $ip_list_str = implode('","', array_map(fn($e) => $e['ip'], $ips));
     $cached_rows = [];
@@ -650,65 +644,79 @@ function enrich_abuseipdb(array $ips, $con, string $api_key, int $timeout = 10):
         }
     }
 
-    $batch_size = count($need_api);
-    if ($calls_so_far + $batch_size > 1000) {
-        // Not enough quota — degrade gracefully
-        $con->rollback();
-        foreach ($ips as &$entry) {
-            $entry['abuse_score'] = $cached_rows[$entry['ip']] ?? null;
-        }
-        // Signal to caller that AbuseIPDB was partially unavailable
-        return $ips;
-    }
+    $batch_size  = count($need_api);
+    $api_results = [];
 
-    // Commit the quota reservation (increment after actual calls)
-    $con->query(
-        'INSERT INTO abuseipdb_daily_usage (usage_date, calls_made) VALUES ("' . $today . '", 0)
-         ON DUPLICATE KEY UPDATE calls_made = calls_made'
-    );
-    $con->commit();
+    if ($batch_size > 0) {
+        // Reserve the batch atomically BEFORE any network I/O. A single
+        // conditional UPDATE both enforces the 1000/day cap and reserves the
+        // slots, so two concurrent lookups can never both pass the cap (closes
+        // the prior TOCTOU) and no row lock is held across the curl calls.
+        $con->query(
+            'INSERT INTO abuseipdb_daily_usage (usage_date, calls_made) VALUES ("' . $today . '", 0)
+             ON DUPLICATE KEY UPDATE calls_made = calls_made'
+        );
+        $reserve = $con->prepare(
+            'UPDATE abuseipdb_daily_usage
+                SET calls_made = calls_made + ?
+              WHERE usage_date = ? AND calls_made + ? <= 1000'
+        );
+        $reserve->bind_param('isi', $batch_size, $today, $batch_size);
+        $reserve->execute();
+        $reserved = ($reserve->affected_rows === 1);
+        $reserve->close();
 
-    // Parallel AbuseIPDB calls via curl_multi
-    $actual_calls = 0;
-    $api_results  = [];
-    if (!empty($need_api)) {
-        $multi   = curl_multi_init();
-        $handles = [];
-        foreach ($need_api as $ip) {
-            $ch = curl_init();
-            curl_setopt_array($ch, [
-                CURLOPT_URL            => 'https://api.abuseipdb.com/api/v2/check?ipAddress=' . urlencode($ip) . '&maxAgeInDays=90',
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT        => $timeout,
-                CURLOPT_HTTPHEADER     => ['Key: ' . $api_key, 'Accept: application/json'],
-            ]);
-            curl_multi_add_handle($multi, $ch);
-            $handles[$ip] = $ch;
-        }
-
-        $running = null;
-        do {
-            curl_multi_exec($multi, $running);
-            curl_multi_select($multi);
-        } while ($running > 0);
-
-        foreach ($handles as $ip => $ch) {
-            $body = curl_multi_getcontent($ch);
-            $http = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            curl_multi_remove_handle($multi, $ch);
-            curl_close($ch);
-            if ($http === 200 && $body) {
-                $data = json_decode($body, true);
-                $score = (int)($data['data']['abuseConfidenceScore'] ?? 0);
-                $total_reports = (int)($data['data']['totalReports'] ?? 0);
-                $api_results[$ip] = ['score' => $score, 'total_reports' => $total_reports];
-                $actual_calls++;
+        if (!$reserved) {
+            // Over the daily cap — degrade gracefully (cached where available).
+            foreach ($ips as &$entry) {
+                $entry['abuse_score'] = $cached_rows[$entry['ip']] ?? null;
             }
+            unset($entry);
+            return $ips;
         }
-        curl_multi_close($multi);
 
-        // Cache results + update actual quota used
-        if ($actual_calls > 0) {
+        // We reserved $batch_size slots. Reconcile unused reservations no matter
+        // how we leave the curl block (exception included) so the counter
+        // reflects calls actually made. A hard fatal would leak the small
+        // reservation, which self-heals when usage_date rolls over at UTC midnight.
+        $actual_calls = 0;
+        try {
+            $multi   = curl_multi_init();
+            $handles = [];
+            foreach ($need_api as $ip) {
+                $ch = curl_init();
+                curl_setopt_array($ch, [
+                    CURLOPT_URL            => 'https://api.abuseipdb.com/api/v2/check?ipAddress=' . urlencode($ip) . '&maxAgeInDays=90',
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_TIMEOUT        => $timeout,
+                    CURLOPT_HTTPHEADER     => ['Key: ' . $api_key, 'Accept: application/json'],
+                ]);
+                curl_multi_add_handle($multi, $ch);
+                $handles[$ip] = $ch;
+            }
+
+            $running = null;
+            do {
+                curl_multi_exec($multi, $running);
+                curl_multi_select($multi);
+            } while ($running > 0);
+
+            foreach ($handles as $ip => $ch) {
+                $body = curl_multi_getcontent($ch);
+                $http = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_multi_remove_handle($multi, $ch);
+                curl_close($ch);
+                if ($http === 200 && $body) {
+                    $data = json_decode($body, true);
+                    $score = (int)($data['data']['abuseConfidenceScore'] ?? 0);
+                    $total_reports = (int)($data['data']['totalReports'] ?? 0);
+                    $api_results[$ip] = ['score' => $score, 'total_reports' => $total_reports];
+                    $actual_calls++;
+                }
+            }
+            curl_multi_close($multi);
+
+            // Cache successful results.
             foreach ($api_results as $ip => $result) {
                 $stmt = $con->prepare(
                     'INSERT INTO abuseipdb_cache (ip, confidence_score, total_reports, queried_at)
@@ -722,11 +730,16 @@ function enrich_abuseipdb(array $ips, $con, string $api_key, int $timeout = 10):
                 $stmt->execute();
                 $stmt->close();
             }
-            $con->query(
-                'UPDATE abuseipdb_daily_usage
-                 SET calls_made = calls_made + ' . $actual_calls . '
-                 WHERE usage_date = "' . $today . '"'
-            );
+        } finally {
+            // Return unused reservations (failed/timed-out calls) to the budget.
+            $unused = $batch_size - $actual_calls;
+            if ($unused > 0) {
+                $con->query(
+                    'UPDATE abuseipdb_daily_usage
+                        SET calls_made = calls_made - ' . (int)$unused . '
+                      WHERE usage_date = "' . $today . '"'
+                );
+            }
         }
     }
 
