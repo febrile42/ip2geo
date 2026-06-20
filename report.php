@@ -156,6 +156,13 @@ if ($status === 'free') {
                 $drop_data_free  = compute_drop_report_data($ip_data_free, $top25_free, false);
                 $top25_free      = $drop_data_free['top25'];
                 $drop_count_free = $drop_data_free['drop_count'];
+                // Keep the verdict consistent with the lookup CTA: a DROP hit floors
+                // it at MODERATE, so the header can't read "LOW THREAT" while the
+                // count line says N IPs sit on a criminal list. Same override as
+                // index.php; we only need the verdict_level here.
+                $verdict_free = apply_reputation_override(
+                    $verdict_free, false, $total_free, $drop_count_free, ''
+                )['verdict_level'];
             }
 
             $free_report = [
@@ -362,6 +369,13 @@ if (REPUTATION_AXIS_ENABLED) {
     $top25       = $drop_data['top25'];
     $drop_count  = $drop_data['drop_count'];
     $drop_ranges = $drop_data['drop_ranges'];
+    // Floor the verdict at MODERATE on a DROP hit so the header agrees with the
+    // DROP count line / netblock group below — same override the lookup CTA uses.
+    // Runs after maybe_upgrade_verdict (the override only lifts LOW→MODERATE, so
+    // it never undoes a HIGH upgrade from AbuseIPDB).
+    $verdict = apply_reputation_override(
+        $verdict, false, $total, $drop_count, ''
+    )['verdict_level'];
 }
 
 $report = [
