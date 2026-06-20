@@ -1099,7 +1099,11 @@ button.button.small:hover {
 
 .threat-cta-top {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    /* Left column carries all the prose (verdict, reason, stats, DROP callout,
+       locked count); the right holds three short bullets. A 50/50 split crammed
+       the text and orphaned trailing words ("netblocks", "IPs)"). Give the text
+       ~63% so the long lines fit, and the bullets shift right into the slack. */
+    grid-template-columns: 1.7fr 1fr;
     gap: 2em;
     padding: 1.4em 1.6em;
 }
@@ -1123,6 +1127,14 @@ button.button.small:hover {
     font-size: 0.9em;
     color: var(--text-muted);
     margin: 0;
+}
+/* Keep the last line of each prose block from dropping to a single orphaned
+   word — backstops the column-width fix above on longer copy. */
+.threat-cta-reason,
+.threat-cta-stats,
+.threat-score-drop,
+.threat-score-locked {
+    text-wrap: pretty;
 }
 
 /* Inline threat-score teaser: real proof scores for the top 1-2 attackers,
