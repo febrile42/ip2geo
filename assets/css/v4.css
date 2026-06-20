@@ -1751,7 +1751,9 @@ button.button.small:hover {
     color: var(--text-muted);
     font-size: 0.95em;
 }
-.report-drop-count strong {
+/* Scope under .report-inner so this beats `.report-inner p strong` (0,1,2),
+   which otherwise repaints the count white and kills the intended accent. */
+.report-inner .report-drop-count strong {
     color: var(--verdict-moderate);
     font-weight: 600;
 }
