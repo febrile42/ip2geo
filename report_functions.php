@@ -553,7 +553,9 @@ function render_free_report(array $report, string $token, ?string $expires_at, a
     <section id="report" class="report-section">
         <div class="report-inner">
 
-            <!-- 1. Verdict banner -->
+            <!-- 1. Verdict banner — the Spamhaus DROP count line is folded inside so
+                 the threat read is one block, not a banner with an orphaned line
+                 floating between it and the upgrade CTA. -->
             <div class="threat-cta-box threat-cta-box--<?php echo htmlspecialchars($verdict_lc, ENT_QUOTES, 'UTF-8'); ?>" role="region" aria-label="Threat Assessment">
                 <div class="threat-cta-left">
                     <p class="asn-verdict asn-verdict--<?php echo htmlspecialchars($verdict_lc, ENT_QUOTES, 'UTF-8'); ?>">
@@ -561,15 +563,13 @@ function render_free_report(array $report, string $token, ?string $expires_at, a
                     </p>
                     <p class="threat-cta-stats"><?php echo $scan_pct; ?>% of IPs from scanning or proxy infrastructure
                         (<?php echo $scan_count; ?> of <?php echo $total; ?> IPs)</p>
+                    <?php $drop_count = (int)($report['drop_count'] ?? 0); if ($drop_count > 0): ?>
+                    <p class="report-drop-count">
+                        <strong><?php echo number_format($drop_count); ?></strong> of these IPs sit in Spamhaus DROP netblocks &mdash; ranges confirmed under criminal control.
+                    </p>
+                    <?php endif; ?>
                 </div>
             </div>
-
-            <!-- Spamhaus DROP count line (only when listed IPs are present) -->
-            <?php $drop_count = (int)($report['drop_count'] ?? 0); if ($drop_count > 0): ?>
-            <p class="report-drop-count">
-                <strong><?php echo number_format($drop_count); ?></strong> of these IPs sit in Spamhaus DROP netblocks &mdash; ranges confirmed under criminal control.
-            </p>
-            <?php endif; ?>
 
             <!-- 2. Upgrade CTA -->
             <div class="free-report-upgrade">

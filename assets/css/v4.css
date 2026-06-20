@@ -1755,6 +1755,16 @@ button.button.small:hover {
     color: var(--verdict-moderate);
     font-weight: 600;
 }
+/* Free report folds this line inside the verdict banner: the flex column already
+   supplies the gap, so drop the standalone margin and add a hair of separation,
+   and let the count pick up the box verdict color instead of the fixed amber so
+   it reads as part of the banner (pink on HIGH, amber on MODERATE). */
+.threat-cta-left .report-drop-count {
+    margin: 0.3em 0 0;
+}
+.threat-cta-box--high     .report-drop-count strong { color: var(--verdict-high); }
+.threat-cta-box--moderate .report-drop-count strong { color: var(--verdict-moderate); }
+.threat-cta-box--low      .report-drop-count strong { color: var(--verdict-low); }
 
 /* Paid Block-by-Range: the DROP netblock group sits above the ASN ranges. Pink
    (verdict-high) heading + chips mark it as confirmed criminal infrastructure —
