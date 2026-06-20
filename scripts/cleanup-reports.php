@@ -79,10 +79,12 @@ if ($admin_db_name !== '') {
             "INSERT INTO `{$admin_db_name}`.`report_meta`
                 (token, top_country, unique_countries, computed_at,
                  status, created_at, ip_count, verdict,
-                 acquisition_domain, has_email, converted_to_paid_at)
+                 acquisition_domain, has_email, converted_to_paid_at,
+                 drop_count, reputation_override)
              VALUES (:token, NULL, 0, NOW(),
                  :status, :created_at, :ip_count, :verdict,
-                 :acquisition_domain, :has_email, :converted_to_paid_at)
+                 :acquisition_domain, :has_email, :converted_to_paid_at,
+                 :drop_count, :reputation_override)
              ON DUPLICATE KEY UPDATE
                  status = VALUES(status),
                  created_at = VALUES(created_at),
@@ -91,6 +93,8 @@ if ($admin_db_name !== '') {
                  acquisition_domain = VALUES(acquisition_domain),
                  has_email = VALUES(has_email),
                  converted_to_paid_at = VALUES(converted_to_paid_at),
+                 drop_count = VALUES(drop_count),
+                 reputation_override = VALUES(reputation_override),
                  computed_at = NOW()"
         );
 
@@ -110,6 +114,12 @@ if ($admin_db_name !== '') {
             $conversion_lookup->execute([':submission_hash' => $r['submission_hash']]);
             $converted_at = $conversion_lookup->fetchColumn() ?: null;
 
+            // Spamhaus DROP signal: preserve the per-report IP-in-DROP count and
+            // whether the DROP floor elevated the verdict, so free-tier reputation
+            // metrics survive this deletion. Legacy reports lack the keys → NULL/0.
+            $drop_count    = isset($report['drop_count']) ? (int)$report['drop_count'] : null;
+            $rep_override  = !empty($report['reputation_override']) ? 1 : 0;
+
             $upsert->execute([
                 ':token'                => $r['token'],
                 ':status'               => $r['status'],
@@ -119,6 +129,8 @@ if ($admin_db_name !== '') {
                 ':acquisition_domain'   => $domain,
                 ':has_email'            => !empty($r['notification_email']) ? 1 : 0,
                 ':converted_to_paid_at' => $converted_at,
+                ':drop_count'           => $drop_count,
+                ':reputation_override'  => $rep_override,
             ]);
             $free_materialized++;
         }

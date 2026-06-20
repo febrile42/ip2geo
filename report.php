@@ -152,6 +152,7 @@ if ($status === 'free') {
             // Spamhaus DROP proof for the free tier: per-IP on_drop flag + a count
             // across all submitted IPs. No drop_ranges (free has no block layer).
             $drop_count_free = 0;
+            $reputation_override_free = false;
             if (REPUTATION_AXIS_ENABLED) {
                 $drop_data_free  = compute_drop_report_data($ip_data_free, $top25_free, false);
                 $top25_free      = $drop_data_free['top25'];
@@ -160,9 +161,14 @@ if ($status === 'free') {
                 // it at MODERATE, so the header can't read "LOW THREAT" while the
                 // count line says N IPs sit on a criminal list. Same override as
                 // index.php; we only need the verdict_level here.
+                $pre_override_free = $verdict_free;
                 $verdict_free = apply_reputation_override(
                     $verdict_free, false, $total_free, $drop_count_free, ''
                 )['verdict_level'];
+                // Record whether the DROP floor actually elevated the verdict
+                // (LOW→MODERATE) so the admin can count elevations exactly; the
+                // pre-override verdict isn't otherwise persisted anywhere.
+                $reputation_override_free = ($pre_override_free === 'LOW' && $verdict_free === 'MODERATE');
             }
 
             $free_report = [
@@ -176,6 +182,7 @@ if ($status === 'free') {
                 'block_ips'      => [],
                 'asn_ranges'     => [],
                 'drop_count'     => $drop_count_free,
+                'reputation_override' => $reputation_override_free,
                 'generated_at'   => date('Y-m-d H:i:s'),
                 'abuseipdb_note' => null,
             ];
@@ -364,6 +371,7 @@ $asn_ranges = fetch_asn_ranges($con, $top25);
 // submitted IPs, and the unique covering CIDRs to surface + add to block scripts.
 $drop_count  = 0;
 $drop_ranges = [];
+$reputation_override = false;
 if (REPUTATION_AXIS_ENABLED) {
     $drop_data   = compute_drop_report_data($ip_data, $top25, true);
     $top25       = $drop_data['top25'];
@@ -373,9 +381,13 @@ if (REPUTATION_AXIS_ENABLED) {
     // DROP count line / netblock group below — same override the lookup CTA uses.
     // Runs after maybe_upgrade_verdict (the override only lifts LOW→MODERATE, so
     // it never undoes a HIGH upgrade from AbuseIPDB).
+    $pre_override = $verdict;
     $verdict = apply_reputation_override(
         $verdict, false, $total, $drop_count, ''
     )['verdict_level'];
+    // Record whether the DROP floor actually elevated the verdict (LOW→MODERATE)
+    // so the admin can count elevations exactly; persisted into report_json.
+    $reputation_override = ($pre_override === 'LOW' && $verdict === 'MODERATE');
 }
 
 $report = [
@@ -390,6 +402,7 @@ $report = [
     'asn_ranges'      => $asn_ranges,
     'drop_count'      => $drop_count,
     'drop_ranges'     => $drop_ranges,
+    'reputation_override' => $reputation_override,
     'generated_at'    => date('Y-m-d H:i:s'),
     'abuseipdb_note'  => null,
 ];
