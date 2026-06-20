@@ -788,14 +788,46 @@ function get_script_lines(string $format, array $report, string $token): array
 
     $ips   = !empty($report['block_ips']) ? $report['block_ips'] : array_column($report['top25'] ?? [], 'ip');
     // Spamhaus DROP netblocks lead the range scripts: they are confirmed
-    // criminal-controlled space, the highest-confidence block we can offer.
-    // (IP-only formats below never touch $cidrs, so they are unaffected.)
-    $cidrs = $report['drop_ranges'] ?? [];
+    // criminal-controlled space, the highest-confidence block we can offer, then
+    // the scanning/VPN ASN ranges. Keep the two groups separate so the header
+    // counts them honestly and the body can label each section. (IP-only formats
+    // below never touch these, so they are unaffected.)
+    $drop_ranges = $report['drop_ranges'] ?? [];
+    $asn_cidrs   = [];
     foreach ($report['asn_ranges'] ?? [] as $group) {
         foreach ($group['cidrs'] as $cidr) {
-            $cidrs[] = $cidr;
+            $asn_cidrs[] = $cidr;
         }
     }
+    $cidrs    = array_merge($drop_ranges, $asn_cidrs);
+    $drop_n   = count($drop_ranges);
+    $asn_n    = count($asn_cidrs);
+    $has_both = $drop_n > 0 && $asn_n > 0;
+
+    // Honest one-line summary: name the DROP criminal netblocks apart from the
+    // ASN ranges instead of lumping all CIDRs under "scanning/VPN ASN prefixes".
+    if ($has_both) {
+        $range_summary = 'Block ' . count($cidrs) . ' CIDR ranges — ' . $drop_n
+            . ' Spamhaus DROP criminal netblock' . ($drop_n === 1 ? '' : 's')
+            . ' + ' . $asn_n . ' scanning/VPN ASN range' . ($asn_n === 1 ? '' : 's');
+    } elseif ($drop_n > 0) {
+        $range_summary = 'Block ' . $drop_n . ' Spamhaus DROP criminal netblock' . ($drop_n === 1 ? '' : 's');
+    } else {
+        $range_summary = 'Block ' . $asn_n . ' CIDR range' . ($asn_n === 1 ? '' : 's')
+            . ' covering scanning/VPN ASN prefixes';
+    }
+
+    // Build the range body with a labeled DROP section then ASN section. Only
+    // label when both are present — a single-group script needs no divider.
+    // $fmt maps one CIDR to one rule line for the target format.
+    $render_ranges = function (callable $fmt) use ($drop_ranges, $asn_cidrs, $has_both): string {
+        $lines = [];
+        if ($has_both) $lines[] = '# Spamhaus DROP — confirmed criminal / hijacked netblocks';
+        foreach ($drop_ranges as $c) $lines[] = $fmt($c);
+        if ($has_both) { $lines[] = ''; $lines[] = '# Scanning / VPN ASN ranges'; }
+        foreach ($asn_cidrs as $c) $lines[] = $fmt($c);
+        return implode("\n", $lines) . "\n";
+    };
 
     if ($format === 'sh-iptables') {
         $preamble = '#!/bin/bash
@@ -819,24 +851,24 @@ set -euo pipefail
         $body = $preamble . implode("\n", array_map(fn($ip) => 'ufw deny from ' . $ip . ' to any', $ips)) . "\n";
     } elseif ($format === 'sh-iptables-ranges') {
         $preamble = '#!/bin/bash
-# ip2geo threat report — iptables block rules (ASN ranges)
+# ip2geo threat report — iptables block rules (CIDR ranges)
 # Generated: ' . date('Y-m-d') . '
 # Token: ' . $token . '
-# Block ' . count($cidrs) . ' CIDR ranges covering scanning/VPN ASN prefixes
+# ' . $range_summary . '
 
 set -euo pipefail
 ';
-        $body = $preamble . implode("\n", array_map(fn($cidr) => 'iptables -A INPUT -s ' . $cidr . ' -j DROP', $cidrs)) . "\n";
+        $body = $preamble . $render_ranges(fn($cidr) => 'iptables -A INPUT -s ' . $cidr . ' -j DROP');
     } elseif ($format === 'sh-ufw-ranges') {
         $preamble = '#!/bin/bash
-# ip2geo threat report — ufw block rules (ASN ranges)
+# ip2geo threat report — ufw block rules (CIDR ranges)
 # Generated: ' . date('Y-m-d') . '
 # Token: ' . $token . '
-# Block ' . count($cidrs) . ' CIDR ranges covering scanning/VPN ASN prefixes
+# ' . $range_summary . '
 
 set -euo pipefail
 ';
-        $body = $preamble . implode("\n", array_map(fn($cidr) => 'ufw deny from ' . $cidr . ' to any', $cidrs)) . "\n";
+        $body = $preamble . $render_ranges(fn($cidr) => 'ufw deny from ' . $cidr . ' to any');
     } elseif ($format === 'nginx-ips') {
         $preamble = '# ip2geo threat report — nginx geo block (individual IPs)
 # Generated: ' . date('Y-m-d') . '
@@ -848,23 +880,23 @@ default 0;
 ';
         $body = $preamble . implode("\n", array_map(fn($ip) => $ip . ' 1;', $ips)) . "\n";
     } elseif ($format === 'nginx-ranges') {
-        $preamble = '# ip2geo threat report — nginx geo block (ASN ranges)
+        $preamble = '# ip2geo threat report — nginx geo block (CIDR ranges)
 # Generated: ' . date('Y-m-d') . '
 # Token: ' . $token . '
-# Block ' . count($cidrs) . ' CIDR ranges covering scanning/VPN ASN prefixes
+# ' . $range_summary . '
 # Usage: include this file inside a geo $blocked_ip { } block in nginx.conf
 
 default 0;
 ';
-        $body = $preamble . implode("\n", array_map(fn($cidr) => $cidr . ' 1;', $cidrs)) . "\n";
+        $body = $preamble . $render_ranges(fn($cidr) => $cidr . ' 1;');
     } else { // txt-ranges
         $preamble = '# ip2geo threat report — CIDR ranges (plain list)
 # Generated: ' . date('Y-m-d') . '
 # Token: ' . $token . '
-# ' . count($cidrs) . ' CIDR ranges covering scanning/VPN ASN prefixes
+# ' . $range_summary . '
 # One range per line — paste into ipset, web firewall, or any blocklist tool
 ';
-        $body = $preamble . implode("\n", $cidrs) . "\n";
+        $body = $preamble . $render_ranges(fn($cidr) => $cidr);
     }
 
     return explode("\n", rtrim($body));

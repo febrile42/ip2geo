@@ -184,6 +184,43 @@ class SpamhausDropReportTest extends TestCase
         );
     }
 
+    public function testRangeScriptsLabelDropAndAsnSections(): void
+    {
+        $report = $this->reportWithDrop();   // 2 DROP netblocks + 1 ASN range
+        $sh = implode("\n", get_script_lines('sh-iptables-ranges', $report, 'tok'));
+
+        // Honest header names the DROP netblocks apart from the ASN ranges.
+        $this->assertStringContainsString('2 Spamhaus DROP criminal netblocks', $sh);
+        $this->assertStringContainsString('1 scanning/VPN ASN range', $sh);
+        $this->assertStringNotContainsString('covering scanning/VPN ASN prefixes', $sh);
+
+        // Body carries a labeled section per group, DROP leading.
+        $this->assertStringContainsString('# Spamhaus DROP', $sh);
+        $this->assertStringContainsString('# Scanning / VPN ASN ranges', $sh);
+        $this->assertLessThan(
+            strpos($sh, '# Scanning / VPN ASN ranges'),
+            strpos($sh, '# Spamhaus DROP'),
+            'DROP section must lead the ASN section'
+        );
+    }
+
+    public function testRangeScriptsOmitSectionLabelsWhenNoDrop(): void
+    {
+        $report = [
+            'block_ips'   => ['1.2.3.4'],
+            'top25'       => [['ip' => '1.2.3.4']],
+            'asn_ranges'  => [['cidrs' => ['10.0.0.0/8'], 'total' => 1]],
+            'drop_ranges' => [],
+        ];
+        $sh = implode("\n", get_script_lines('sh-iptables-ranges', $report, 'tok'));
+
+        // No DROP data → ASN-only header, no DROP wording, no section dividers.
+        $this->assertStringContainsString('covering scanning/VPN ASN prefixes', $sh);
+        $this->assertStringNotContainsString('Spamhaus DROP', $sh);
+        $this->assertStringNotContainsString('# Scanning / VPN ASN ranges', $sh);
+        $this->assertStringContainsString('10.0.0.0/8', $sh);
+    }
+
     public function testIpFormatsDoNotIncludeDropRanges(): void
     {
         $report = $this->reportWithDrop();
