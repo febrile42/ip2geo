@@ -1125,6 +1125,28 @@ button.button.small:hover {
     margin: 0;
 }
 
+/* Inline threat-score teaser: real proof scores for the top 1-2 attackers,
+   then the flagged-IP count whose full scores live behind the $9 report. */
+.threat-cta-scores {
+    margin: 0.35em 0 0;
+    font-size: 0.9em;
+    line-height: 1.5;
+}
+.threat-score {
+    font-family: var(--font-mono);
+    margin-right: 0.9em;
+    white-space: nowrap;
+}
+.threat-score-ip { color: var(--text-muted); }
+.threat-score strong { color: var(--verdict-high); font-weight: 600; }
+.threat-cta-box--moderate .threat-score strong { color: var(--verdict-moderate); }
+.threat-score-src { color: var(--text-muted); font-size: 0.85em; }
+.threat-score-locked {
+    display: block;
+    margin-top: 0.4em;
+    color: var(--text-muted);
+}
+
 .threat-cta-right {
     display: flex;
     flex-direction: column;

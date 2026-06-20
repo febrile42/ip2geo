@@ -2,6 +2,7 @@
 
 require __DIR__ . '/config.php';
 require __DIR__ . '/asn_classification.php';
+require __DIR__ . '/report_functions.php'; // rank_ips(), enrich_abuseipdb(), build_teaser() for the inline threat-score teaser
 @include_once __DIR__ . '/db_version.php'; // gitignored; written by the monthly DB update script
 
 function getRealIPAddr()
@@ -441,6 +442,19 @@ if ($_POST || $view_token_mode)
 		$verdict_reason = '';
 	}
 
+	// --- Inline threat-score teaser (proof scores for the top 1-2 attackers) ---
+	// Only when the CTA shows (MODERATE/HIGH). Enrich at most the top 2 ranked
+	// IPs with a tight 2s timeout so a slow AbuseIPDB never stalls the results
+	// render; degrade to the flagged count on timeout/quota. locked_count comes
+	// from $scanning_proxy_count (already computed) — NOT from enrichment, which
+	// only covers the top 1-2. See report_functions.php build_teaser().
+	$teaser = ['samples' => [], 'locked_count' => $scanning_proxy_count];
+	if ($show_cta && !$view_token_mode && !empty($ip_classified_data)) {
+		$teaser_top = array_slice(rank_ips($ip_classified_data, 25), 0, 2);
+		$teaser_top = enrich_abuseipdb($teaser_top, $con, $abuseipdb_api_key ?? '', 2);
+		$teaser     = build_teaser($teaser_top, $scanning_proxy_count);
+	}
+
 	arsort($country_counts);
 
 	// --- Output results section ---
@@ -470,6 +484,16 @@ if ($_POST || $view_token_mode)
 					<?php endif; ?>
 					<p class="threat-cta-stats"><?php echo round($non_residential_pct * 100); ?>% of IPs from cloud, scanning, or proxy infrastructure
 						(<?php echo $non_residential_count; ?> of <?php echo $matches_total; ?> IPs)</p>
+					<?php if (!empty($teaser['samples']) || $teaser['locked_count'] > 0): ?>
+					<p class="threat-cta-scores">
+						<?php if (!empty($teaser['samples'])): ?>
+						<?php foreach ($teaser['samples'] as $s): ?><span class="threat-score"><span class="threat-score-ip"><?php echo htmlspecialchars($s['ip'], ENT_QUOTES, 'UTF-8'); ?></span> <strong><?php echo (int)$s['score']; ?>/100</strong></span><?php endforeach; ?><span class="threat-score-src">AbuseIPDB confidence</span>
+						<?php endif; ?>
+						<?php if ($teaser['locked_count'] > 0): ?>
+						<span class="threat-score-locked"><?php echo (int)$teaser['locked_count']; ?> flagged IP<?php echo $teaser['locked_count'] === 1 ? '' : 's'; ?> in this lookup &mdash; full AbuseIPDB scores &amp; whole-network block rules are in the report <span aria-hidden="true">&#128274;</span></span>
+						<?php endif; ?>
+					</p>
+					<?php endif; ?>
 				</div>
 				<div class="threat-cta-right">
 					<?php if (($_GET['error'] ?? '') === 'rate_limit'): ?>
@@ -484,7 +508,7 @@ if ($_POST || $view_token_mode)
 			</div>
 			<div class="threat-cta-bottom">
 				<p class="threat-cta-fine">No account. No payment. 5 seconds.<br>
-					$9 unlocks full threat scores + permalink.</p>
+					$9 unlocks AbuseIPDB scores for every flagged IP + ASN range block rules + a permanent link.</p>
 				<button type="submit" id="cta-button" class="button">Get Free Threat Report</button>
 			</div>
 		</form>
