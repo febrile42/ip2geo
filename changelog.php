@@ -10,6 +10,9 @@ render_page_open('Changelog — ip2geo.org', 'Release notes for ip2geo.org.');
         </div>
 
         <div class="prose">
+            <h3>4.1.0 — 2026-06-20</h3>
+            <p>Your worst IPs now flash a sample of their AbuseIPDB confidence scores right on the results page. Turns out burying the good stuff where nobody looks wasn't much of a sales pitch.</p>
+
             <h3>4.0.2 — 2026-05-02</h3>
             <p>Tightened the monthly Bad Guy ASN refresh so it lands in production automatically each month, no manual nudge required. Same data, less waiting.</p>
 
