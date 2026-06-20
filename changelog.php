@@ -10,6 +10,9 @@ render_page_open('Changelog — ip2geo.org', 'Release notes for ip2geo.org.');
         </div>
 
         <div class="prose">
+            <h3>4.3.0 — 2026-06-20</h3>
+            <p>Threat Reports now flag the attackers squatting in Spamhaus DROP netblocks, and the paid report blocks the whole criminal range. Blocking them one address at a time was a cute idea.</p>
+
             <h3>4.2.0 — 2026-06-20</h3>
             <p>Plenty of the IPs attacking you live on ordinary home networks, where the verdict used to give them a pass. Now they're checked against the Spamhaus DROP list of criminal-run netblocks &mdash; a residential address is no longer an alibi.</p>
 
