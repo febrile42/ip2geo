@@ -11,7 +11,7 @@ render_page_open('Changelog — ip2geo.org', 'Release notes for ip2geo.org.');
 
         <div class="prose">
             <h3>4.2.0 — 2026-06-20</h3>
-            <p>A lot of the IPs hammering your server live on ordinary home and mobile networks, which the threat verdict used to wave through &mdash; the network looked residential, so it shrugged. Now every IP in your lookup is checked against the <a href="https://www.spamhaus.org/drop/" target="_blank" rel="noopener">Spamhaus DROP</a> list (netblocks handed over to criminals and hijackers), so real attackers count toward the verdict even when their ASN looks innocent. The flagged ones get called out right on the results page, no extra cost.</p>
+            <p>Plenty of the IPs attacking you live on ordinary home networks, where the verdict used to give them a pass. Now they're checked against the Spamhaus DROP list of criminal-run netblocks &mdash; a residential address is no longer an alibi.</p>
 
             <h3>4.1.0 — 2026-06-20</h3>
             <p>Your worst IPs now flash a sample of their AbuseIPDB confidence scores right on the results page. Turns out burying the good stuff where nobody looks wasn't much of a sales pitch.</p>
