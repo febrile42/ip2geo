@@ -1099,7 +1099,11 @@ button.button.small:hover {
 
 .threat-cta-top {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    /* Left column carries all the prose (verdict, reason, stats, DROP callout,
+       locked count); the right holds three short bullets. A 50/50 split crammed
+       the text and orphaned trailing words ("netblocks", "IPs)"). Give the text
+       ~63% so the long lines fit, and the bullets shift right into the slack. */
+    grid-template-columns: 1.7fr 1fr;
     gap: 2em;
     padding: 1.4em 1.6em;
 }
@@ -1123,6 +1127,14 @@ button.button.small:hover {
     font-size: 0.9em;
     color: var(--text-muted);
     margin: 0;
+}
+/* Keep the last line of each prose block from dropping to a single orphaned
+   word — backstops the column-width fix above on longer copy. */
+.threat-cta-reason,
+.threat-cta-stats,
+.threat-score-drop,
+.threat-score-locked {
+    text-wrap: pretty;
 }
 
 /* Inline threat-score teaser: real proof scores for the top 1-2 attackers,
@@ -1155,15 +1167,24 @@ button.button.small:hover {
     margin-top: 0.4em;
     color: var(--text-muted);
 }
-/* Free, zero-quota proof line: count of IPs on the Spamhaus DROP list. The count
-   takes the box's verdict color to read as hard evidence; the rest stays muted to
-   match .threat-score-locked and honor the restrained-color rule in DESIGN.md. */
+/* Free, zero-quota proof line, raised to a contained callout: the box's own
+   left-border + faint verdict tint makes the criminal-netblock count the visual
+   anchor without a loud pill (DESIGN.md restraint). Default = high/pink; the
+   moderate variant overrides to amber to match the box verdict color. */
 .threat-score-drop {
     display: block;
-    margin-top: 0.4em;
-    color: var(--text-muted);
+    margin-top: 0.6em;
+    padding: 0.5em 0.7em;
+    border-left: 3px solid var(--verdict-high);
+    background: rgba(224, 108, 159, 0.12);
+    border-radius: 0 4px 4px 0;
+    color: var(--text);
 }
-.threat-score-drop strong { color: var(--verdict-high); font-weight: 600; }
+.threat-score-drop strong { color: var(--verdict-high); font-weight: 600; font-size: 1.12em; }
+.threat-cta-box--moderate .threat-score-drop {
+    border-left-color: var(--verdict-moderate);
+    background: rgba(224, 168, 90, 0.12);
+}
 .threat-cta-box--moderate .threat-score-drop strong { color: var(--verdict-moderate); }
 
 .threat-cta-right {
@@ -1702,6 +1723,72 @@ button.button.small:hover {
     white-space: nowrap;
     line-height: 1.4;
     user-select: all;
+}
+
+/* ---------- 18c. Spamhaus DROP surfaces (free=proof, paid=action) ---------- */
+
+/* Per-IP flag in the Top Threat Sources Category cell. Outlined (not filled) so
+   it reads as a secondary tag next to the filled category pill; the text label
+   "DROP" keeps it legible without relying on color (colorblind-safe). */
+.drop-flag {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.72em;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    color: var(--verdict-high);
+    border: 1px solid color-mix(in srgb, var(--verdict-high) 45%, transparent);
+    border-radius: var(--r-sm);
+    padding: 0.1em 0.4em;
+    line-height: 1.4;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+
+/* Verdict count line under the threat banner (both tiers). Muted prose with the
+   count itself raised in the moderate accent so it carries the eye. */
+.report-drop-count {
+    color: var(--text-muted);
+    font-size: 0.95em;
+}
+/* Scope under .report-inner so this beats `.report-inner p strong` (0,1,2),
+   which otherwise repaints the count white and kills the intended accent. */
+.report-inner .report-drop-count strong {
+    color: var(--verdict-moderate);
+    font-weight: 600;
+}
+/* Free report folds this line inside the verdict banner: the flex column already
+   supplies the gap, so drop the standalone margin and add a hair of separation,
+   and let the count pick up the box verdict color instead of the fixed amber so
+   it reads as part of the banner (pink on HIGH, amber on MODERATE). */
+.threat-cta-left .report-drop-count {
+    margin: 0.3em 0 0;
+}
+.threat-cta-box--high     .report-drop-count strong { color: var(--verdict-high); }
+.threat-cta-box--moderate .report-drop-count strong { color: var(--verdict-moderate); }
+.threat-cta-box--low      .report-drop-count strong { color: var(--verdict-low); }
+
+/* Paid Block-by-Range: the DROP netblock group sits above the ASN ranges. Pink
+   (verdict-high) heading + chips mark it as confirmed criminal infrastructure —
+   a step above the neutral ASN ranges below it. */
+.cidr-group--drop {
+    margin-bottom: 1.5em;
+    padding-bottom: 1.25em;
+    border-bottom: 1px solid var(--border);
+}
+.cidr-group--drop .section-head h3 {
+    color: var(--verdict-high);
+    font-size: 20px;
+}
+.cidr-group--drop .cidr-group-note {
+    font-size: 0.78em;
+    color: var(--text-muted);
+    margin: 0.6em 0 0;
+}
+.cidr-chip--drop {
+    color: var(--verdict-high);
+    border-color: color-mix(in srgb, var(--verdict-high) 38%, transparent);
+    background: color-mix(in srgb, var(--verdict-high) 10%, transparent);
 }
 
 /* Stack ranges/rules columns on tablet and below */

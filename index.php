@@ -5,10 +5,9 @@ require __DIR__ . '/asn_classification.php';
 require __DIR__ . '/report_functions.php'; // rank_ips(), enrich_abuseipdb(), build_teaser() for the inline threat-score teaser
 @include_once __DIR__ . '/db_version.php'; // gitignored; written by the monthly DB update script
 
-// Kill switch for the Spamhaus DROP reputation axis (the residential-attacker CTA
-// override). Flip to false to disable the reputation logic instantly without a
-// code change to the hot loop — handy if the override ever misfires in prod.
-const REPUTATION_AXIS_ENABLED = true;
+// REPUTATION_AXIS_ENABLED (the Spamhaus DROP kill switch) is defined in
+// report_functions.php — required above — so both this lookup page and report.php
+// share one gate. Flip it there to disable the reputation logic instantly.
 
 function getRealIPAddr()
 {

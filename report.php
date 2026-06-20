@@ -149,6 +149,22 @@ if ($status === 'free') {
             arsort($country_counts_free);
             $top_countries_free = array_slice($country_counts_free, 0, 5, true);
 
+            // Spamhaus DROP proof for the free tier: per-IP on_drop flag + a count
+            // across all submitted IPs. No drop_ranges (free has no block layer).
+            $drop_count_free = 0;
+            if (REPUTATION_AXIS_ENABLED) {
+                $drop_data_free  = compute_drop_report_data($ip_data_free, $top25_free, false);
+                $top25_free      = $drop_data_free['top25'];
+                $drop_count_free = $drop_data_free['drop_count'];
+                // Keep the verdict consistent with the lookup CTA: a DROP hit floors
+                // it at MODERATE, so the header can't read "LOW THREAT" while the
+                // count line says N IPs sit on a criminal list. Same override as
+                // index.php; we only need the verdict_level here.
+                $verdict_free = apply_reputation_override(
+                    $verdict_free, false, $total_free, $drop_count_free, ''
+                )['verdict_level'];
+            }
+
             $free_report = [
                 'verdict'        => $verdict_free,
                 'total_ips'      => $total_free,
@@ -159,6 +175,7 @@ if ($status === 'free') {
                 'top25'          => $top25_free,
                 'block_ips'      => [],
                 'asn_ranges'     => [],
+                'drop_count'     => $drop_count_free,
                 'generated_at'   => date('Y-m-d H:i:s'),
                 'abuseipdb_note' => null,
             ];
@@ -343,6 +360,24 @@ $top_countries = array_slice($country_counts, 0, 5, true);
 // ASN ranges for scanning/VPN ASNs (DB must still be open here)
 $asn_ranges = fetch_asn_ranges($con, $top25);
 
+// Spamhaus DROP action for the paid tier: per-IP on_drop flag, a count across all
+// submitted IPs, and the unique covering CIDRs to surface + add to block scripts.
+$drop_count  = 0;
+$drop_ranges = [];
+if (REPUTATION_AXIS_ENABLED) {
+    $drop_data   = compute_drop_report_data($ip_data, $top25, true);
+    $top25       = $drop_data['top25'];
+    $drop_count  = $drop_data['drop_count'];
+    $drop_ranges = $drop_data['drop_ranges'];
+    // Floor the verdict at MODERATE on a DROP hit so the header agrees with the
+    // DROP count line / netblock group below — same override the lookup CTA uses.
+    // Runs after maybe_upgrade_verdict (the override only lifts LOW→MODERATE, so
+    // it never undoes a HIGH upgrade from AbuseIPDB).
+    $verdict = apply_reputation_override(
+        $verdict, false, $total, $drop_count, ''
+    )['verdict_level'];
+}
+
 $report = [
     'verdict'         => $verdict,
     'total_ips'       => $total,
@@ -353,6 +388,8 @@ $report = [
     'top25'           => $top25,
     'block_ips'       => $block_ips,
     'asn_ranges'      => $asn_ranges,
+    'drop_count'      => $drop_count,
+    'drop_ranges'     => $drop_ranges,
     'generated_at'    => date('Y-m-d H:i:s'),
     'abuseipdb_note'  => null,
 ];
@@ -450,7 +487,7 @@ function include_block_rules_tabs(string $token, bool $has_ranges, array $report
     ?>
             <div class="block-rules-tabs">
                 <div class="block-rules-tablist" role="tablist" aria-label="Block by IP or by range">
-                    <div class="block-rules-tab<?php echo $has_ranges ? ' active' : ''; ?>" id="tab-by-range" role="tab" tabindex="<?php echo $has_ranges ? '0' : '-1'; ?>" aria-selected="<?php echo $has_ranges ? 'true' : 'false'; ?>" aria-controls="panel-by-range"<?php echo $has_ranges ? '' : ' aria-disabled="true" title="No ASN ranges available for this report"'; ?>>Block by Range</div>
+                    <div class="block-rules-tab<?php echo $has_ranges ? ' active' : ''; ?>" id="tab-by-range" role="tab" tabindex="<?php echo $has_ranges ? '0' : '-1'; ?>" aria-selected="<?php echo $has_ranges ? 'true' : 'false'; ?>" aria-controls="panel-by-range"<?php echo $has_ranges ? '' : ' aria-disabled="true" title="No block ranges available for this report"'; ?>>Block by Range</div>
                     <div class="block-rules-tab<?php echo $has_ranges ? '' : ' active'; ?>" id="tab-by-ip" role="tab" tabindex="0" aria-selected="<?php echo $has_ranges ? 'false' : 'true'; ?>" aria-controls="panel-by-ip">Block by IP</div>
                 </div>
                 <div id="panel-by-range" class="block-rules-panel" role="tabpanel" aria-labelledby="tab-by-range"<?php echo $has_ranges ? '' : ' hidden'; ?>>
@@ -458,7 +495,7 @@ function include_block_rules_tabs(string $token, bool $has_ranges, array $report
                     <?php if ($has_ranges):
                         foreach (['sh-iptables-ranges', 'sh-ufw-ranges', 'nginx-ranges', 'txt-ranges'] as $fmt) $render($fmt);
                     else: ?>
-                    <p class="report-no-ranges">No ASN ranges available for this report.</p>
+                    <p class="report-no-ranges">No block ranges available for this report.</p>
                     <?php endif; ?>
                 </div>
                 <div id="panel-by-ip" class="block-rules-panel" role="tabpanel" aria-labelledby="tab-by-ip"<?php echo $has_ranges ? ' hidden' : ''; ?>>
@@ -677,9 +714,33 @@ function render_report(array $report, string $token, ?string $expires_at, array 
 
             <?php
             // Pre-compute values needed for stat strip (also used below)
-            $has_ranges = !empty($report['asn_ranges']);
-            $asn_count  = count($report['asn_ranges'] ?? []);
-            $abuse_data = compute_abuseipdb_callout($top25);
+            $has_ranges  = !empty($report['asn_ranges']);
+            $asn_count   = count($report['asn_ranges'] ?? []);
+            $abuse_data  = compute_abuseipdb_callout($top25);
+            $drop_ranges = $report['drop_ranges'] ?? [];
+            $has_drop    = !empty($drop_ranges);
+            // "Are there any CIDR ranges to block?" — DROP netblocks count too, so
+            // the Block-by-Range tab + range scripts surface even with no ASN ranges.
+            $has_cidr_ranges = $has_ranges || $has_drop;
+
+            // The Spamhaus DROP netblock group, rendered above the ASN ranges in
+            // whichever layout branch is active. Confirmed criminal-controlled
+            // space — the highest-confidence block, so it leads the ranges column.
+            $render_drop_group = static function () use ($drop_ranges) {
+                ?>
+                <div class="cidr-group--drop">
+                    <div class="section-head">
+                        <h3>Spamhaus DROP netblocks &mdash; confirmed criminal infrastructure</h3>
+                    </div>
+                    <div class="cidr-chips">
+                        <?php foreach ($drop_ranges as $cidr): ?>
+                        <span class="cidr-chip cidr-chip--drop"><?php echo htmlspecialchars($cidr, ENT_QUOTES, 'UTF-8'); ?></span>
+                        <?php endforeach; ?>
+                    </div>
+                    <p class="cidr-group-note">Whole criminal-controlled ranges, included in your block scripts below.</p>
+                </div>
+                <?php
+            };
             ?>
 
             <!-- Row 1: Title + stats -->
@@ -726,6 +787,13 @@ function render_report(array $report, string $token, ?string $expires_at, array 
             <p><?php echo $narrative; ?></p>
             <?php else: ?>
             <p><?php echo htmlspecialchars($verdict_text, ENT_QUOTES, 'UTF-8'); ?></p>
+            <?php endif; ?>
+
+            <!-- Spamhaus DROP count line (only when listed IPs are present) -->
+            <?php $drop_count = (int)($report['drop_count'] ?? 0); if ($drop_count > 0): ?>
+            <p class="report-drop-count">
+                <strong><?php echo number_format($drop_count); ?></strong> of these IPs sit in Spamhaus DROP netblocks &mdash; ranges confirmed under criminal control.
+            </p>
             <?php endif; ?>
 
             <!-- AbuseIPDB callout -->
@@ -839,6 +907,7 @@ function render_report(array $report, string $token, ?string $expires_at, array 
             <?php if ($use_columns): ?>
             <div class="ranges-rules-grid">
                 <div class="ranges-col">
+                    <?php if ($has_drop) $render_drop_group(); ?>
                     <div class="section-head">
                         <h3>ASN Ranges to Block</h3>
                         <span class="section-tag">01 / RANGES</span>
@@ -869,8 +938,10 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                 </div>
                 <div class="rules-col">
             <?php else: ?>
-            <?php if ($has_ranges): ?>
+            <?php if ($has_ranges || $has_drop): ?>
             <div class="ranges-stack">
+                <?php if ($has_drop) $render_drop_group(); ?>
+                <?php if ($has_ranges): ?>
                 <div class="section-head">
                     <h3>ASN Ranges to Block</h3>
                     <span class="section-tag">01 / RANGES</span>
@@ -898,6 +969,7 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                     </div>
                 </div>
                 <?php endforeach; ?>
+                <?php endif; /* has_ranges */ ?>
             </div>
             <?php endif; ?>
             <div class="block-rules-fullwidth">
@@ -911,7 +983,7 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                     </p>
                     <div class="block-rules-grid">
                     <div class="block-rules-grid-main">
-                    <?php include_block_rules_tabs($token, $has_ranges, $report); ?>
+                    <?php include_block_rules_tabs($token, $has_cidr_ranges, $report); ?>
                     </div>
                     <aside class="block-rules-grid-rail">
                     <div class="hosting-callout">
@@ -925,7 +997,7 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                         </ul>
                         <p class="hosting-note">
                             <strong>What to paste:</strong>
-                            <?php if ($has_ranges): ?>
+                            <?php if ($has_cidr_ranges): ?>
                             <span id="hosting-paste-ranges">Expand <strong>cidr-ranges.txt</strong> above and copy the list &mdash; one range per line, works with all panels above. If your panel only accepts single IPs, copy them from the Top Threat Sources table instead.</span>
                             <span id="hosting-paste-ips" hidden>Copy the IPs you want to block from the Top Threat Sources table below and paste them one per line into your panel.</span>
                             <?php else: ?>
@@ -1264,7 +1336,7 @@ function render_report(array $report, string $token, ?string $expires_at, array 
                     <tr<?php echo $row_class; ?> data-category="<?php echo htmlspecialchars($cat, ENT_QUOTES, 'UTF-8'); ?>" data-country="<?php echo htmlspecialchars($entry['country'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
                         <td class="col-mono"><?php echo htmlspecialchars($entry['ip'] ?? '', ENT_QUOTES, 'UTF-8'); ?></td>
                         <td class="cell-asn-org" title="<?php echo htmlspecialchars($asn_org_full, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($asn_org_full, ENT_QUOTES, 'UTF-8'); ?></td>
-                        <td class="cell-asn-category"><span class="asn-category asn-category--<?php echo htmlspecialchars($cat, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($cat, ENT_QUOTES, 'UTF-8'); ?></span></td>
+                        <td class="cell-asn-category"><span class="asn-category asn-category--<?php echo htmlspecialchars($cat, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($cat, ENT_QUOTES, 'UTF-8'); ?></span><?php if (!empty($entry['on_drop'])): ?> <span class="drop-flag" title="On the Spamhaus DROP list (criminal/hijacked netblock)">DROP</span><?php endif; ?></td>
                         <td class="col-mono"><?php echo $freq > 1 ? '<strong>' . $freq . 'x</strong>' : '1x'; ?></td>
                         <td><?php echo $score !== null ? htmlspecialchars((string)$score, ENT_QUOTES, 'UTF-8') : '<span class="dim-dash">&mdash;</span>'; ?></td>
                         <?php if ($data_consent === 1):
