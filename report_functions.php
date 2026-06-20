@@ -6,9 +6,22 @@
  * without booting the full page or a DB connection.
  */
 
-// Spamhaus DROP reputation data: $spamhaus_drop_ranges, a sorted, non-overlapping
-// list of [start_int, end_int] unsigned-32-bit IPv4 ranges. Machine-generated
-// weekly by .github/workflows/sync-spamhaus-drop.yml (that file is never hand-edited).
+// Kill switch for the Spamhaus DROP reputation axis (the residential-attacker CTA
+// override on the lookup page, and the DROP surfaces in the threat reports). Flip
+// to false to disable all of it instantly without a code change to the hot loop —
+// handy if the override ever misfires in prod. Defined here (loaded by both
+// index.php and report.php) so the gate is in scope on both entry points.
+if (!defined('REPUTATION_AXIS_ENABLED')) {
+    define('REPUTATION_AXIS_ENABLED', true);
+}
+
+// Spamhaus DROP reputation data. Two globals, both machine-generated weekly by
+// .github/workflows/sync-spamhaus-drop.yml (that file is never hand-edited):
+//   $spamhaus_drop_ranges — sorted, non-overlapping [start_int, end_int] pairs;
+//                           the O(log n) membership hot path (ip_in_spamhaus_drop).
+//   $spamhaus_drop_cidrs  — the un-merged originals [start_int, end_int, "cidr"],
+//                           sorted by start; used by the report to name + block the
+//                           specific netblock (spamhaus_drop_cidr_for_ip).
 require_once __DIR__ . '/spamhaus_drop_data.php';
 
 /**
@@ -41,6 +54,70 @@ function ip_in_spamhaus_drop(int $ip_int): bool {
         }
     }
     return false;
+}
+
+/**
+ * Name the specific Spamhaus DROP CIDR an IPv4 address sits in, or null.
+ *
+ * The merged $spamhaus_drop_ranges used by ip_in_spamhaus_drop() drops CIDR
+ * boundaries, so it can't tell you *which* netblock to block. This searches the
+ * un-merged $spamhaus_drop_cidrs (sorted ascending by start) for the covering
+ * CIDR; on overlap it returns the most-specific (longest-prefix / smallest)
+ * range, which is the one you actually want to name and block.
+ *
+ * Runs only on report IPs (≤25 per report), so correctness beats micro-perf:
+ * a binary search lands near the candidate region, then a short linear scan
+ * walks the few entries whose start is ≤ $ip_int and keeps the tightest cover.
+ *
+ * @param int $ip_int  Unsigned 32-bit IPv4 as int (same encoding as ip_in_spamhaus_drop()).
+ * @return string|null The covering CIDR string, most-specific on overlap, or null if unlisted.
+ */
+function spamhaus_drop_cidr_for_ip(int $ip_int): ?string {
+    global $spamhaus_drop_cidrs;
+    $cidrs = $spamhaus_drop_cidrs ?? [];
+    $n = count($cidrs);
+    if ($n === 0) {
+        return null;
+    }
+
+    // Binary search for the last entry whose start <= $ip_int. Everything that
+    // can possibly cover $ip_int starts at or before it.
+    $lo = 0;
+    $hi = $n - 1;
+    $idx = -1;
+    while ($lo <= $hi) {
+        $mid = intdiv($lo + $hi, 2);
+        if ($cidrs[$mid][0] <= $ip_int) {
+            $idx = $mid;
+            $lo = $mid + 1;
+        } else {
+            $hi = $mid - 1;
+        }
+    }
+    if ($idx < 0) {
+        return null; // every CIDR starts after $ip_int
+    }
+
+    // Walk backwards over candidates (start <= $ip_int), keeping the tightest
+    // cover. A containing block has a smaller start, so scanning back from $idx
+    // reaches it; we stop early once no remaining entry can still cover $ip_int.
+    $best        = null;
+    $best_span   = PHP_INT_MAX;
+    for ($i = $idx; $i >= 0; $i--) {
+        [$start, $end, $cidr] = $cidrs[$i];
+        if ($end >= $ip_int) {                 // covers the IP
+            $span = $end - $start;
+            if ($span < $best_span) {          // tighter (more-specific) cover
+                $best      = $cidr;
+                $best_span = $span;
+                if ($span === 0) {
+                    break;                     // /32 — can't get more specific
+                }
+            }
+        }
+    }
+
+    return $best;
 }
 
 /**
@@ -82,6 +159,68 @@ function apply_reputation_override(
         'verdict_level'  => $verdict_level,
         'show_cta'       => $show_cta,
         'verdict_reason' => $verdict_reason,
+    ];
+}
+
+/**
+ * Compute the Spamhaus DROP report data for one submission.
+ *
+ * Shared by the free and paid report generators (and unit-tested directly):
+ *   - tags each $top25 entry with 'on_drop' (membership of its IP),
+ *   - counts drop_count across ALL submitted IPs (not just the shown top 25),
+ *   - (paid only) collects drop_ranges = the unique covering CIDRs, sorted.
+ *
+ * Empty/unlisted submissions yield drop_count = 0 and (when requested)
+ * drop_ranges = [] — the caller stores those defaults so old cached reports,
+ * which carry neither key, render unchanged.
+ *
+ * Pure: no DB, no network; backed by the in-memory Spamhaus DROP globals.
+ *
+ * @param array $all_ips       Every submitted IP entry (each has 'ip').
+ * @param array $top25         The ranked top-25 entries to tag in place.
+ * @param bool  $with_ranges   True on the paid tier to also build drop_ranges.
+ * @return array{top25:array, drop_count:int, drop_ranges:array<int,string>}
+ */
+function compute_drop_report_data(array $all_ips, array $top25, bool $with_ranges): array
+{
+    // IPv4 string → unsigned 32-bit int; IPv6/invalid → 0 (never listed in DROP).
+    // Mirrors ipToLong() in index.php; inlined so this stays DB- and page-free.
+    $to_int = static function ($ip): int {
+        $long = ip2long((string) $ip);
+        return $long === false ? 0 : (int) sprintf('%u', $long);
+    };
+
+    $drop_count  = 0;
+    $drop_ranges = [];
+
+    foreach ($all_ips as $e) {
+        $ip_int = $to_int($e['ip'] ?? '');
+        if ($ip_int !== 0 && ip_in_spamhaus_drop($ip_int)) {
+            $drop_count++;
+            if ($with_ranges) {
+                $cidr = spamhaus_drop_cidr_for_ip($ip_int);
+                if ($cidr !== null) {
+                    $drop_ranges[$cidr] = true;
+                }
+            }
+        }
+    }
+
+    foreach ($top25 as &$entry) {
+        $ip_int = $to_int($entry['ip'] ?? '');
+        $entry['on_drop'] = ($ip_int !== 0 && ip_in_spamhaus_drop($ip_int));
+    }
+    unset($entry);
+
+    if ($with_ranges) {
+        $drop_ranges = array_keys($drop_ranges);
+        sort($drop_ranges);
+    }
+
+    return [
+        'top25'       => $top25,
+        'drop_count'  => $drop_count,
+        'drop_ranges' => $drop_ranges,
     ];
 }
 
@@ -425,6 +564,13 @@ function render_free_report(array $report, string $token, ?string $expires_at, a
                 </div>
             </div>
 
+            <!-- Spamhaus DROP count line (only when listed IPs are present) -->
+            <?php $drop_count = (int)($report['drop_count'] ?? 0); if ($drop_count > 0): ?>
+            <p class="report-drop-count">
+                <strong><?php echo number_format($drop_count); ?></strong> of these IPs sit in Spamhaus DROP netblocks &mdash; ranges confirmed under criminal control.
+            </p>
+            <?php endif; ?>
+
             <!-- 2. Upgrade CTA -->
             <div class="free-report-upgrade">
                 <p class="free-report-upgrade__headline">Confirm which of these IPs are active attackers &mdash; $9</p>
@@ -477,7 +623,7 @@ function render_free_report(array $report, string $token, ?string $expires_at, a
                             <?php if ($org_safe !== ''): ?><span class="asn-org"><?php echo $org_safe; ?></span><?php endif; ?>
                             <?php else: ?>&mdash;<?php endif; ?>
                         </td>
-                        <td class="cell-asn-category"><span class="asn-category asn-category--<?php echo $cat_safe; ?>"><?php echo $cat_safe; ?></span></td>
+                        <td class="cell-asn-category"><span class="asn-category asn-category--<?php echo $cat_safe; ?>"><?php echo $cat_safe; ?></span><?php if (!empty($entry['on_drop'])): ?> <span class="drop-flag" title="On the Spamhaus DROP list (criminal/hijacked netblock)">DROP</span><?php endif; ?></td>
                         <td class="col-right"><?php echo number_format($freq); ?></td>
                         <td class="col-locked">&mdash;</td>
                     </tr>
@@ -641,7 +787,10 @@ function get_script_lines(string $format, array $report, string $token): array
     if (!in_array($format, $valid, true)) return [];
 
     $ips   = !empty($report['block_ips']) ? $report['block_ips'] : array_column($report['top25'] ?? [], 'ip');
-    $cidrs = [];
+    // Spamhaus DROP netblocks lead the range scripts: they are confirmed
+    // criminal-controlled space, the highest-confidence block we can offer.
+    // (IP-only formats below never touch $cidrs, so they are unaffected.)
+    $cidrs = $report['drop_ranges'] ?? [];
     foreach ($report['asn_ranges'] ?? [] as $group) {
         foreach ($group['cidrs'] as $cidr) {
             $cidrs[] = $cidr;
