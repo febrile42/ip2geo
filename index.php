@@ -464,7 +464,10 @@ if ($_POST || $view_token_mode)
 	arsort($country_counts);
 
 	// --- Output results section ---
-	echo '<section id="results" class="block"><div class="section-head"><h2 id="result">Lookup Results</h2><span class="section-tag">01 / Results</span></div>';
+	// Stamp the verdict + CTA-visibility onto the section so the client-side
+	// lookup_submit event can report them (Umami sees only what the DOM carries).
+	$cta_shown_flag = ($show_cta && !$view_token_mode) ? '1' : '0';
+	echo '<section id="results" class="block" data-verdict-level="' . htmlspecialchars(strtolower($verdict_level), ENT_QUOTES, 'UTF-8') . '" data-cta-shown="' . $cta_shown_flag . '"><div class="section-head"><h2 id="result">Lookup Results</h2><span class="section-tag">01 / Results</span></div>';
 	// In view_token mode the page is server-rendered (not injected by AJAX), so
 	// we need a script to scroll to results. The #results hash in the link from
 	// report.php handles the common case; this handles direct URL access without hash.
@@ -870,7 +873,11 @@ else
 					             : count <= 1000 ? '501-1000'
 					             : count <= 5000 ? '1001-5000'
 					             :                 '5000+';
-					try { umami.track('lookup_submit', { ip_count_bucket: bucket }); } catch(_) {}
+					// verdict_level + cta_shown come from data-* stamped on #results
+					// server-side; lets the Umami re-pull measure the real CTA fire rate.
+					var verdictLevel = inserted ? (inserted.dataset.verdictLevel || '') : '';
+					var ctaShown = inserted ? (inserted.dataset.ctaShown === '1') : false;
+					try { umami.track('lookup_submit', { ip_count_bucket: bucket, verdict_level: verdictLevel, cta_shown: ctaShown }); } catch(_) {}
 
 					// Recent-lookups: notify the opt-in handler with the actual IPs.
 					// Listener lives in assets/js/ip2geo-app.js; it no-ops when opt-in is OFF.
