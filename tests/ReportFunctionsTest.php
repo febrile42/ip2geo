@@ -356,4 +356,33 @@ class ReportFunctionsTest extends TestCase
         $lines = get_script_lines('sh-ufw', $this->makeReport(), 'tok');
         $this->assertNotSame('', end($lines));
     }
+
+    // ── enrich_abuseipdb signature contract (regression) ───────────────────────
+    // enrich_abuseipdb moved from report.php to here and gained a $timeout param
+    // (default 10). report.php still calls it with 3 args; the teaser passes 4.
+    // The api_key='' branch is the only network-free path — it proves the
+    // function is callable under both arities and still attaches scores.
+
+    public function testEnrichEmptyKeyThreeArgsStillAttachesNullScore(): void
+    {
+        // Mirrors report.php's 3-arg call site — $timeout must default.
+        $out = enrich_abuseipdb([['ip' => '1.2.3.4']], null, '');
+        $this->assertArrayHasKey('abuse_score', $out[0]);
+        $this->assertNull($out[0]['abuse_score']);
+    }
+
+    public function testEnrichEmptyKeyFourArgsAcceptsTimeout(): void
+    {
+        // Mirrors the teaser's 4-arg call (2s timeout).
+        $out = enrich_abuseipdb([['ip' => '1.2.3.4'], ['ip' => '5.6.7.8']], null, '', 2);
+        $this->assertNull($out[0]['abuse_score']);
+        $this->assertNull($out[1]['abuse_score']);
+    }
+
+    public function testEnrichEmptyKeyFiveArgsAcceptsLiveFlag(): void
+    {
+        // Mirrors the teaser's cache-only 5-arg call on large submissions.
+        $out = enrich_abuseipdb([['ip' => '1.2.3.4']], null, '', 2, false);
+        $this->assertNull($out[0]['abuse_score']);
+    }
 }

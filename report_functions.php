@@ -6,6 +6,85 @@
  * without booting the full page or a DB connection.
  */
 
+// Spamhaus DROP reputation data: $spamhaus_drop_ranges, a sorted, non-overlapping
+// list of [start_int, end_int] unsigned-32-bit IPv4 ranges. Machine-generated
+// weekly by .github/workflows/sync-spamhaus-drop.yml (that file is never hand-edited).
+require_once __DIR__ . '/spamhaus_drop_data.php';
+
+/**
+ * Is an IPv4 address (as an unsigned 32-bit int) inside any Spamhaus DROP range?
+ *
+ * DROP lists netblocks controlled by criminals/hijackers, so a hit is a high-
+ * confidence "this IP is bad" signal independent of ASN classification. Used by
+ * the lookup hot loop to fire the threat CTA on residential attackers that the
+ * ASN-based verdict would otherwise miss.
+ *
+ * Binary search over the sorted, disjoint $spamhaus_drop_ranges → O(log n).
+ *
+ * @param int $ip_int  Unsigned 32-bit IPv4 as int. Pass (int) ipToLong($ip);
+ *                     ipToLong() returns sprintf('%u', ip2long($ip)) as a string,
+ *                     and IPv6/invalid IPs collapse to 0 (never listed in DROP).
+ * @return bool
+ */
+function ip_in_spamhaus_drop(int $ip_int): bool {
+    global $spamhaus_drop_ranges;
+    $lo = 0;
+    $hi = count($spamhaus_drop_ranges) - 1;
+    while ($lo <= $hi) {
+        $mid = intdiv($lo + $hi, 2);
+        if ($ip_int < $spamhaus_drop_ranges[$mid][0]) {
+            $hi = $mid - 1;
+        } elseif ($ip_int > $spamhaus_drop_ranges[$mid][1]) {
+            $lo = $mid + 1;
+        } else {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Apply the Spamhaus DROP reputation override to a computed verdict + CTA state.
+ *
+ * A DROP hit is high-confidence criminal/hijacked space. Any hit (with the
+ * existing >=5-IP floor) opens the CTA and floors the verdict at MODERATE, even
+ * when the ASN-based verdict is LOW — this is what makes a residential fail2ban
+ * paste fire. reputation_count == 0 returns the inputs unchanged (regression-safe).
+ *
+ * Pure: extracted from the index.php lookup path so it is unit-testable.
+ * The REPUTATION_AXIS_ENABLED kill switch is checked by the caller.
+ *
+ * @param string $verdict_level   'HIGH' | 'MODERATE' | 'LOW'
+ * @param bool   $show_cta        Whether the CTA would show pre-override
+ * @param int    $matches_total   Non-good-country IP count (the >=5 floor)
+ * @param int    $reputation_count Count of IPs on the Spamhaus DROP list
+ * @param string $verdict_reason  Reason string computed pre-override ('' if none)
+ * @return array{verdict_level:string, show_cta:bool, verdict_reason:string}
+ */
+function apply_reputation_override(
+    string $verdict_level,
+    bool $show_cta,
+    int $matches_total,
+    int $reputation_count,
+    string $verdict_reason
+): array {
+    if ($matches_total >= 5 && $reputation_count >= 1) {
+        $show_cta = true;
+        if ($verdict_level === 'LOW') {
+            $verdict_level = 'MODERATE';
+        }
+        if ($verdict_reason === '') {
+            $verdict_reason = $reputation_count . ' IP' . ($reputation_count === 1 ? '' : 's')
+                . ' on the Spamhaus DROP list (hijacked/criminal netblocks).';
+        }
+    }
+    return [
+        'verdict_level'  => $verdict_level,
+        'show_cta'       => $show_cta,
+        'verdict_reason' => $verdict_reason,
+    ];
+}
+
 /**
  * Compute the threat verdict from scanning/proxy counts.
  *
@@ -157,6 +236,43 @@ function rank_ips(array $ip_data, int $limit = 25): array {
     });
 
     return array_slice($ip_data, 0, $limit);
+}
+
+/**
+ * Build the inline threat-score teaser shown in the lookup CTA box.
+ *
+ * Pure: no DB, no network. Takes the already-enriched top entries plus the
+ * flagged-IP count computed at verdict time.
+ *
+ * IMPORTANT: locked_count comes from $flagged_count (the scanning/proxy IP
+ * count), NOT from the enriched scores. The inline path only enriches the top
+ * 1-2 IPs live, so the rest carry abuse_score = null; counting scores above the
+ * threshold across the (mostly-null) list would read ~0 on a cold cache — the
+ * common first-investigation case. The honest number we already have is the
+ * flagged count.
+ *
+ * @param array $enriched      Top entries; each may have 'ip' (string) and 'abuse_score' (int|null)
+ * @param int   $flagged_count Count of flagged (scanning/proxy) IPs — the locked_count source
+ * @param int   $threshold     Min confidence to reveal a sample score (default 80 = verified-attacker bar)
+ * @param int   $drop_count    Count of IPs on the Spamhaus DROP list — free, zero-quota proof.
+ *                             Primary proof for the residential-trigger case where flagged_count
+ *                             (and thus live AbuseIPDB enrichment) is 0.
+ * @return array{samples: array<int,array{ip:string,score:int}>, locked_count:int, drop_count:int}
+ */
+function build_teaser(array $enriched, int $flagged_count, int $threshold = 80, int $drop_count = 0): array {
+    $samples = [];
+    foreach ($enriched as $e) {
+        $score = $e['abuse_score'] ?? null;
+        if ($score !== null && (int)$score > $threshold) {
+            $samples[] = ['ip' => (string)($e['ip'] ?? ''), 'score' => (int)$score];
+            if (count($samples) >= 2) break; // at most 2 proof scores
+        }
+    }
+    return [
+        'samples'      => $samples,
+        'locked_count' => max(0, $flagged_count),
+        'drop_count'   => max(0, $drop_count),
+    ];
 }
 
 /**
@@ -603,4 +719,163 @@ default 0;
     }
 
     return explode("\n", rtrim($body));
+}
+
+// ── AbuseIPDB enrichment ──────────────────────────────────────────────────────
+// Moved here from report.php so non-report callers (the index.php inline
+// threat-score teaser) can reuse it without including a whole page file.
+// $timeout is the per-IP curl timeout: 10s on the report path, ~2s on the
+// lookup hot path so a slow AbuseIPDB never stalls the results render.
+//
+// $live=false makes this CACHE-ONLY (no API calls, no quota): used by the inline
+// teaser on large submissions, whose base geo lookup is already slow enough that
+// adding a live call would blow the post-deploy perf budget. Recurring mass
+// scanners still surface from cache at zero latency.
+//
+// Quota: a hard 1000/day cap (abuseipdb_daily_usage) with graceful degrade —
+// over budget returns cached scores where available, null otherwise.
+
+function enrich_abuseipdb(array $ips, $con, string $api_key, int $timeout = 10, bool $live = true): array {
+    if ($api_key === '') {
+        foreach ($ips as &$entry) $entry['abuse_score'] = null;
+        return $ips;
+    }
+
+    $today = date('Y-m-d');
+
+    // Separate cached vs uncached IPs. Cache hits (queried within 7 days) cost
+    // no quota; only uncached IPs need a live call.
+    $need_api = [];
+    $ip_list_str = implode('","', array_map(fn($e) => $e['ip'], $ips));
+    $cached_rows = [];
+    if ($ip_list_str !== '') {
+        $res = $con->query(
+            'SELECT ip, confidence_score FROM abuseipdb_cache
+             WHERE ip IN ("' . $ip_list_str . '")
+               AND queried_at > DATE_SUB(NOW(), INTERVAL 7 DAY)'
+        );
+        while ($r = $res->fetch_assoc()) {
+            $cached_rows[$r['ip']] = (int)$r['confidence_score'];
+        }
+    }
+
+    foreach ($ips as $entry) {
+        if (!isset($cached_rows[$entry['ip']])) {
+            $need_api[] = $entry['ip'];
+        }
+    }
+
+    $batch_size  = count($need_api);
+    $api_results = [];
+
+    if ($live && $batch_size > 0) {
+        // Reserve the batch atomically BEFORE any network I/O. A single
+        // conditional UPDATE both enforces the 1000/day cap and reserves the
+        // slots, so two concurrent lookups can never both pass the cap (closes
+        // the prior TOCTOU) and no row lock is held across the curl calls.
+        $con->query(
+            'INSERT INTO abuseipdb_daily_usage (usage_date, calls_made) VALUES ("' . $today . '", 0)
+             ON DUPLICATE KEY UPDATE calls_made = calls_made'
+        );
+        $reserve = $con->prepare(
+            'UPDATE abuseipdb_daily_usage
+                SET calls_made = calls_made + ?
+              WHERE usage_date = ? AND calls_made + ? <= 1000'
+        );
+        $reserve->bind_param('isi', $batch_size, $today, $batch_size);
+        $reserve->execute();
+        $reserved = ($reserve->affected_rows === 1);
+        $reserve->close();
+
+        if (!$reserved) {
+            // Over the daily cap — degrade gracefully (cached where available).
+            foreach ($ips as &$entry) {
+                $entry['abuse_score'] = $cached_rows[$entry['ip']] ?? null;
+            }
+            unset($entry);
+            return $ips;
+        }
+
+        // We reserved $batch_size slots. Reconcile unused reservations no matter
+        // how we leave the curl block (exception included) so the counter
+        // reflects calls actually made. A hard fatal would leak the small
+        // reservation, which self-heals when usage_date rolls over at UTC midnight.
+        $actual_calls = 0;
+        try {
+            $multi   = curl_multi_init();
+            $handles = [];
+            foreach ($need_api as $ip) {
+                $ch = curl_init();
+                curl_setopt_array($ch, [
+                    CURLOPT_URL            => 'https://api.abuseipdb.com/api/v2/check?ipAddress=' . urlencode($ip) . '&maxAgeInDays=90',
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_TIMEOUT        => $timeout,
+                    CURLOPT_HTTPHEADER     => ['Key: ' . $api_key, 'Accept: application/json'],
+                ]);
+                curl_multi_add_handle($multi, $ch);
+                $handles[$ip] = $ch;
+            }
+
+            $running = null;
+            do {
+                curl_multi_exec($multi, $running);
+                curl_multi_select($multi);
+            } while ($running > 0);
+
+            foreach ($handles as $ip => $ch) {
+                $body = curl_multi_getcontent($ch);
+                $http = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_multi_remove_handle($multi, $ch);
+                curl_close($ch);
+                if ($http === 200 && $body) {
+                    $data = json_decode($body, true);
+                    $score = (int)($data['data']['abuseConfidenceScore'] ?? 0);
+                    $total_reports = (int)($data['data']['totalReports'] ?? 0);
+                    $api_results[$ip] = ['score' => $score, 'total_reports' => $total_reports];
+                    $actual_calls++;
+                }
+            }
+            curl_multi_close($multi);
+
+            // Cache successful results.
+            foreach ($api_results as $ip => $result) {
+                $stmt = $con->prepare(
+                    'INSERT INTO abuseipdb_cache (ip, confidence_score, total_reports, queried_at)
+                     VALUES (?, ?, ?, NOW())
+                     ON DUPLICATE KEY UPDATE
+                       confidence_score = VALUES(confidence_score),
+                       total_reports    = VALUES(total_reports),
+                       queried_at       = NOW()'
+                );
+                $stmt->bind_param('sii', $ip, $result['score'], $result['total_reports']);
+                $stmt->execute();
+                $stmt->close();
+            }
+        } finally {
+            // Return unused reservations (failed/timed-out calls) to the budget.
+            $unused = $batch_size - $actual_calls;
+            if ($unused > 0) {
+                $con->query(
+                    'UPDATE abuseipdb_daily_usage
+                        SET calls_made = calls_made - ' . (int)$unused . '
+                      WHERE usage_date = "' . $today . '"'
+                );
+            }
+        }
+    }
+
+    // Attach scores to each IP entry
+    foreach ($ips as &$entry) {
+        $ip = $entry['ip'];
+        if (isset($api_results[$ip])) {
+            $entry['abuse_score']        = $api_results[$ip]['score'];
+            $entry['abuse_total_reports'] = $api_results[$ip]['total_reports'];
+        } elseif (isset($cached_rows[$ip])) {
+            $entry['abuse_score'] = $cached_rows[$ip];
+        } else {
+            $entry['abuse_score'] = null;
+        }
+    }
+    unset($entry);
+    return $ips;
 }

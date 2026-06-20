@@ -1125,6 +1125,47 @@ button.button.small:hover {
     margin: 0;
 }
 
+/* Inline threat-score teaser: real proof scores for the top 1-2 attackers,
+   then the flagged-IP count whose full scores live behind the $9 report. */
+.threat-cta-scores {
+    margin: 0.35em 0 0;
+    font-size: 0.9em;
+    line-height: 1.5;
+}
+.threat-score {
+    font-family: var(--font-mono);
+    display: block;            /* stack each proof score on its own line */
+    white-space: nowrap;
+}
+.threat-score-ip {
+    display: inline-block;
+    min-width: 15ch;           /* align the score column across rows (widest IPv4 = 15 chars) */
+    color: var(--text-muted);
+}
+.threat-score strong { color: var(--verdict-high); font-weight: 600; }
+.threat-cta-box--moderate .threat-score strong { color: var(--verdict-moderate); }
+.threat-score-src {
+    display: block;            /* source label sits above the stacked scores */
+    margin-bottom: 0.15em;
+    color: var(--text-muted);
+    font-size: 0.85em;
+}
+.threat-score-locked {
+    display: block;
+    margin-top: 0.4em;
+    color: var(--text-muted);
+}
+/* Free, zero-quota proof line: count of IPs on the Spamhaus DROP list. The count
+   takes the box's verdict color to read as hard evidence; the rest stays muted to
+   match .threat-score-locked and honor the restrained-color rule in DESIGN.md. */
+.threat-score-drop {
+    display: block;
+    margin-top: 0.4em;
+    color: var(--text-muted);
+}
+.threat-score-drop strong { color: var(--verdict-high); font-weight: 600; }
+.threat-cta-box--moderate .threat-score-drop strong { color: var(--verdict-moderate); }
+
 .threat-cta-right {
     display: flex;
     flex-direction: column;

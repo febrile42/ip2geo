@@ -2,7 +2,13 @@
 
 require __DIR__ . '/config.php';
 require __DIR__ . '/asn_classification.php';
+require __DIR__ . '/report_functions.php'; // rank_ips(), enrich_abuseipdb(), build_teaser() for the inline threat-score teaser
 @include_once __DIR__ . '/db_version.php'; // gitignored; written by the monthly DB update script
+
+// Kill switch for the Spamhaus DROP reputation axis (the residential-attacker CTA
+// override). Flip to false to disable the reputation logic instantly without a
+// code change to the hot loop — handy if the override ever misfires in prod.
+const REPUTATION_AXIS_ENABLED = true;
 
 function getRealIPAddr()
 {
@@ -235,6 +241,10 @@ if ($_POST || $view_token_mode)
 
 	// For CTA threshold and filter UI
 	$scanning_proxy_count = 0;
+	// Spamhaus DROP reputation axis: count of looked-up IPs that fall in a DROP
+	// netblock. Independent of ASN category — this is what lets a residential
+	// fail2ban paste fire the CTA. See the reputation override after the verdict.
+	$reputation_count = 0;
 	$category_counts = ['scanning' => 0, 'cloud' => 0, 'vpn' => 0, 'residential' => 0, 'unknown' => 0];
 	$country_counts = [];
 	// For ip_list_json stored at token creation (Phase A)
@@ -309,6 +319,12 @@ if ($_POST || $view_token_mode)
 				$category_counts[$category]++;
 				if ($category === 'scanning' || $category === 'vpn') {
 					$scanning_proxy_count++;
+				}
+				// Reputation axis: ASN-agnostic. A DROP hit counts even when the
+				// ASN says residential — $ip_int is the unsigned 32-bit value from
+				// ipToLong() (cast to int for the strict-typed lookup signature).
+				if (REPUTATION_AXIS_ENABLED && ip_in_spamhaus_drop((int) $ip_int)) {
+					$reputation_count++;
 				}
 				if ($country_code !== '') {
 					$country_counts[$country_code] = ($country_counts[$country_code] ?? 0) + 1;
@@ -441,10 +457,43 @@ if ($_POST || $view_token_mode)
 		$verdict_reason = '';
 	}
 
+	// --- Reputation override (Spamhaus DROP axis) ---
+	// Runs AFTER the LOW-suppress above so a DROP hit re-opens a suppressed CTA.
+	// Logic lives in report_functions.php (apply_reputation_override) so it is
+	// unit-testable; the kill switch gates whether we apply it at all.
+	if (REPUTATION_AXIS_ENABLED) {
+		$_rep = apply_reputation_override($verdict_level, $show_cta, $matches_total, $reputation_count, $verdict_reason);
+		$verdict_level  = $_rep['verdict_level'];
+		$show_cta       = $_rep['show_cta'];
+		$verdict_reason = $_rep['verdict_reason'];
+	}
+
+	// --- Inline threat-score teaser (proof scores for the top 1-2 attackers) ---
+	// Only when the CTA shows (MODERATE/HIGH). Enrich at most the top 2 ranked
+	// IPs with a tight 2s timeout so a slow AbuseIPDB never stalls the results
+	// render; degrade to the flagged count on timeout/quota. locked_count comes
+	// from $scanning_proxy_count (already computed) — NOT from enrichment, which
+	// only covers the top 1-2. See report_functions.php build_teaser().
+	//
+	// Large submissions already spend the time budget on geo lookups (the 10k
+	// post-deploy perf gate is 6s), so for those we go CACHE-ONLY: no live API
+	// call, zero added latency, but recurring mass scanners still surface from
+	// cache. Smaller lookups (the common fail2ban-paste case) get the live score.
+	$teaser = ['samples' => [], 'locked_count' => $scanning_proxy_count, 'drop_count' => $reputation_count];
+	if ($show_cta && !$view_token_mode && !empty($ip_classified_data)) {
+		$teaser_live = (isset($ip_list) ? count($ip_list) : 0) <= 2500;
+		$teaser_top  = array_slice(rank_ips($ip_classified_data, 25), 0, 2);
+		$teaser_top  = enrich_abuseipdb($teaser_top, $con, $abuseipdb_api_key ?? '', 2, $teaser_live);
+		$teaser      = build_teaser($teaser_top, $scanning_proxy_count, 80, $reputation_count);
+	}
+
 	arsort($country_counts);
 
 	// --- Output results section ---
-	echo '<section id="results" class="block"><div class="section-head"><h2 id="result">Lookup Results</h2><span class="section-tag">01 / Results</span></div>';
+	// Stamp the verdict + CTA-visibility onto the section so the client-side
+	// lookup_submit event can report them (Umami sees only what the DOM carries).
+	$cta_shown_flag = ($show_cta && !$view_token_mode) ? '1' : '0';
+	echo '<section id="results" class="block" data-verdict-level="' . htmlspecialchars(strtolower($verdict_level), ENT_QUOTES, 'UTF-8') . '" data-cta-shown="' . $cta_shown_flag . '"><div class="section-head"><h2 id="result">Lookup Results</h2><span class="section-tag">01 / Results</span></div>';
 	// In view_token mode the page is server-rendered (not injected by AJAX), so
 	// we need a script to scroll to results. The #results hash in the link from
 	// report.php handles the common case; this handles direct URL access without hash.
@@ -470,6 +519,19 @@ if ($_POST || $view_token_mode)
 					<?php endif; ?>
 					<p class="threat-cta-stats"><?php echo round($non_residential_pct * 100); ?>% of IPs from cloud, scanning, or proxy infrastructure
 						(<?php echo $non_residential_count; ?> of <?php echo $matches_total; ?> IPs)</p>
+					<?php if (!empty($teaser['samples']) || $teaser['locked_count'] > 0 || ($teaser['drop_count'] ?? 0) > 0): ?>
+					<p class="threat-cta-scores">
+						<?php if (!empty($teaser['samples'])): ?>
+						<span class="threat-score-src">AbuseIPDB confidence</span><?php foreach ($teaser['samples'] as $s): ?><span class="threat-score"><span class="threat-score-ip"><?php echo htmlspecialchars($s['ip'], ENT_QUOTES, 'UTF-8'); ?></span> <strong><?php echo (int)$s['score']; ?>/100</strong></span><?php endforeach; ?>
+						<?php endif; ?>
+						<?php if (($teaser['drop_count'] ?? 0) > 0): ?>
+						<span class="threat-score-drop"><strong><?php echo (int)$teaser['drop_count']; ?></strong> IP<?php echo $teaser['drop_count'] === 1 ? '' : 's'; ?> on the Spamhaus DROP list &mdash; confirmed hijacked or criminal netblocks</span>
+						<?php endif; ?>
+						<?php if ($teaser['locked_count'] > 0): ?>
+						<span class="threat-score-locked"><?php echo (int)$teaser['locked_count']; ?> flagged IP<?php echo $teaser['locked_count'] === 1 ? '' : 's'; ?> in this lookup &mdash; full AbuseIPDB scores &amp; whole-network block rules are in the report <span aria-hidden="true">&#128274;</span></span>
+						<?php endif; ?>
+					</p>
+					<?php endif; ?>
 				</div>
 				<div class="threat-cta-right">
 					<?php if (($_GET['error'] ?? '') === 'rate_limit'): ?>
@@ -484,7 +546,7 @@ if ($_POST || $view_token_mode)
 			</div>
 			<div class="threat-cta-bottom">
 				<p class="threat-cta-fine">No account. No payment. 5 seconds.<br>
-					$9 unlocks full threat scores + permalink.</p>
+					$9 unlocks AbuseIPDB scores for every flagged IP + ASN range block rules + a permanent link.</p>
 				<button type="submit" id="cta-button" class="button">Get Free Threat Report</button>
 			</div>
 		</form>
@@ -840,7 +902,11 @@ else
 					             : count <= 1000 ? '501-1000'
 					             : count <= 5000 ? '1001-5000'
 					             :                 '5000+';
-					try { umami.track('lookup_submit', { ip_count_bucket: bucket }); } catch(_) {}
+					// verdict_level + cta_shown come from data-* stamped on #results
+					// server-side; lets the Umami re-pull measure the real CTA fire rate.
+					var verdictLevel = inserted ? (inserted.dataset.verdictLevel || '') : '';
+					var ctaShown = inserted ? (inserted.dataset.ctaShown === '1') : false;
+					try { umami.track('lookup_submit', { ip_count_bucket: bucket, verdict_level: verdictLevel, cta_shown: ctaShown }); } catch(_) {}
 
 					// Recent-lookups: notify the opt-in handler with the actual IPs.
 					// Listener lives in assets/js/ip2geo-app.js; it no-ops when opt-in is OFF.

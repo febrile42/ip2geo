@@ -10,6 +10,12 @@ render_page_open('Changelog — ip2geo.org', 'Release notes for ip2geo.org.');
         </div>
 
         <div class="prose">
+            <h3>4.2.0 — 2026-06-20</h3>
+            <p>Plenty of the IPs attacking you live on ordinary home networks, where the verdict used to give them a pass. Now they're checked against the Spamhaus DROP list of criminal-run netblocks &mdash; a residential address is no longer an alibi.</p>
+
+            <h3>4.1.0 — 2026-06-20</h3>
+            <p>Your worst IPs now flash a sample of their AbuseIPDB confidence scores right on the results page. Turns out burying the good stuff where nobody looks wasn't much of a sales pitch.</p>
+
             <h3>4.0.2 — 2026-05-02</h3>
             <p>Tightened the monthly Bad Guy ASN refresh so it lands in production automatically each month, no manual nudge required. Same data, less waiting.</p>
 
