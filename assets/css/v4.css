@@ -1155,15 +1155,24 @@ button.button.small:hover {
     margin-top: 0.4em;
     color: var(--text-muted);
 }
-/* Free, zero-quota proof line: count of IPs on the Spamhaus DROP list. The count
-   takes the box's verdict color to read as hard evidence; the rest stays muted to
-   match .threat-score-locked and honor the restrained-color rule in DESIGN.md. */
+/* Free, zero-quota proof line, raised to a contained callout: the box's own
+   left-border + faint verdict tint makes the criminal-netblock count the visual
+   anchor without a loud pill (DESIGN.md restraint). Default = high/pink; the
+   moderate variant overrides to amber to match the box verdict color. */
 .threat-score-drop {
     display: block;
-    margin-top: 0.4em;
-    color: var(--text-muted);
+    margin-top: 0.6em;
+    padding: 0.5em 0.7em;
+    border-left: 3px solid var(--verdict-high);
+    background: rgba(224, 108, 159, 0.12);
+    border-radius: 0 4px 4px 0;
+    color: var(--text);
 }
-.threat-score-drop strong { color: var(--verdict-high); font-weight: 600; }
+.threat-score-drop strong { color: var(--verdict-high); font-weight: 600; font-size: 1.12em; }
+.threat-cta-box--moderate .threat-score-drop {
+    border-left-color: var(--verdict-moderate);
+    background: rgba(224, 168, 90, 0.12);
+}
 .threat-cta-box--moderate .threat-score-drop strong { color: var(--verdict-moderate); }
 
 .threat-cta-right {
