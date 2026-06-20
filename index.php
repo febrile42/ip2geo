@@ -5,6 +5,11 @@ require __DIR__ . '/asn_classification.php';
 require __DIR__ . '/report_functions.php'; // rank_ips(), enrich_abuseipdb(), build_teaser() for the inline threat-score teaser
 @include_once __DIR__ . '/db_version.php'; // gitignored; written by the monthly DB update script
 
+// Kill switch for the Spamhaus DROP reputation axis (the residential-attacker CTA
+// override). Flip to false to disable the reputation logic instantly without a
+// code change to the hot loop — handy if the override ever misfires in prod.
+const REPUTATION_AXIS_ENABLED = true;
+
 function getRealIPAddr()
 {
 	// Check for IP from shared internet / proxy
@@ -236,6 +241,10 @@ if ($_POST || $view_token_mode)
 
 	// For CTA threshold and filter UI
 	$scanning_proxy_count = 0;
+	// Spamhaus DROP reputation axis: count of looked-up IPs that fall in a DROP
+	// netblock. Independent of ASN category — this is what lets a residential
+	// fail2ban paste fire the CTA. See the reputation override after the verdict.
+	$reputation_count = 0;
 	$category_counts = ['scanning' => 0, 'cloud' => 0, 'vpn' => 0, 'residential' => 0, 'unknown' => 0];
 	$country_counts = [];
 	// For ip_list_json stored at token creation (Phase A)
@@ -310,6 +319,12 @@ if ($_POST || $view_token_mode)
 				$category_counts[$category]++;
 				if ($category === 'scanning' || $category === 'vpn') {
 					$scanning_proxy_count++;
+				}
+				// Reputation axis: ASN-agnostic. A DROP hit counts even when the
+				// ASN says residential — $ip_int is the unsigned 32-bit value from
+				// ipToLong() (cast to int for the strict-typed lookup signature).
+				if (REPUTATION_AXIS_ENABLED && ip_in_spamhaus_drop((int) $ip_int)) {
+					$reputation_count++;
 				}
 				if ($country_code !== '') {
 					$country_counts[$country_code] = ($country_counts[$country_code] ?? 0) + 1;
@@ -442,6 +457,17 @@ if ($_POST || $view_token_mode)
 		$verdict_reason = '';
 	}
 
+	// --- Reputation override (Spamhaus DROP axis) ---
+	// Runs AFTER the LOW-suppress above so a DROP hit re-opens a suppressed CTA.
+	// Logic lives in report_functions.php (apply_reputation_override) so it is
+	// unit-testable; the kill switch gates whether we apply it at all.
+	if (REPUTATION_AXIS_ENABLED) {
+		$_rep = apply_reputation_override($verdict_level, $show_cta, $matches_total, $reputation_count, $verdict_reason);
+		$verdict_level  = $_rep['verdict_level'];
+		$show_cta       = $_rep['show_cta'];
+		$verdict_reason = $_rep['verdict_reason'];
+	}
+
 	// --- Inline threat-score teaser (proof scores for the top 1-2 attackers) ---
 	// Only when the CTA shows (MODERATE/HIGH). Enrich at most the top 2 ranked
 	// IPs with a tight 2s timeout so a slow AbuseIPDB never stalls the results
@@ -453,12 +479,12 @@ if ($_POST || $view_token_mode)
 	// post-deploy perf gate is 6s), so for those we go CACHE-ONLY: no live API
 	// call, zero added latency, but recurring mass scanners still surface from
 	// cache. Smaller lookups (the common fail2ban-paste case) get the live score.
-	$teaser = ['samples' => [], 'locked_count' => $scanning_proxy_count];
+	$teaser = ['samples' => [], 'locked_count' => $scanning_proxy_count, 'drop_count' => $reputation_count];
 	if ($show_cta && !$view_token_mode && !empty($ip_classified_data)) {
 		$teaser_live = (isset($ip_list) ? count($ip_list) : 0) <= 2500;
 		$teaser_top  = array_slice(rank_ips($ip_classified_data, 25), 0, 2);
 		$teaser_top  = enrich_abuseipdb($teaser_top, $con, $abuseipdb_api_key ?? '', 2, $teaser_live);
-		$teaser      = build_teaser($teaser_top, $scanning_proxy_count);
+		$teaser      = build_teaser($teaser_top, $scanning_proxy_count, 80, $reputation_count);
 	}
 
 	arsort($country_counts);
@@ -493,10 +519,13 @@ if ($_POST || $view_token_mode)
 					<?php endif; ?>
 					<p class="threat-cta-stats"><?php echo round($non_residential_pct * 100); ?>% of IPs from cloud, scanning, or proxy infrastructure
 						(<?php echo $non_residential_count; ?> of <?php echo $matches_total; ?> IPs)</p>
-					<?php if (!empty($teaser['samples']) || $teaser['locked_count'] > 0): ?>
+					<?php if (!empty($teaser['samples']) || $teaser['locked_count'] > 0 || ($teaser['drop_count'] ?? 0) > 0): ?>
 					<p class="threat-cta-scores">
 						<?php if (!empty($teaser['samples'])): ?>
 						<span class="threat-score-src">AbuseIPDB confidence</span><?php foreach ($teaser['samples'] as $s): ?><span class="threat-score"><span class="threat-score-ip"><?php echo htmlspecialchars($s['ip'], ENT_QUOTES, 'UTF-8'); ?></span> <strong><?php echo (int)$s['score']; ?>/100</strong></span><?php endforeach; ?>
+						<?php endif; ?>
+						<?php if (($teaser['drop_count'] ?? 0) > 0): ?>
+						<span class="threat-score-drop"><strong><?php echo (int)$teaser['drop_count']; ?></strong> IP<?php echo $teaser['drop_count'] === 1 ? '' : 's'; ?> on the Spamhaus DROP list &mdash; confirmed hijacked or criminal netblocks</span>
 						<?php endif; ?>
 						<?php if ($teaser['locked_count'] > 0): ?>
 						<span class="threat-score-locked"><?php echo (int)$teaser['locked_count']; ?> flagged IP<?php echo $teaser['locked_count'] === 1 ? '' : 's'; ?> in this lookup &mdash; full AbuseIPDB scores &amp; whole-network block rules are in the report <span aria-hidden="true">&#128274;</span></span>

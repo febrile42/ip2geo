@@ -1155,6 +1155,16 @@ button.button.small:hover {
     margin-top: 0.4em;
     color: var(--text-muted);
 }
+/* Free, zero-quota proof line: count of IPs on the Spamhaus DROP list. The count
+   takes the box's verdict color to read as hard evidence; the rest stays muted to
+   match .threat-score-locked and honor the restrained-color rule in DESIGN.md. */
+.threat-score-drop {
+    display: block;
+    margin-top: 0.4em;
+    color: var(--text-muted);
+}
+.threat-score-drop strong { color: var(--verdict-high); font-weight: 600; }
+.threat-cta-box--moderate .threat-score-drop strong { color: var(--verdict-moderate); }
 
 .threat-cta-right {
     display: flex;

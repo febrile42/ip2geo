@@ -1,0 +1,173 @@
+name: Spamhaus DROP Sync
+
+# Regenerates spamhaus_drop_data.php from the Spamhaus combined DROP list and
+# pushes to develop. spamhaus_drop_data.php is 100% machine-owned (no manual
+# content), so the auto-promote guard is just "is the only develop↔main delta
+# that file?" — no strip-block-and-compare like sync-spamhaus.yml needs.
+#
+# Weekly (DROP changes more often than the monthly ASN-DROP list). Kept separate
+# from sync-spamhaus.yml so the two cadences stay independent.
+
+on:
+  schedule:
+    - cron: '0 4 * * 1'    # 4am UTC every Monday
+  workflow_dispatch:         # allow manual trigger from the Actions tab
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  sync-spamhaus-drop:
+    name: Regenerate spamhaus_drop_data.php on develop
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout develop
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          ref: develop
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # ubuntu-latest ships PHP preinstalled (same as sync-spamhaus.yml, which
+      # calls `php -l` with no setup step), so no setup-php action is needed.
+      - name: Regenerate spamhaus_drop_data.php
+        id: regen
+        run: |
+          set -euo pipefail
+
+          DATA_FILE="spamhaus_drop_data.php"
+
+          # Fetch the combined DROP list (NDJSON). Fail the job — never empty the
+          # committed file — if the fetch errors or returns nothing.
+          TMP_FEED=$(mktemp)
+          if ! curl -sf --max-time 60 https://www.spamhaus.org/drop/drop_v4.json -o "$TMP_FEED"; then
+            echo "Spamhaus DROP fetch failed — aborting to avoid emptying $DATA_FILE."
+            exit 1
+          fi
+          if [ ! -s "$TMP_FEED" ]; then
+            echo "Spamhaus DROP fetch returned empty — aborting."
+            exit 1
+          fi
+
+          # Generator exits non-zero (without writing) on empty/garbage input.
+          php scripts/gen-spamhaus-drop.php < "$TMP_FEED" > "$DATA_FILE.new"
+          php -l "$DATA_FILE.new"
+          rm -f "$TMP_FEED"
+
+          # Compare ignoring the volatile "// Last sync:" line so an unchanged DROP
+          # list does NOT produce a weekly no-op commit (and a no-op prod promote).
+          strip_date() { grep -v '^// Last sync:'; }
+          if [ -f "$DATA_FILE" ] && diff -q <(strip_date < "$DATA_FILE") <(strip_date < "$DATA_FILE.new") >/dev/null; then
+            echo "Spamhaus DROP sync: no range changes."
+            rm -f "$DATA_FILE.new"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          mv "$DATA_FILE.new" "$DATA_FILE"
+
+          ADDED=$(git diff "$DATA_FILE" | grep -cE "^\+ +\[[0-9]+, [0-9]+\]," || true)
+          REMOVED=$(git diff "$DATA_FILE" | grep -cE "^- +\[[0-9]+, [0-9]+\]," || true)
+          echo "Spamhaus DROP sync: +${ADDED} / -${REMOVED} ranges"
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "$DATA_FILE"
+          git commit -m "chore: sync Spamhaus DROP — +${ADDED} / -${REMOVED} ranges ($(date -u +%Y-%m-%d))"
+          git push origin develop
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      # GITHUB_TOKEN pushes don't trigger the CI/CD workflow (GitHub loop-
+      # prevention), so mirror deploy.yml's staging deploy here.
+      - name: Deploy to staging (only if the DROP diff produced a commit)
+        if: steps.regen.outputs.changed == 'true'
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT }}
+          script: |
+            cd ${{ secrets.STAGING_PATH }}
+            git fetch origin && git reset --hard origin/develop
+            ~/bin/composer install --no-dev --no-interaction --quiet
+            printf "User-agent: *\nDisallow: /\n" > robots.txt
+
+      # Auto-promote develop -> main, but only when the entire delta is the
+      # machine-owned data file. Any other unreleased change on develop bails to a
+      # normal release PR. Runs unconditionally so a previously-stranded data
+      # commit catches up on the next run even with no new diff this run.
+      - name: Auto-promote develop -> main if delta is pure DROP data
+        id: promote
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git fetch origin main develop
+
+          if [ "$(git rev-parse origin/develop)" = "$(git rev-parse origin/main)" ]; then
+            echo "develop is already at main; nothing to promote."
+            echo "promoted=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          OTHER_FILES=$(git diff origin/main..origin/develop --name-only \
+            | grep -v '^spamhaus_drop_data.php$' || true)
+          if [ -n "$OTHER_FILES" ]; then
+            echo "develop has unreleased non-DROP changes; not auto-promoting:"
+            echo "$OTHER_FILES"
+            echo "promoted=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Pure DROP-data delta detected. Opening PR develop -> main."
+          DATE=$(date -u +%Y-%m-%d)
+          PR_NUMBER=$(gh pr list --base main --head develop --state open \
+            --json number --jq '.[0].number // empty')
+          if [ -z "$PR_NUMBER" ]; then
+            PR_URL=$(gh pr create \
+              --base main --head develop \
+              --title "chore(spamhaus): promote ${DATE} DROP sync to main" \
+              --body $'Automated promotion: develop\'s only delta vs main is the machine-owned spamhaus_drop_data.php. No version bump.')
+            PR_NUMBER=$(echo "$PR_URL" | grep -oE '[0-9]+$')
+            echo "Opened PR #${PR_NUMBER}: ${PR_URL}"
+          else
+            echo "Reusing existing PR #${PR_NUMBER}."
+          fi
+
+          if gh pr merge "$PR_NUMBER" --squash; then
+            echo "Merged PR #${PR_NUMBER}."
+            echo "promoted=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Auto-merge failed (likely branch protection). PR #${PR_NUMBER} left open."
+            echo "promoted=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Deploy to production after auto-promote
+        if: steps.promote.outputs.promoted == 'true'
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT }}
+          script: |
+            cd ${{ secrets.DEPLOY_PATH }}
+            git fetch origin && git reset --hard origin/main
+            ~/bin/composer install --no-dev --no-interaction --quiet
+
+      - name: Smoke test production after auto-promote
+        if: steps.promote.outputs.promoted == 'true'
+        run: |
+          sleep 3
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Host: ip2geo.org" \
+            "http://${{ secrets.DEPLOY_HOST }}")
+          if [ "$STATUS" != "200" ]; then
+            echo "Production smoke test failed: HTTP $STATUS"
+            exit 1
+          fi
+          echo "Production smoke test passed"
