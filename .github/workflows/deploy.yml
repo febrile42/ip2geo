@@ -5,6 +5,10 @@ on:
     branches:
       - main
       - develop
+  # Manual trigger: bot pushes made with GITHUB_TOKEN (Spamhaus syncs) don't
+  # fire the push event, leaving the required "PHP Syntax Check" unreported on
+  # promotion PRs. `gh workflow run deploy.yml --ref develop` fills that gap.
+  workflow_dispatch:
 
 jobs:
 
