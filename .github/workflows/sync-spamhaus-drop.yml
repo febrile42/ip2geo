@@ -25,6 +25,27 @@ jobs:
       pull-requests: write
 
     steps:
+      # `develop` is the branch this entire workflow operates on: the bot pushes
+      # the regenerated block there, staging deploys from it, and it is the head
+      # of the auto-promote PR. When it is missing, actions/checkout fails with a
+      # bare "a branch or tag with the name 'develop' could not be found", every
+      # later step is skipped, and the only signal is "all jobs have failed".
+      # Deleting `develop` right after merging an auto-promote PR did exactly
+      # that on 2026-08-31 and went unnoticed for three days. Fail legibly.
+      - name: Verify develop exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if ! gh api "repos/${GITHUB_REPOSITORY}/branches/develop" --silent 2>/dev/null; then
+            echo "::error::Branch 'develop' does not exist in ${GITHUB_REPOSITORY}."
+            echo "::error::This workflow regenerates Spamhaus data on 'develop' and auto-promotes it to 'main'."
+            echo "::error::Recreate it, then re-run this workflow:"
+            echo "::error::  git push origin origin/main:refs/heads/develop"
+            exit 1
+          fi
+          echo "Branch 'develop' found."
+
       - name: Checkout develop
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
         with:
