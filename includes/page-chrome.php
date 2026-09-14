@@ -30,7 +30,7 @@ function render_page_open(string $title, string $meta_desc = '', array $og = [],
 <html lang="en" data-theme="dark">
 <head>
     <?php if ($_SERVER['HTTP_HOST'] === 'ip2geo.org'): ?>
-    <script defer src="https://cloud.umami.is/script.js" data-website-id="656d7a15-6282-4079-af1e-b8ed857fba2e"></script>
+    <script defer src="/u/script.js" data-website-id="656d7a15-6282-4079-af1e-b8ed857fba2e" data-domains="ip2geo.org"></script>
     <?php endif; ?>
     <title><?php echo $safe_title; ?></title>
     <meta charset="utf-8" />
