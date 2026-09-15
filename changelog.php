@@ -10,6 +10,9 @@ render_page_open('Changelog — ip2geo.org', 'Release notes for ip2geo.org.');
         </div>
 
         <div class="prose">
+            <h3>4.3.2 — 2026-09-15</h3>
+            <p>Moved analytics off Umami Cloud and onto a copy of <a href="https://umami.is/" target="_blank" rel="noopener">Umami</a> I run myself. Same anonymous visitor counts, still no cookies, they just land on my server now instead of someone else's. No more third party behavior analytics.</p>
+
             <h3>4.3.1 — 2026-06-20</h3>
             <p>Made note in the <a href="/privacy.php">privacy policy</a> of saving local storage in your local browser, which stays local, we never see it, and is used for local things like theme and recent searches. It's local, everyone, just in case you missed that part. No one is looking at your IP searches.</p>
 
