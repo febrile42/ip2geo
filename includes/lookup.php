@@ -35,6 +35,10 @@ declare(strict_types=1);
 use MaxMind\Db\Reader;
 use MaxMind\Db\Reader\InvalidDatabaseException;
 
+// Pages (index.php, api/lookup.php) don't load Composer themselves; the MaxMind
+// reader lives in vendor/, so this file pulls in the autoloader it depends on.
+require_once dirname(__DIR__) . '/vendor/autoload.php';
+
 // Where the monthly job (scripts/update-geoip.sh) drops GeoLite2-City.mmdb
 // and GeoLite2-ASN.mmdb. Override in config.php: define('GEOIP_MMDB_DIR', '...');
 // before this file is required. Documented in config.sample.php.
