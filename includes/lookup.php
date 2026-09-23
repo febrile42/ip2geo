@@ -39,7 +39,7 @@ use MaxMind\Db\Reader\InvalidDatabaseException;
 // and GeoLite2-ASN.mmdb. Override in config.php: define('GEOIP_MMDB_DIR', '...');
 // before this file is required. Documented in config.sample.php.
 if (!defined('GEOIP_MMDB_DIR')) {
-    define('GEOIP_MMDB_DIR', '/var/www/geoip');
+    define('GEOIP_MMDB_DIR', dirname(__DIR__) . '/data/geoip');
 }
 
 /**

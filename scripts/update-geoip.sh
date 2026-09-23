@@ -33,11 +33,11 @@ DB_NAME=$(php -r "require '$PROD_PATH/config.php'; echo \$db_name;")
 
 # Read the .mmdb target directory from each environment's own config.php.
 # config.php (copied from config.sample.php) defines GEOIP_MMDB_DIR itself,
-# falling back to /var/www/geoip if the operator never overrode it there;
+# falling back to <app>/data/geoip if the operator never overrode it there;
 # includes/lookup.php carries the same fallback for anything that requires
 # it without config.php. If config.php can't be read at all, fall back here too.
-PROD_MMDB_DIR=$(php -r "require '$PROD_PATH/config.php'; echo defined('GEOIP_MMDB_DIR') ? GEOIP_MMDB_DIR : '/var/www/geoip';" 2>/dev/null || echo '/var/www/geoip')
-STAGING_MMDB_DIR=$(php -r "require '$STAGING_PATH/config.php'; echo defined('GEOIP_MMDB_DIR') ? GEOIP_MMDB_DIR : '/var/www/geoip';" 2>/dev/null || echo '/var/www/geoip')
+PROD_MMDB_DIR=$(php -r "require '$PROD_PATH/config.php'; echo defined('GEOIP_MMDB_DIR') ? GEOIP_MMDB_DIR : '$PROD_PATH/data/geoip';" 2>/dev/null || echo "$PROD_PATH/data/geoip")
+STAGING_MMDB_DIR=$(php -r "require '$STAGING_PATH/config.php'; echo defined('GEOIP_MMDB_DIR') ? GEOIP_MMDB_DIR : '$STAGING_PATH/data/geoip';" 2>/dev/null || echo "$STAGING_PATH/data/geoip")
 
 # Write credentials to a temp file so they never appear in the process list
 MYCNF=$(mktemp)
