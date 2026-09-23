@@ -3,8 +3,7 @@
 // Provides render_page_open() and render_page_close() so every page renders
 // the same nav, head, theme toggle, smooth-scroll, and footer.
 
-// Ensure APP_VERSION is defined for asset versioning (same guard as in footer.php)
-defined('APP_VERSION') || define('APP_VERSION', '4.3.3');
+require_once __DIR__ . '/version.php'; // APP_VERSION for ?v= asset URLs
 
 if (!function_exists('render_page_open')):
 
