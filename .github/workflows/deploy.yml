@@ -30,7 +30,11 @@ jobs:
     steps:
       - name: Pull develop on server (staging dir)
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
+        env:
+          MAXMIND_ACCOUNT_ID: ${{ secrets.MAXMIND_ACCOUNT_ID }}
+          MAXMIND_LICENSE_KEY: ${{ secrets.MAXMIND_LICENSE_KEY }}
         with:
+          envs: MAXMIND_ACCOUNT_ID,MAXMIND_LICENSE_KEY
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
@@ -40,6 +44,8 @@ jobs:
             git fetch origin && git reset --hard origin/${{ github.ref_name }}
             ~/bin/composer install --no-dev --no-interaction --quiet
             printf "User-agent: *\nDisallow: /\n" > robots.txt
+            # .mmdb lookup data (v5): only downloads when missing or >35 days old
+            if [ -f scripts/fetch-mmdb.sh ]; then bash scripts/fetch-mmdb.sh "$PWD"; fi
 
   test-staging:
     name: Test Staging
@@ -63,6 +69,17 @@ jobs:
             exit 1
           fi
           echo "Smoke test passed: HTTP $STATUS"
+
+      - name: Lookup data is not web-reachable (GeoLite2 license)
+        run: |
+          CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Host: staging.ip2geo.org" \
+            "http://${{ secrets.DEPLOY_HOST }}/data/geoip/GeoLite2-City.mmdb")
+          if [ "$CODE" != "403" ] && [ "$CODE" != "404" ]; then
+            echo "data/geoip is web-reachable: HTTP $CODE"
+            exit 1
+          fi
+          echo "data/geoip blocked: HTTP $CODE"
 
       - name: Functional test — known IP lookup returns expected country
         run: |

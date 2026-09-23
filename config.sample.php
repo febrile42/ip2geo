@@ -22,5 +22,5 @@ $db_name = 'your_db_name';
 // make lookup_ips() throw GeoDbUnavailableException, which api/lookup.php
 // turns into a 503.
 if (!defined('GEOIP_MMDB_DIR')) {
-    define('GEOIP_MMDB_DIR', '/var/www/geoip');
+    define('GEOIP_MMDB_DIR', __DIR__ . '/data/geoip');
 }
