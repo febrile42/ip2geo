@@ -447,7 +447,10 @@ main {
   user-select: none;
 }
 .opt-in input { accent-color: var(--accent-purple); }
-.opt-in .muted-tag { color: var(--text-muted); opacity: 0.7; }
+/* D16: the extra opacity on top of --text-muted pushed contrast below WCAG
+   AA (2.21:1 on light) — dropped so the token's own contrast applies
+   unmodified. Caught by tests/e2e/a11y.spec.js's axe scan. */
+.opt-in .muted-tag { color: var(--text-muted); }
 
 /* Wrapper row for the recent-lookups opt-in checkbox: sits directly below the
    submit button in the .actions column. Fades on hover so the row stays

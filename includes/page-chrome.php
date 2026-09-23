@@ -46,7 +46,7 @@ function render_page_open(string $title, string $meta_desc = '', array $og = [],
         }
     })();
     </script>
-    <?php if ($_SERVER['HTTP_HOST'] === 'ip2geo.org'): ?>
+    <?php if (($_SERVER['HTTP_HOST'] === 'ip2geo.org' || getenv('IP2GEO_E2E_FORCE_UMAMI') === '1')): ?>
     <script defer src="/u/script.js" data-website-id="656d7a15-6282-4079-af1e-b8ed857fba2e" data-domains="ip2geo.org" data-exclude-hash="true"></script>
     <?php endif; ?>
     <title><?php echo $safe_title; ?></title>
