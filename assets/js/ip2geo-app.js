@@ -1,66 +1,6 @@
 (function () {
     'use strict';
 
-    // ── Stripe cancel restore ──────────────────────────────────────────────
-    // If the user cancelled from Stripe and was redirected back with ?cancelled=1,
-    // restore their IPs from sessionStorage and re-submit the form automatically.
-    (function handleCancel() {
-        var params = new URLSearchParams(window.location.search);
-        if (!params.get('cancelled')) return;
-
-        // Remove ?cancelled=1 from the URL without a page reload
-        history.replaceState(null, '', window.location.pathname);
-
-        window.umami && umami.track('stripe_cancel');
-
-        var pending = sessionStorage.getItem('ip2geo_pending_ips');
-        if (pending) {
-            sessionStorage.removeItem('ip2geo_pending_ips');
-            var textarea = document.getElementById('message');
-            var form = document.getElementById('iplookup');
-            if (textarea && form) {
-                textarea.value = pending;
-                // Re-submit via the existing AJAX handler; it fires on the submit button click
-                // so we dispatch a click event which the existing listener handles.
-                var btn = form.querySelector('input[type="submit"]');
-                if (btn) {
-                    // Set a flag so the cancel notice shows after results render
-                    sessionStorage.setItem('ip2geo_show_cancel_notice', '1');
-                    btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-                }
-            }
-        } else {
-            // sessionStorage empty (different tab / cleared) — show static notice
-            showCancelNotice('Payment cancelled. Paste your IPs again to continue.');
-        }
-    })();
-
-    function showCancelNotice(msg) {
-        var existing = document.getElementById('cancel-notice');
-        if (existing) return;
-        var notice = document.createElement('div');
-        notice.id = 'cancel-notice';
-        notice.setAttribute('role', 'status');
-        notice.innerHTML = '<span>' + msg + '</span><button aria-label="Dismiss">&#215;</button>';
-        notice.querySelector('button').addEventListener('click', function () { notice.remove(); });
-        setTimeout(function () { if (notice.parentNode) notice.remove(); }, 8000);
-        var intro = document.getElementById('intro');
-        if (intro) intro.insertAdjacentElement('afterend', notice);
-    }
-
-    // ── CTA button: save IPs to sessionStorage before Stripe redirect ──────
-    // The CTA is a form submit (POST to /get-report.php with ip_classified_json).
-    // We save the raw textarea value here so we can restore it if the user cancels.
-    document.addEventListener('click', function (e) {
-        if (!e.target || e.target.id !== 'cta-button') return;
-        var textarea = document.getElementById('message');
-        if (textarea && textarea.value) {
-            sessionStorage.setItem('ip2geo_pending_ips', textarea.value);
-        }
-        window.umami && umami.track('cta_click');
-        // Let the form submit proceed normally
-    });
-
     // ── Row striping ──────────────────────────────────────────────────────
     // nth-child counts hidden rows, breaking alternating colors when filtered.
     // We manage stripes explicitly with a class so only visible rows stripe.
@@ -279,7 +219,9 @@
                 // Exclusive select: only this country
                 all.forEach(function (i) { i.checked = false; });
                 clicked.checked = true;
-                window.umami && umami.track('filter_country', { country: clicked.value });
+                // No country property (R9/D8): the value comes from the user's own
+                // paste, so only the fact that the filter was used is sent.
+                window.umami && umami.track('filter_country');
             }
         }
 
@@ -294,7 +236,8 @@
         var hidden = unresolvedBody.style.display === 'none';
         unresolvedBody.style.display = hidden ? '' : 'none';
         var n = unresolvedBody.rows.length;
-        e.target.textContent = (hidden ? 'Hide ' : 'Show ') + n + ' unresolved IP' + (n !== 1 ? 's' : '');
+        var suffix = e.target.dataset.suffix || ''; // e.g. " (3 IPv6)", set server-side
+        e.target.textContent = (hidden ? 'Hide ' : 'Show ') + n + ' unresolved IP' + (n !== 1 ? 's' : '') + suffix;
         applyFilters(); // update "Showing X of Y" to include/exclude unresolved rows
     });
 
@@ -310,7 +253,7 @@
         }
     });
 
-    // ── After AJAX results inject: init filters + show cancel notice ───────
+    // ── After AJAX results inject: init filters ─────────────────────────────
     // The existing AJAX handler in index.php replaces #results via outerHTML.
     // We use a MutationObserver to detect when #results is newly added to the DOM.
     //
@@ -327,12 +270,51 @@
         });
         if (!resultsAdded) return;
         applyFilters();
-        if (sessionStorage.getItem('ip2geo_show_cancel_notice')) {
-            sessionStorage.removeItem('ip2geo_show_cancel_notice');
-            showCancelNotice('Changed your mind? Your threat report is still ready.');
-        }
     });
     observer.observe(document.body, { childList: true, subtree: true });
+
+    // ── "Try a sample log" (D11 + R13 + R16) ────────────────────────────────
+    // Loads the public sample-fail2ban.txt (built only from published scanner,
+    // DROP and cloud ranges — R13) and, when the visitor's own IP passed
+    // FILTER_VALIDATE_IP server-side, appends one benign line with it so the
+    // first result includes a "(you)" row. lookup_submit carries sample=true
+    // for the resulting lookup (read by the inline submit handler in
+    // index.php via window.__ip2geoSampleActive).
+    (function () {
+        var link = document.getElementById('try-sample-log');
+        if (!link) return;
+
+        var textarea = document.getElementById('message');
+        if (textarea) {
+            // Any manual edit after loading the sample means the next submit
+            // is no longer "the sample lookup" as-is.
+            textarea.addEventListener('input', function () { window.__ip2geoSampleActive = false; });
+        }
+
+        link.addEventListener('click', function (e) {
+            e.preventDefault();
+            var url = link.dataset.sampleUrl || 'assets/sample-fail2ban.txt';
+            fetch(url)
+                .then(function (resp) {
+                    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                    return resp.text();
+                })
+                .then(function (text) {
+                    var visitorIp = link.dataset.visitorIp || '';
+                    if (visitorIp) {
+                        text = text.replace(/\n+$/, '') + '\nAccepted publickey for analyst from ' + visitorIp + ' port 52144 ssh2\n';
+                    }
+                    if (textarea) {
+                        textarea.value = text;
+                        textarea.focus();
+                    }
+                    window.__ip2geoSampleActive = true;
+                })
+                .catch(function () {
+                    // Leave the textarea untouched — the link simply didn't do anything.
+                });
+        });
+    })();
 
     // Init filters + stripes + rules on initial server-rendered load
     applyFilters();
