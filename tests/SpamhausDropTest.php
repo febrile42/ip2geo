@@ -6,7 +6,7 @@ namespace Ip2Geo\Tests;
 
 use PHPUnit\Framework\TestCase;
 
-require_once __DIR__ . '/../report_functions.php';      // ip_in_spamhaus_drop(), apply_reputation_override(), build_teaser()
+require_once __DIR__ . '/../report_functions.php';      // ip_in_spamhaus_drop(), apply_reputation_override()
 require_once __DIR__ . '/../scripts/gen-spamhaus-drop.php'; // spamhaus_drop_ranges_from_ndjson() (CLI entry self-guards)
 
 /**
@@ -14,8 +14,8 @@ require_once __DIR__ . '/../scripts/gen-spamhaus-drop.php'; // spamhaus_drop_ran
  * residential attackers the ASN verdict would otherwise miss.
  *
  * Covers the lookup (binary search), the generator (CIDR -> sorted/merged int
- * ranges, skipping metadata + IPv6), the verdict override, the teaser drop_count,
- * the committed data file's integrity, and a perf guard for the 10k hot loop.
+ * ranges, skipping metadata + IPv6), the verdict override, the committed data
+ * file's integrity, and a perf guard for the 10k hot loop.
  */
 class SpamhausDropTest extends TestCase
 {
@@ -142,20 +142,6 @@ class SpamhausDropTest extends TestCase
         $r = apply_reputation_override('MODERATE', false, 5, 1, '');
         $this->assertTrue($r['show_cta']);
         $this->assertSame('1 IP on the Spamhaus DROP list (hijacked/criminal netblocks).', $r['verdict_reason']);
-    }
-
-    // --- build_teaser() drop_count -----------------------------------------
-
-    public function testBuildTeaserCarriesDropCount(): void
-    {
-        $t = build_teaser([], 0, 80, 7);
-        $this->assertSame(7, $t['drop_count']);
-    }
-
-    public function testBuildTeaserDropCountDefaultsToZeroAndClamps(): void
-    {
-        $this->assertSame(0, build_teaser([], 0)['drop_count']);
-        $this->assertSame(0, build_teaser([], 0, 80, -3)['drop_count']);
     }
 
     // --- committed data file integrity -------------------------------------
