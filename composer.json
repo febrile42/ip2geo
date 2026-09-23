@@ -1,7 +1,5 @@
 {
     "require": {
-        "stripe/stripe-php": "^13.0",
-        "resend/resend-php": "^0.8",
         "maxmind-db/reader": "^1.11"
     },
     "require-dev": {
