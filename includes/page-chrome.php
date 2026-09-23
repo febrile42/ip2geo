@@ -3,6 +3,9 @@
 // Provides render_page_open() and render_page_close() so every page renders
 // the same nav, head, theme toggle, smooth-scroll, and footer.
 
+// Ensure APP_VERSION is defined for asset versioning (same guard as in footer.php)
+defined('APP_VERSION') || define('APP_VERSION', '4.3.3');
+
 if (!function_exists('render_page_open')):
 
 /**
@@ -40,13 +43,13 @@ function render_page_open(string $title, string $meta_desc = '', array $og = [],
     <meta property="og:title" content="<?php echo htmlspecialchars($og['title'] ?? $title, ENT_QUOTES, 'UTF-8'); ?>">
     <meta property="og:description" content="<?php echo htmlspecialchars($og['description'] ?? $safe_desc, ENT_QUOTES, 'UTF-8'); ?>">
     <meta property="og:url" content="<?php echo htmlspecialchars($og['url'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
-    <meta property="og:image" content="https://ip2geo.org/assets/images/og-card.webp">
+    <meta property="og:image" content="https://ip2geo.org/assets/images/og-card.png">
     <meta property="og:type" content="website">
     <?php endif; ?>
     <link rel="preconnect" href="https://fonts.bunny.net" crossorigin>
     <link rel="stylesheet" href="https://fonts.bunny.net/css?family=geist:400,500,700,900|geist-mono:400,500&display=swap">
-    <link rel="stylesheet" href="/assets/css/v4.css" />
-    <link rel="stylesheet" href="/assets/css/ip2geo-print.css" media="print" />
+    <link rel="stylesheet" href="/assets/css/v4.css?v=<?php echo APP_VERSION; ?>" />
+    <link rel="stylesheet" href="/assets/css/ip2geo-print.css?v=<?php echo APP_VERSION; ?>" media="print" />
     <link rel="icon" href="/favicon.ico" />
     <script>
     // Apply theme before paint to avoid a flash. An explicit saved choice wins;
