@@ -12,7 +12,7 @@ require_once __DIR__ . '/includes/version.php';  // APP_VERSION for ?v= asset UR
 if (is_file(__DIR__ . '/config.php')) {
     // Optional in v5: index.php no longer talks to MySQL or Stripe (R17), so
     // the only thing it might still read from here is a GEOIP_MMDB_DIR
-    // override. Other pages (report.php, webhook.php, get-report.php) still
+    // override. Other pages (e.g. intel.php) still
     // require it directly for their own needs.
     require_once __DIR__ . '/config.php';
 }
