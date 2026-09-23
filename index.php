@@ -4,6 +4,7 @@ require __DIR__ . '/config.php';
 require __DIR__ . '/asn_classification.php';
 require __DIR__ . '/report_functions.php'; // rank_ips(), enrich_abuseipdb(), build_teaser() for the inline threat-score teaser
 @include_once __DIR__ . '/db_version.php'; // gitignored; written by the monthly DB update script
+require __DIR__ . '/includes/footer.php'; // APP_VERSION
 
 // REPUTATION_AXIS_ENABLED (the Spamhaus DROP kill switch) is defined in
 // report_functions.php — required above — so both this lookup page and report.php
@@ -44,10 +45,18 @@ $view_token_val  = $view_token_mode ? preg_replace('/[^a-f0-9\-]/', '', trim($_G
 		<meta charset="utf-8" />
 		<meta name="description" content="Free tool to filter up to 10,000 IP addresses from an arbitrary text blob and list their geographic location." />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta property="og:title" content="ip2geo · Bulk IP lookup for raw logs" />
+		<meta property="og:description" content="Paste up to 10,000 IPs from any log. Country, ASN and category. Free, no signup." />
+		<meta property="og:image" content="https://ip2geo.org/assets/images/og-card.png" />
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="630" />
+		<meta property="og:url" content="https://ip2geo.org/" />
+		<meta property="og:type" content="website" />
+		<meta name="twitter:card" content="summary_large_image" />
 		<link rel="preconnect" href="https://fonts.bunny.net" crossorigin>
 		<link rel="stylesheet" href="https://fonts.bunny.net/css?family=geist:400,500,700,900|geist-mono:400,500&display=swap">
-		<link rel="stylesheet" href="assets/css/v4.css" />
-		<link rel="stylesheet" href="assets/css/ip2geo-print.css" media="print" />
+		<link rel="stylesheet" href="assets/css/v4.css?v=<?php echo APP_VERSION; ?>" />
+		<link rel="stylesheet" href="assets/css/ip2geo-print.css?v=<?php echo APP_VERSION; ?>" media="print" />
 		<link rel="icon" href="/favicon.ico" />
 		<script>
 		// Apply theme before paint to avoid a flash. An explicit saved choice wins;
@@ -952,7 +961,7 @@ else
 
 		})();
 		</script>
-		<script src="assets/js/ip2geo-app.js"></script>
+		<script src="assets/js/ip2geo-app.js?v=<?php echo APP_VERSION; ?>"></script>
 
 	</body>
 </html>
