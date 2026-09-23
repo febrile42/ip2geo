@@ -1,0 +1,8 @@
+outbound connection to 1.2.3.4:443
+outbound connection to 1.2.3.4:8443
+defanged reference 1.2.3[.]4 seen in report (not extracted by design)
+defanged reference 5[.]6[.]7[.]8 seen in report (not extracted by design)
+bracketed host [2001:4860:4860::8888]:443
+port only reference 9.9.9.9:53
+repeated 1.2.3.4:443
+hxxp://198.51.100.44:8080/path
