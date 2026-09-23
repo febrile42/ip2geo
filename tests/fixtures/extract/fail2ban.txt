@@ -1,0 +1,15 @@
+2026-09-10 03:14:07 fail2ban.actions [12345]: NOTICE  [sshd] Ban 45.142.212.61
+2026-09-10 03:14:12 fail2ban.actions [12345]: NOTICE  [sshd] Ban 45.142.212.61
+2026-09-10 03:15:44 fail2ban.actions [12345]: NOTICE  [sshd] Ban 185.220.101.7
+2026-09-10 03:16:01 fail2ban.filter  [12345]: INFO    [sshd] Found 192.168.1.55 - 2026-09-10 03:16:01
+2026-09-10 03:16:20 fail2ban.actions [12345]: NOTICE  [sshd] Ban 45.142.212.61
+2026-09-10 03:17:03 fail2ban.actions [12345]: NOTICE  [sshd] Ban 103.75.201.4
+2026-09-10 03:17:55 fail2ban.filter  [12345]: INFO    [sshd] Found 10.0.0.8 - 2026-09-10 03:17:55
+2026-09-10 03:18:30 fail2ban.actions [12345]: NOTICE  [sshd] Ban 185.220.101.7
+2026-09-10 03:19:02 fail2ban.actions [12345]: NOTICE  [sshd] Unban 103.75.201.4
+2026-09-10 03:20:45 fail2ban.filter  [12345]: INFO    [sshd] Found 172.16.5.9 - 2026-09-10 03:20:45
+2026-09-10 03:21:10 fail2ban.actions [12345]: NOTICE  [sshd] Ban 185.220.101.7
+2026-09-10 03:22:18 fail2ban.actions [12345]: NOTICE  [sshd] Ban 89.248.165.74
+2026-09-10 03:23:00 fail2ban.filter  [12345]: INFO    [sshd] Found 127.0.0.1 - 2026-09-10 03:23:00
+2026-09-10 03:23:59 fail2ban.actions [12345]: NOTICE  [sshd] Ban 45.142.212.61
+2026-09-10 03:24:41 fail2ban.actions [12345]: NOTICE  [sshd] Ban 194.26.29.5

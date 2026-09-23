@@ -1,0 +1,18 @@
+connection from 2001:4860:4860::8888 accepted
+connection from 2001:4860:4860::8888 accepted
+connection from 203.0.113.5 accepted
+connection from 2606:4700:4700::1111 accepted
+blocked loopback ::1
+blocked link-local fe80::1ff:fe23:4567:890a
+blocked unique-local fc00::1234:5678:9abc:def0
+blocked unique-local fd12:3456:789a:1::1
+documentation example 2001:db8::1
+mapped private v6 ::ffff:192.168.1.1
+mapped public v6 ::ffff:203.0.113.9
+private v4 10.0.0.1
+private v4 192.168.1.1
+public v4 8.8.8.8
+public v4 8.8.8.8
+public v4 1.1.1.1
+loopback v4 127.0.0.1
+another public v6 2400:cb00:2049:1::a29f:1804
