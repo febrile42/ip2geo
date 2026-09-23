@@ -1,0 +1,230 @@
+# assets/sample-fail2ban.txt
+#
+# Synthetic demo log for ip2geo's "Try a sample log" feature.
+# Generated: 2026-09-23
+#
+# This is NOT a real fail2ban/auth.log capture and contains no residential or
+# personal IP addresses. Every address below is drawn only from:
+#   - Censys's own published, self-identified research-scanner ranges
+#     (https://docs.censys.com/docs/opt-out-of-data-collection)
+#   - Spamhaus DROP netblocks, as synced into spamhaus_drop_data.php
+#     (https://www.spamhaus.org/drop/drop_v4.json, terms: https://www.spamhaus.org/drop/terms/)
+#   - AWS's published IP ranges (https://ip-ranges.amazonaws.com/ip-ranges.json)
+#   - Google Cloud's published IP ranges (https://www.gstatic.com/ipranges/cloud.json)
+#   - DigitalOcean's published geo/IP feed (https://www.digitalocean.com/geo/google.csv)
+#
+# The full list of source CIDRs actually used is committed at
+# tests/fixtures/sample-sources.txt and is verified against every IP in this
+# file by tests/SampleLogTest.php. Timestamps are illustrative, not real
+# observations. This file is public and safe to publish.
+Sep 22 00:12:16 ip2geo-demo sshd[20746]: Failed password for invalid user www from 192.241.221.224 port 52323 ssh2
+Sep 22 00:16:04 ip2geo-demo sshd[21572]: Failed password for invalid user node from 192.241.221.224 port 45678 ssh2
+Sep 22 00:23:26 ip2geo-demo sshd[24585]: Failed password for root from 157.230.67.26 port 44086 ssh2
+Sep 22 00:33:12 ip2geo-demo sshd[23060]: Failed password for invalid user redis from 157.230.67.26 port 27155 ssh2
+Sep 22 00:45:42 ip2geo-demo sshd[20409]: Failed password for invalid user guest from 157.230.67.26 port 49903 ssh2
+2026-09-22 00:45:47,930 fail2ban.actions        [20704]: NOTICE  [sshd] Ban 157.230.67.26
+Sep 22 00:47:36 ip2geo-demo sshd[23205]: Connection closed by authenticating user admin 103.6.38.133 port 29516 [preauth]
+Sep 22 00:57:11 ip2geo-demo sshd[24259]: Failed password for root from 176.65.149.49 port 47958 ssh2
+Sep 22 01:00:28 ip2geo-demo sshd[20312]: Failed password for root from 176.65.149.49 port 38977 ssh2
+Sep 22 01:09:24 ip2geo-demo sshd[24084]: Connection closed by authenticating user test 45.93.20.223 port 51104 [preauth]
+Sep 22 01:21:22 ip2geo-demo sshd[23032]: Failed password for invalid user docker from 45.93.20.223 port 26307 ssh2
+Sep 22 01:28:20 ip2geo-demo sshd[20627]: Failed password for root from 45.93.20.223 port 45920 ssh2
+2026-09-22 01:28:25,703 fail2ban.actions        [20005]: NOTICE  [sshd] Ban 45.93.20.223
+Sep 22 01:33:40 ip2geo-demo sshd[22469]: Connection closed by authenticating user ubuntu 198.137.160.159 port 54508 [preauth]
+Sep 22 01:36:34 ip2geo-demo sshd[23610]: Failed password for root from 199.253.225.78 port 46112 ssh2
+Sep 22 01:38:17 ip2geo-demo sshd[21284]: Failed password for root from 199.253.225.78 port 29720 ssh2
+Sep 22 01:45:44 ip2geo-demo sshd[21441]: Failed password for invalid user vagrant from 199.253.225.78 port 54253 ssh2
+2026-09-22 01:45:48,851 fail2ban.actions        [20631]: NOTICE  [sshd] Ban 199.253.225.78
+Sep 22 02:00:28 ip2geo-demo sshd[22604]: Failed password for invalid user oracle from 35.233.174.21 port 29372 ssh2
+Sep 22 02:14:15 ip2geo-demo sshd[22937]: Connection closed by authenticating user oracle 35.233.174.21 port 21870 [preauth]
+Sep 22 02:27:11 ip2geo-demo sshd[24984]: Connection closed by authenticating user admin 66.132.148.64 port 39650 [preauth]
+Sep 22 02:34:11 ip2geo-demo sshd[20219]: Connection closed by authenticating user test 66.132.148.64 port 41160 [preauth]
+Sep 22 02:40:07 ip2geo-demo sshd[21411]: Failed password for invalid user ubuntu from 162.142.125.16 port 28229 ssh2
+Sep 22 02:50:43 ip2geo-demo sshd[21278]: Failed password for invalid user debian from 162.142.125.16 port 45792 ssh2
+Sep 22 03:05:33 ip2geo-demo sshd[21417]: Failed password for invalid user support from 34.153.62.144 port 39237 ssh2
+Sep 22 03:16:42 ip2geo-demo sshd[20411]: Failed password for root from 2602:80d:1004::4dfb port 49820 ssh2
+Sep 22 03:18:45 ip2geo-demo sshd[22264]: Failed password for root from 99.77.143.195 port 50877 ssh2
+Sep 22 03:27:42 ip2geo-demo sshd[22651]: Failed password for root from 99.77.143.195 port 52033 ssh2
+Sep 22 03:38:21 ip2geo-demo sshd[21054]: Failed password for root from 99.77.143.195 port 27043 ssh2
+2026-09-22 03:38:24,907 fail2ban.actions        [20194]: NOTICE  [sshd] Ban 99.77.143.195
+Sep 22 03:46:41 ip2geo-demo sshd[24277]: Failed password for invalid user docker from 99.77.143.195 port 43890 ssh2
+Sep 22 04:00:02 ip2geo-demo sshd[21437]: Connection closed by authenticating user oracle 99.77.143.195 port 30800 [preauth]
+Sep 22 04:03:07 ip2geo-demo sshd[22155]: Failed password for root from 99.77.143.195 port 52642 ssh2
+Sep 22 04:04:54 ip2geo-demo sshd[22281]: Failed password for invalid user postgres from 99.77.143.195 port 63430 ssh2
+Sep 22 04:11:42 ip2geo-demo sshd[21317]: Failed password for invalid user test from 99.77.143.195 port 40891 ssh2
+Sep 22 04:14:21 ip2geo-demo sshd[24148]: Failed password for invalid user support from 35.244.97.35 port 20951 ssh2
+Sep 22 04:21:46 ip2geo-demo sshd[22384]: Failed password for invalid user postgres from 35.244.97.35 port 30068 ssh2
+Sep 22 04:36:13 ip2geo-demo sshd[24036]: Failed password for invalid user vagrant from 35.244.97.35 port 20350 ssh2
+2026-09-22 04:36:15,929 fail2ban.actions        [20305]: NOTICE  [sshd] Ban 35.244.97.35
+Sep 22 04:41:34 ip2geo-demo sshd[20552]: Failed password for invalid user ansible from 35.244.97.35 port 24074 ssh2
+Sep 22 04:46:51 ip2geo-demo sshd[21942]: Failed password for invalid user support from 35.244.97.35 port 49315 ssh2
+Sep 22 04:57:25 ip2geo-demo sshd[23402]: Failed password for root from 35.244.97.35 port 55267 ssh2
+Sep 22 05:07:27 ip2geo-demo sshd[20973]: Failed password for invalid user docker from 35.244.97.35 port 22195 ssh2
+Sep 22 05:17:27 ip2geo-demo sshd[20272]: Failed password for invalid user dev from 35.244.97.35 port 27846 ssh2
+Sep 22 05:22:12 ip2geo-demo sshd[22753]: Connection closed by authenticating user user 44.216.199.3 port 50632 [preauth]
+Sep 22 05:34:54 ip2geo-demo sshd[24595]: Connection closed by authenticating user admin 44.216.199.3 port 60271 [preauth]
+Sep 22 05:36:50 ip2geo-demo sshd[24368]: Failed password for invalid user oracle from 2.56.195.36 port 58794 ssh2
+Sep 22 05:39:52 ip2geo-demo sshd[21684]: Failed password for invalid user steam from 66.36.2.145 port 21371 ssh2
+Sep 22 05:44:39 ip2geo-demo sshd[24462]: Failed password for invalid user admin from 66.36.2.145 port 36092 ssh2
+Sep 22 05:49:02 ip2geo-demo sshd[22255]: Failed password for invalid user service from 66.36.2.145 port 62812 ssh2
+2026-09-22 05:49:03,449 fail2ban.actions        [20085]: NOTICE  [sshd] Ban 66.36.2.145
+Sep 22 05:57:17 ip2geo-demo sshd[21140]: Connection closed by authenticating user oracle 52.82.182.61 port 41554 [preauth]
+Sep 22 05:59:19 ip2geo-demo sshd[20461]: Failed password for invalid user user from 137.184.158.54 port 64304 ssh2
+Sep 22 06:01:29 ip2geo-demo sshd[22982]: Failed password for root from 137.184.158.54 port 43892 ssh2
+Sep 22 06:09:57 ip2geo-demo sshd[21981]: Failed password for invalid user support from 137.184.158.54 port 26323 ssh2
+2026-09-22 06:10:02,606 fail2ban.actions        [20782]: NOTICE  [sshd] Ban 137.184.158.54
+Sep 22 06:14:23 ip2geo-demo sshd[23444]: Failed password for invalid user ubuntu from 206.168.34.153 port 24967 ssh2
+Sep 22 06:27:06 ip2geo-demo sshd[24375]: Connection closed by authenticating user test 69.55.61.69 port 32416 [preauth]
+Sep 22 06:35:53 ip2geo-demo sshd[23495]: Failed password for root from 69.55.61.69 port 23297 ssh2
+Sep 22 06:50:05 ip2geo-demo sshd[24611]: Failed password for root from 69.55.61.69 port 39185 ssh2
+2026-09-22 06:50:07,396 fail2ban.actions        [20855]: NOTICE  [sshd] Ban 69.55.61.69
+Sep 22 06:53:08 ip2geo-demo sshd[21110]: Connection closed by authenticating user admin 69.55.61.69 port 59818 [preauth]
+Sep 22 06:59:17 ip2geo-demo sshd[23320]: Failed password for invalid user steam from 69.55.61.69 port 41073 ssh2
+Sep 22 07:02:19 ip2geo-demo sshd[24283]: Failed password for invalid user redis from 66.132.172.7 port 55073 ssh2
+Sep 22 07:15:12 ip2geo-demo sshd[23570]: Failed password for root from 66.132.172.7 port 64839 ssh2
+Sep 22 07:22:51 ip2geo-demo sshd[24330]: Failed password for root from 66.132.224.125 port 35365 ssh2
+Sep 22 07:35:10 ip2geo-demo sshd[22794]: Failed password for invalid user backup from 66.132.224.125 port 29768 ssh2
+Sep 22 07:37:34 ip2geo-demo sshd[21045]: Failed password for invalid user steam from 66.132.224.125 port 39818 ssh2
+2026-09-22 07:37:37,204 fail2ban.actions        [20637]: NOTICE  [sshd] Ban 66.132.224.125
+Sep 22 07:39:19 ip2geo-demo sshd[23799]: Failed password for root from 66.132.224.125 port 61844 ssh2
+Sep 22 07:42:46 ip2geo-demo sshd[24364]: Failed password for invalid user ubuntu from 66.132.224.125 port 41139 ssh2
+Sep 22 07:50:14 ip2geo-demo sshd[23474]: Connection closed by authenticating user root 199.45.155.135 port 34616 [preauth]
+Sep 22 07:59:19 ip2geo-demo sshd[22381]: Failed password for root from 192.108.0.176 port 20155 ssh2
+Sep 22 08:08:15 ip2geo-demo sshd[22260]: Connection closed by authenticating user root 66.132.153.95 port 60119 [preauth]
+Sep 22 08:11:31 ip2geo-demo sshd[23336]: Connection closed by authenticating user root 66.132.153.95 port 35540 [preauth]
+Sep 22 08:13:20 ip2geo-demo sshd[23428]: Failed password for invalid user vagrant from 66.132.153.95 port 48064 ssh2
+2026-09-22 08:13:22,087 fail2ban.actions        [20171]: NOTICE  [sshd] Ban 66.132.153.95
+Sep 22 08:19:56 ip2geo-demo sshd[20881]: Failed password for root from 66.132.153.95 port 55533 ssh2
+Sep 22 08:33:41 ip2geo-demo sshd[24671]: Failed password for root from 66.132.153.95 port 54934 ssh2
+Sep 22 08:47:10 ip2geo-demo sshd[21594]: Failed password for invalid user docker from 35.233.179.201 port 45134 ssh2
+Sep 22 08:52:16 ip2geo-demo sshd[24305]: Failed password for root from 113.213.160.174 port 40277 ssh2
+Sep 22 08:56:34 ip2geo-demo sshd[22771]: Failed password for root from 113.213.160.174 port 56687 ssh2
+Sep 22 09:09:50 ip2geo-demo sshd[22081]: Failed password for invalid user docker from 154.211.12.20 port 24221 ssh2
+Sep 22 09:18:46 ip2geo-demo sshd[23297]: Failed password for root from 154.211.12.20 port 34386 ssh2
+Sep 22 09:32:27 ip2geo-demo sshd[20607]: Failed password for invalid user minecraft from 137.184.149.129 port 49605 ssh2
+Sep 22 09:44:30 ip2geo-demo sshd[20351]: Connection closed by authenticating user root 137.184.149.129 port 55213 [preauth]
+Sep 22 09:57:44 ip2geo-demo sshd[24417]: Connection closed by authenticating user oracle 199.253.226.134 port 37051 [preauth]
+Sep 22 10:02:52 ip2geo-demo sshd[23461]: Connection closed by authenticating user root 199.253.226.134 port 42255 [preauth]
+Sep 22 10:10:25 ip2geo-demo sshd[24916]: Failed password for invalid user test from 167.94.138.236 port 24200 ssh2
+Sep 22 10:21:41 ip2geo-demo sshd[20958]: Failed password for root from 167.94.138.236 port 21876 ssh2
+Sep 22 10:24:45 ip2geo-demo sshd[20089]: Failed password for invalid user jenkins from 209.54.176.123 port 63729 ssh2
+Sep 22 10:28:48 ip2geo-demo sshd[20190]: Failed password for invalid user vagrant from 157.230.203.210 port 41112 ssh2
+Sep 22 10:35:10 ip2geo-demo sshd[24641]: Failed password for invalid user postgres from 167.94.145.8 port 33396 ssh2
+Sep 22 10:50:06 ip2geo-demo sshd[24553]: Failed password for invalid user test from 167.94.145.8 port 49594 ssh2
+Sep 22 10:57:39 ip2geo-demo sshd[21168]: Failed password for invalid user vagrant from 35.247.208.83 port 53967 ssh2
+Sep 22 11:05:40 ip2geo-demo sshd[21549]: Failed password for invalid user jenkins from 35.247.208.83 port 43888 ssh2
+Sep 22 11:17:34 ip2geo-demo sshd[22374]: Failed password for invalid user ansible from 35.247.208.83 port 32535 ssh2
+2026-09-22 11:17:39,679 fail2ban.actions        [20885]: NOTICE  [sshd] Ban 35.247.208.83
+Sep 22 11:28:33 ip2geo-demo sshd[23826]: Failed password for root from 35.247.208.83 port 46601 ssh2
+Sep 22 11:32:22 ip2geo-demo sshd[20086]: Failed password for invalid user oracle from 35.247.208.83 port 28414 ssh2
+Sep 22 11:33:36 ip2geo-demo sshd[23170]: Connection closed by authenticating user ubuntu 35.247.208.83 port 26909 [preauth]
+Sep 22 11:42:47 ip2geo-demo sshd[24518]: Failed password for invalid user centos from 35.247.208.83 port 52033 ssh2
+Sep 22 11:53:50 ip2geo-demo sshd[21833]: Failed password for invalid user user from 35.247.208.83 port 54157 ssh2
+Sep 22 12:07:15 ip2geo-demo sshd[21952]: Failed password for invalid user debian from 34.39.195.225 port 38420 ssh2
+Sep 22 12:21:22 ip2geo-demo sshd[21730]: Connection closed by authenticating user test 34.39.195.225 port 57908 [preauth]
+Sep 22 12:31:18 ip2geo-demo sshd[21164]: Failed password for invalid user docker from 206.168.34.39 port 58177 ssh2
+Sep 22 12:41:46 ip2geo-demo sshd[22587]: Failed password for root from 206.168.34.39 port 43640 ssh2
+Sep 22 12:45:22 ip2geo-demo sshd[23607]: Failed password for invalid user steam from 64.227.40.2 port 46863 ssh2
+Sep 22 12:58:12 ip2geo-demo sshd[24829]: Failed password for invalid user docker from 64.227.40.2 port 43480 ssh2
+Sep 22 13:10:54 ip2geo-demo sshd[24124]: Connection closed by authenticating user admin 40.168.227.65 port 53741 [preauth]
+Sep 22 13:17:41 ip2geo-demo sshd[21569]: Failed password for invalid user steam from 66.132.195.133 port 26178 ssh2
+Sep 22 13:30:04 ip2geo-demo sshd[23560]: Failed password for root from 66.132.195.133 port 63643 ssh2
+Sep 22 13:39:22 ip2geo-demo sshd[21773]: Connection closed by authenticating user admin 66.132.195.133 port 56285 [preauth]
+2026-09-22 13:39:23,338 fail2ban.actions        [20291]: NOTICE  [sshd] Ban 66.132.195.133
+Sep 22 13:46:26 ip2geo-demo sshd[24771]: Connection closed by authenticating user oracle 35.189.93.167 port 53798 [preauth]
+Sep 22 13:55:27 ip2geo-demo sshd[22342]: Connection closed by authenticating user root 2606:7b40:1b05:c000::8ba7:2661 port 27075 [preauth]
+Sep 22 14:04:47 ip2geo-demo sshd[23752]: Failed password for invalid user ansible from 2606:7b40:1b05:c000::8ba7:2661 port 54675 ssh2
+Sep 22 14:12:29 ip2geo-demo sshd[21885]: Failed password for invalid user minecraft from 52.82.180.98 port 29977 ssh2
+Sep 22 14:20:18 ip2geo-demo sshd[24871]: Failed password for invalid user docker from 18.60.127.238 port 25989 ssh2
+Sep 22 14:24:05 ip2geo-demo sshd[20957]: Failed password for root from 18.60.127.238 port 44219 ssh2
+Sep 22 14:27:16 ip2geo-demo sshd[24406]: Connection closed by authenticating user admin 18.60.127.238 port 21776 [preauth]
+2026-09-22 14:27:21,915 fail2ban.actions        [20673]: NOTICE  [sshd] Ban 18.60.127.238
+Sep 22 14:29:50 ip2geo-demo sshd[20291]: Connection closed by authenticating user ubuntu 18.60.127.238 port 20773 [preauth]
+Sep 22 14:43:36 ip2geo-demo sshd[23082]: Failed password for invalid user dev from 18.60.127.238 port 35923 ssh2
+Sep 22 14:53:52 ip2geo-demo sshd[20997]: Failed password for root from 167.248.133.187 port 63680 ssh2
+Sep 22 14:58:08 ip2geo-demo sshd[20299]: Failed password for invalid user vagrant from 52.93.64.146 port 35360 ssh2
+Sep 22 15:01:38 ip2geo-demo sshd[24120]: Failed password for invalid user www from 52.93.64.146 port 40466 ssh2
+Sep 22 15:04:19 ip2geo-demo sshd[20992]: Failed password for root from 52.93.64.146 port 34857 ssh2
+2026-09-22 15:04:24,181 fail2ban.actions        [20087]: NOTICE  [sshd] Ban 52.93.64.146
+Sep 22 15:10:58 ip2geo-demo sshd[20776]: Failed password for invalid user steam from 52.93.64.146 port 28049 ssh2
+Sep 22 15:20:31 ip2geo-demo sshd[20073]: Failed password for invalid user root from 52.93.64.146 port 55478 ssh2
+Sep 22 15:21:19 ip2geo-demo sshd[20250]: Connection closed by authenticating user ubuntu 35.200.164.180 port 45527 [preauth]
+Sep 22 15:28:49 ip2geo-demo sshd[24732]: Connection closed by authenticating user root 35.200.164.180 port 32958 [preauth]
+Sep 22 15:33:20 ip2geo-demo sshd[21685]: Failed password for invalid user ubuntu from 199.45.154.143 port 61022 ssh2
+Sep 22 15:38:21 ip2geo-demo sshd[23328]: Connection closed by authenticating user user 199.45.154.143 port 61287 [preauth]
+Sep 22 15:45:33 ip2geo-demo sshd[21375]: Failed password for invalid user ansible from 199.45.154.143 port 31225 ssh2
+2026-09-22 15:45:38,137 fail2ban.actions        [20448]: NOTICE  [sshd] Ban 199.45.154.143
+Sep 22 15:55:47 ip2geo-demo sshd[22348]: Failed password for invalid user guest from 199.45.154.143 port 44360 ssh2
+Sep 22 16:05:29 ip2geo-demo sshd[24088]: Failed password for invalid user guest from 199.45.154.143 port 27677 ssh2
+Sep 22 16:12:00 ip2geo-demo sshd[22517]: Connection closed by authenticating user root 199.45.154.143 port 42677 [preauth]
+Sep 22 16:23:45 ip2geo-demo sshd[20399]: Failed password for invalid user backup from 199.45.154.143 port 56809 ssh2
+Sep 22 16:26:46 ip2geo-demo sshd[21800]: Failed password for invalid user vagrant from 199.45.154.143 port 30855 ssh2
+Sep 22 16:34:59 ip2geo-demo sshd[21427]: Failed password for invalid user debian from 165.232.103.152 port 20005 ssh2
+Sep 22 16:48:02 ip2geo-demo sshd[24700]: Connection closed by authenticating user admin 165.232.103.152 port 60941 [preauth]
+Sep 22 16:49:32 ip2geo-demo sshd[23248]: Failed password for invalid user debian from 176.65.149.63 port 54195 ssh2
+Sep 22 16:54:21 ip2geo-demo sshd[24840]: Failed password for invalid user deploy from 176.65.149.63 port 49595 ssh2
+Sep 22 17:05:31 ip2geo-demo sshd[22083]: Failed password for root from 176.65.149.63 port 26187 ssh2
+2026-09-22 17:05:32,639 fail2ban.actions        [20116]: NOTICE  [sshd] Ban 176.65.149.63
+Sep 22 17:15:07 ip2geo-demo sshd[22845]: Connection closed by authenticating user test 43.194.8.76 port 63623 [preauth]
+Sep 22 17:27:47 ip2geo-demo sshd[24923]: Failed password for invalid user vagrant from 209.54.181.202 port 53578 ssh2
+Sep 22 17:29:15 ip2geo-demo sshd[22310]: Failed password for root from 209.54.181.202 port 47811 ssh2
+Sep 22 17:36:23 ip2geo-demo sshd[24207]: Failed password for invalid user elastic from 86.105.186.38 port 24029 ssh2
+Sep 22 17:36:48 ip2geo-demo sshd[22483]: Failed password for invalid user deploy from 86.105.186.38 port 51020 ssh2
+Sep 22 17:43:30 ip2geo-demo sshd[23329]: Failed password for root from 99.77.62.207 port 40766 ssh2
+Sep 22 17:57:38 ip2geo-demo sshd[21958]: Failed password for invalid user test from 99.77.62.207 port 59391 ssh2
+Sep 22 18:09:38 ip2geo-demo sshd[20168]: Failed password for root from 99.77.62.207 port 36521 ssh2
+2026-09-22 18:09:43,263 fail2ban.actions        [20643]: NOTICE  [sshd] Ban 99.77.62.207
+Sep 22 18:11:13 ip2geo-demo sshd[20147]: Connection closed by authenticating user root 66.132.172.53 port 41591 [preauth]
+Sep 22 18:25:00 ip2geo-demo sshd[23080]: Connection closed by authenticating user test 66.132.172.53 port 59394 [preauth]
+Sep 22 18:29:49 ip2geo-demo sshd[21066]: Connection closed by authenticating user ubuntu 113.213.169.249 port 60545 [preauth]
+Sep 22 18:34:00 ip2geo-demo sshd[24806]: Failed password for invalid user ubuntu from 66.132.186.133 port 51701 ssh2
+Sep 22 18:34:46 ip2geo-demo sshd[20325]: Failed password for root from 34.155.117.219 port 27290 ssh2
+Sep 22 18:47:15 ip2geo-demo sshd[23278]: Failed password for invalid user git from 167.94.146.88 port 27194 ssh2
+Sep 22 18:58:12 ip2geo-demo sshd[23796]: Failed password for root from 167.94.146.88 port 61154 ssh2
+Sep 22 19:06:07 ip2geo-demo sshd[21316]: Connection closed by authenticating user root 167.94.146.88 port 20395 [preauth]
+2026-09-22 19:06:10,698 fail2ban.actions        [20561]: NOTICE  [sshd] Ban 167.94.146.88
+Sep 22 19:07:01 ip2geo-demo sshd[21596]: Connection closed by authenticating user oracle 167.94.146.88 port 42540 [preauth]
+Sep 22 19:21:05 ip2geo-demo sshd[23834]: Failed password for invalid user redis from 167.94.146.88 port 20020 ssh2
+Sep 22 19:31:21 ip2geo-demo sshd[24903]: Failed password for invalid user backup from 167.94.146.88 port 62734 ssh2
+Sep 22 19:32:59 ip2geo-demo sshd[23596]: Connection closed by authenticating user test 167.94.146.88 port 36682 [preauth]
+Sep 22 19:45:46 ip2geo-demo sshd[20373]: Connection closed by authenticating user root 167.94.146.88 port 45102 [preauth]
+Sep 22 19:55:11 ip2geo-demo sshd[20359]: Failed password for root from 2600:9000:5213::cb53:87f3 port 61234 ssh2
+Sep 22 20:06:20 ip2geo-demo sshd[22181]: Failed password for invalid user docker from 216.198.235.210 port 43346 ssh2
+Sep 22 20:13:43 ip2geo-demo sshd[20908]: Failed password for invalid user support from 2600:1902:260::90f0:8453 port 64567 ssh2
+Sep 22 20:27:42 ip2geo-demo sshd[21235]: Failed password for invalid user dev from 2600:1902:260::90f0:8453 port 20792 ssh2
+Sep 22 20:31:31 ip2geo-demo sshd[20545]: Connection closed by authenticating user root 2600:1902:260::90f0:8453 port 49279 [preauth]
+2026-09-22 20:31:36,106 fail2ban.actions        [20643]: NOTICE  [sshd] Ban 2600:1902:260::90f0:8453
+Sep 22 20:43:47 ip2geo-demo sshd[20895]: Failed password for root from 2600:1902:260::90f0:8453 port 35296 ssh2
+Sep 22 20:57:18 ip2geo-demo sshd[22068]: Failed password for invalid user backup from 2600:1902:260::90f0:8453 port 46694 ssh2
+Sep 22 20:59:32 ip2geo-demo sshd[22609]: Failed password for invalid user service from 2600:1902:260::90f0:8453 port 58695 ssh2
+Sep 22 21:03:33 ip2geo-demo sshd[23123]: Failed password for invalid user ubuntu from 2600:1902:260::90f0:8453 port 23177 ssh2
+Sep 22 21:10:45 ip2geo-demo sshd[20211]: Failed password for root from 2600:1902:260::90f0:8453 port 31284 ssh2
+Sep 22 21:16:25 ip2geo-demo sshd[23368]: Connection closed by authenticating user test 15.230.106.220 port 64372 [preauth]
+Sep 22 21:28:42 ip2geo-demo sshd[20135]: Failed password for invalid user git from 40.168.227.83 port 28453 ssh2
+Sep 22 21:30:31 ip2geo-demo sshd[23207]: Failed password for root from 199.45.155.86 port 28310 ssh2
+Sep 22 21:40:00 ip2geo-demo sshd[24401]: Failed password for root from 199.45.155.86 port 64159 ssh2
+Sep 22 21:46:21 ip2geo-demo sshd[22349]: Failed password for invalid user steam from 199.45.155.86 port 29687 ssh2
+2026-09-22 21:46:22,526 fail2ban.actions        [20231]: NOTICE  [sshd] Ban 199.45.155.86
+Sep 22 21:51:17 ip2geo-demo sshd[20840]: Failed password for root from 199.45.155.86 port 50855 ssh2
+Sep 22 22:01:45 ip2geo-demo sshd[20585]: Failed password for invalid user deploy from 199.45.155.86 port 64057 ssh2
+Sep 22 22:10:35 ip2geo-demo sshd[24489]: Failed password for invalid user git from 2602:80d:1003::1bfd port 21448 ssh2
+Sep 22 22:13:04 ip2geo-demo sshd[24190]: Connection closed by authenticating user user 2602:80d:1003::1bfd port 29617 [preauth]
+Sep 22 22:22:41 ip2geo-demo sshd[21730]: Failed password for root from 66.132.159.108 port 38662 ssh2
+Sep 22 22:26:23 ip2geo-demo sshd[23534]: Connection closed by authenticating user user 66.132.159.108 port 59772 [preauth]
+Sep 22 22:30:29 ip2geo-demo sshd[22517]: Connection closed by authenticating user oracle 66.132.159.108 port 43964 [preauth]
+2026-09-22 22:30:33,615 fail2ban.actions        [20099]: NOTICE  [sshd] Ban 66.132.159.108
+Sep 22 22:41:55 ip2geo-demo sshd[20861]: Failed password for invalid user oracle from 66.132.159.108 port 64205 ssh2
+Sep 22 22:51:28 ip2geo-demo sshd[21775]: Failed password for invalid user postgres from 66.132.159.108 port 24174 ssh2
+Sep 22 22:56:01 ip2geo-demo sshd[20018]: Failed password for invalid user mysql from 154.211.12.144 port 42242 ssh2
+Sep 22 23:06:20 ip2geo-demo sshd[24368]: Failed password for invalid user admin from 154.211.12.144 port 52436 ssh2
+Sep 22 23:17:06 ip2geo-demo sshd[21809]: Connection closed by authenticating user admin 154.211.12.144 port 63619 [preauth]
+2026-09-22 23:17:09,489 fail2ban.actions        [20115]: NOTICE  [sshd] Ban 154.211.12.144
+Sep 22 23:31:24 ip2geo-demo sshd[22689]: Connection closed by authenticating user root 154.211.12.144 port 60640 [preauth]
+Sep 22 23:45:41 ip2geo-demo sshd[21678]: Connection closed by authenticating user oracle 154.211.12.144 port 39814 [preauth]
+Sep 22 23:50:28 ip2geo-demo sshd[22903]: Failed password for invalid user pi from 154.211.12.144 port 29567 ssh2
+Sep 22 23:51:00 ip2geo-demo sshd[23418]: Failed password for invalid user deploy from 154.211.12.144 port 44720 ssh2
+Sep 23 00:02:42 ip2geo-demo sshd[23191]: Failed password for root from 154.211.12.144 port 53205 ssh2
+Sep 23 00:03:45 ip2geo-demo sshd[21957]: Connection closed by authenticating user admin 18.60.127.247 port 39725 [preauth]
+Sep 23 00:07:45 ip2geo-demo sshd[21202]: Failed password for invalid user www from 18.60.127.247 port 29451 ssh2
+Sep 23 00:15:30 ip2geo-demo sshd[20021]: Failed password for root from 18.60.127.247 port 38003 ssh2
+2026-09-23 00:15:35,943 fail2ban.actions        [20044]: NOTICE  [sshd] Ban 18.60.127.247
