@@ -18,11 +18,26 @@ CITY_SHA_URL="https://download.maxmind.com/geoip/databases/GeoLite2-City-CSV/dow
 ASN_ZIP_URL="https://download.maxmind.com/geoip/databases/GeoLite2-ASN-CSV/download?suffix=zip"
 ASN_SHA_URL="https://download.maxmind.com/geoip/databases/GeoLite2-ASN-CSV/download?suffix=zip.sha256"
 
+# .mmdb editions (R4) — same account/license key as the CSVs above, just a
+# different edition + suffix on the same download API.
+CITY_MMDB_TGZ_URL="https://download.maxmind.com/geoip/databases/GeoLite2-City/download?suffix=tar.gz"
+CITY_MMDB_SHA_URL="https://download.maxmind.com/geoip/databases/GeoLite2-City/download?suffix=tar.gz.sha256"
+ASN_MMDB_TGZ_URL="https://download.maxmind.com/geoip/databases/GeoLite2-ASN/download?suffix=tar.gz"
+ASN_MMDB_SHA_URL="https://download.maxmind.com/geoip/databases/GeoLite2-ASN/download?suffix=tar.gz.sha256"
+
 # Read DB credentials from config.php (single source of truth)
 DB_HOST=$(php -r "require '$PROD_PATH/config.php'; echo \$db_host;")
 DB_USER=$(php -r "require '$PROD_PATH/config.php'; echo \$db_user;")
 DB_PASS=$(php -r "require '$PROD_PATH/config.php'; echo \$db_pass;")
 DB_NAME=$(php -r "require '$PROD_PATH/config.php'; echo \$db_name;")
+
+# Read the .mmdb target directory from each environment's own config.php.
+# config.php (copied from config.sample.php) defines GEOIP_MMDB_DIR itself,
+# falling back to /var/www/geoip if the operator never overrode it there;
+# includes/lookup.php carries the same fallback for anything that requires
+# it without config.php. If config.php can't be read at all, fall back here too.
+PROD_MMDB_DIR=$(php -r "require '$PROD_PATH/config.php'; echo defined('GEOIP_MMDB_DIR') ? GEOIP_MMDB_DIR : '/var/www/geoip';" 2>/dev/null || echo '/var/www/geoip')
+STAGING_MMDB_DIR=$(php -r "require '$STAGING_PATH/config.php'; echo defined('GEOIP_MMDB_DIR') ? GEOIP_MMDB_DIR : '/var/www/geoip';" 2>/dev/null || echo '/var/www/geoip')
 
 # Write credentials to a temp file so they never appear in the process list
 MYCNF=$(mktemp)
@@ -56,19 +71,19 @@ download_verified() {
 
 rm -rf "$WORK_DIR" && mkdir -p "$WORK_DIR"
 
-echo "[1/15] Downloading GeoLite2-City CSV..."
+echo "[1/19] Downloading GeoLite2-City CSV..."
 download_verified "City" "$CITY_ZIP_URL" "$CITY_SHA_URL" "$WORK_DIR/GeoLite2-City-CSV.zip"
 
-echo "[2/15] Downloading GeoLite2-ASN CSV..."
+echo "[2/19] Downloading GeoLite2-ASN CSV..."
 download_verified "ASN" "$ASN_ZIP_URL" "$ASN_SHA_URL" "$WORK_DIR/GeoLite2-ASN-CSV.zip"
 
-echo "[3/15] Extracting archives..."
+echo "[3/19] Extracting archives..."
 unzip -q "$WORK_DIR/GeoLite2-City-CSV.zip" -d "$WORK_DIR/city"
 unzip -q "$WORK_DIR/GeoLite2-ASN-CSV.zip"  -d "$WORK_DIR/asn"
 CITY_DIR=$(find "$WORK_DIR/city" -maxdepth 1 -mindepth 1 -type d | head -1)
 ASN_DIR=$(find "$WORK_DIR/asn"  -maxdepth 1 -mindepth 1 -type d | head -1)
 
-echo "[4/15] Converting City blocks to integer-range format..."
+echo "[4/19] Converting City blocks to integer-range format..."
 geoip2-csv-converter \
   -block-file "$CITY_DIR/GeoLite2-City-Blocks-IPv4.csv" \
   -output-file "$CITY_DIR/network_int.csv" \
@@ -79,7 +94,7 @@ geoip2-csv-converter \
 #   is_anonymous_proxy, is_satellite_provider, postal_code,
 #   latitude, longitude, accuracy_radius, is_anycast
 
-echo "[5/15] Converting ASN blocks to integer-range format..."
+echo "[5/19] Converting ASN blocks to integer-range format..."
 geoip2-csv-converter \
   -block-file "$ASN_DIR/GeoLite2-ASN-Blocks-IPv4.csv" \
   -output-file "$ASN_DIR/asn_int.csv" \
@@ -88,7 +103,7 @@ geoip2-csv-converter \
 #   network_start_integer, network_last_integer,
 #   autonomous_system_number, autonomous_system_organization
 
-echo "[6/15] Creating shadow tables..."
+echo "[6/19] Creating shadow tables..."
 $MYSQL <<SQL
 DROP TABLE IF EXISTS geoip2_network_incoming_int;
 DROP TABLE IF EXISTS geoip2_location_incoming;
@@ -108,7 +123,7 @@ CREATE TABLE IF NOT EXISTS geoip2_asn_current_int (
 CREATE TABLE geoip2_asn_incoming_int LIKE geoip2_asn_current_int;
 SQL
 
-echo "[7/15] Importing City network blocks (~3.3M rows)..."
+echo "[7/19] Importing City network blocks (~3.3M rows)..."
 $MYSQL --local-infile=1 -e "
 LOAD DATA LOCAL INFILE '$CITY_DIR/network_int.csv'
 INTO TABLE geoip2_network_incoming_int
@@ -120,7 +135,7 @@ IGNORE 1 ROWS
  postal_code, latitude, longitude, accuracy_radius, is_anycast)
 SET network_end_integer = @net_last;"
 
-echo "[8/15] Importing City location data..."
+echo "[8/19] Importing City location data..."
 $MYSQL --local-infile=1 -e "
 LOAD DATA LOCAL INFILE '$CITY_DIR/GeoLite2-City-Locations-en.csv'
 INTO TABLE geoip2_location_incoming
@@ -128,7 +143,7 @@ FIELDS TERMINATED BY ',' OPTIONALLY ENCLOSED BY '\"'
 LINES TERMINATED BY '\n'
 IGNORE 1 ROWS;"
 
-echo "[9/15] Importing ASN data (~400K rows)..."
+echo "[9/19] Importing ASN data (~400K rows)..."
 $MYSQL --local-infile=1 -e "
 LOAD DATA LOCAL INFILE '$ASN_DIR/asn_int.csv'
 INTO TABLE geoip2_asn_incoming_int
@@ -138,7 +153,7 @@ IGNORE 1 ROWS
 (network_start_integer, @net_last, autonomous_system_number, autonomous_system_org)
 SET network_end_integer = @net_last;"
 
-echo "[10/15] Verifying City data..."
+echo "[10/19] Verifying City data..."
 CURRENT_NET=$($MYSQL -sN -e "SELECT COUNT(*) FROM geoip2_network_current_int;")
 INCOMING_NET=$($MYSQL -sN -e "SELECT COUNT(*) FROM geoip2_network_incoming_int;")
 CURRENT_LOC=$($MYSQL -sN -e "SELECT COUNT(*) FROM geoip2_location_current;")
@@ -176,7 +191,7 @@ if [ "$SPOT" != "US" ]; then
 fi
 echo "  City spot check passed: 8.8.8.8 -> $SPOT"
 
-echo "[11/15] Verifying ASN data..."
+echo "[11/19] Verifying ASN data..."
 CURRENT_ASN=$($MYSQL -sN -e "SELECT COUNT(*) FROM geoip2_asn_current_int;")
 INCOMING_ASN=$($MYSQL -sN -e "SELECT COUNT(*) FROM geoip2_asn_incoming_int;")
 echo "  ASN: current=$CURRENT_ASN incoming=$INCOMING_ASN"
@@ -211,7 +226,7 @@ if [ "$ASN_SPOT" != "15169" ]; then
 fi
 echo "  ASN spot check passed: 8.8.8.8 -> AS$ASN_SPOT"
 
-echo "[12/15] Atomic swap (City + ASN)..."
+echo "[12/19] Atomic swap (City + ASN)..."
 $MYSQL <<SQL
 RENAME TABLE
   geoip2_network_current_int TO geoip2_network_backup_int,
@@ -222,13 +237,13 @@ RENAME TABLE
   geoip2_asn_incoming_int TO geoip2_asn_current_int;
 SQL
 
-echo "[13/15] Updating db_meta..."
+echo "[13/19] Updating db_meta..."
 DATE_LABEL=$(date +"%B %Y")
 $MYSQL -e "UPDATE db_meta SET value = CURDATE() WHERE key_name = 'data_last_updated';"
 printf '<?php $db_data_date = '"'"'%s'"'"'; ?>\n' "$DATE_LABEL" \
   | tee "$PROD_PATH/db_version.php" "$STAGING_PATH/db_version.php" > /dev/null
 
-echo "[14/15] Post-swap verification..."
+echo "[14/19] Post-swap verification..."
 POST_SPOT=$($MYSQL -sN -e "
 SELECT l.country_iso_code
 FROM geoip2_network_current_int n
@@ -273,10 +288,74 @@ SQL
 fi
 echo "  ASN post-swap: 8.8.8.8 -> AS$POST_ASN"
 
-echo "[15/15] Dropping backup tables..."
+echo "[15/19] Dropping backup tables..."
 $MYSQL -e "
   DROP TABLE IF EXISTS geoip2_network_backup_int;
   DROP TABLE IF EXISTS geoip2_location_backup;
   DROP TABLE IF EXISTS geoip2_asn_backup_int;"
 
-echo "Done. GeoLite2 City + ASN updated to $DATE_LABEL."
+echo "Done. GeoLite2 City + ASN updated to $DATE_LABEL (MySQL tables)."
+
+# ── .mmdb download (R4) ────────────────────────────────────────────────────
+# MySQL is done and swapped above; this section is independent of it (the
+# MySQL tables stay in place until the HTML page is switched to lookup_ips(),
+# per the design doc). A failure below leaves the previous .mmdb files in
+# place untouched — mmdb_atomic_swap only replaces them once a new file has
+# already been downloaded, verified and extracted successfully.
+
+echo "[16/19] Downloading GeoLite2-City .mmdb..."
+download_verified "City .mmdb" "$CITY_MMDB_TGZ_URL" "$CITY_MMDB_SHA_URL" "$WORK_DIR/GeoLite2-City-mmdb.tar.gz"
+
+echo "[17/19] Downloading GeoLite2-ASN .mmdb..."
+download_verified "ASN .mmdb" "$ASN_MMDB_TGZ_URL" "$ASN_MMDB_SHA_URL" "$WORK_DIR/GeoLite2-ASN-mmdb.tar.gz"
+
+echo "[18/19] Extracting .mmdb archives..."
+mkdir -p "$WORK_DIR/city-mmdb" "$WORK_DIR/asn-mmdb"
+tar -xzf "$WORK_DIR/GeoLite2-City-mmdb.tar.gz" -C "$WORK_DIR/city-mmdb"
+tar -xzf "$WORK_DIR/GeoLite2-ASN-mmdb.tar.gz"  -C "$WORK_DIR/asn-mmdb"
+CITY_MMDB_SRC=$(find "$WORK_DIR/city-mmdb" -name 'GeoLite2-City.mmdb' | head -1)
+ASN_MMDB_SRC=$(find "$WORK_DIR/asn-mmdb"  -name 'GeoLite2-ASN.mmdb'  | head -1)
+if [ -z "$CITY_MMDB_SRC" ] || [ -z "$ASN_MMDB_SRC" ]; then
+  echo "FAIL: extracted archive did not contain the expected .mmdb file. Old files kept in place."
+  exit 1
+fi
+# Sanity check both files parse and answer the same 8.8.8.8 / AS15169 spot
+# check used for the MySQL tables above, using the reader this app ships
+# (composer.json: maxmind-db/reader). A bad extract must not reach prod.
+php -r "
+require '$PROD_PATH/vendor/autoload.php';
+foreach (['$CITY_MMDB_SRC' => 'country', '$ASN_MMDB_SRC' => 'asn'] as \$path => \$kind) {
+    \$r = new MaxMind\Db\Reader(\$path);
+    \$rec = \$r->get('8.8.8.8');
+    \$r->close();
+    if (\$kind === 'country' && (\$rec['country']['iso_code'] ?? null) !== 'US') {
+        fwrite(STDERR, \"FAIL: City .mmdb spot check (8.8.8.8) did not return US\n\");
+        exit(1);
+    }
+    if (\$kind === 'asn' && (\$rec['autonomous_system_number'] ?? null) !== 15169) {
+        fwrite(STDERR, \"FAIL: ASN .mmdb spot check (8.8.8.8) did not return AS15169\n\");
+        exit(1);
+    }
+}
+echo \"  .mmdb spot checks passed: 8.8.8.8 -> US / AS15169\n\";
+"
+
+# Atomic swap: write to a temp name in the SAME directory as the target (so
+# the rename is on one filesystem, and never durably visible half-written),
+# then mv -f over the live file. Applied to both prod and staging mmdb dirs.
+mmdb_atomic_swap() {
+  local src="$1" dest_dir="$2" dest_name="$3"
+  mkdir -p "$dest_dir"
+  local tmp="$dest_dir/.${dest_name}.tmp.$$"
+  cp "$src" "$tmp"
+  mv -f "$tmp" "$dest_dir/$dest_name"
+}
+
+echo "[19/19] Atomic swap of .mmdb files (prod + staging)..."
+mmdb_atomic_swap "$CITY_MMDB_SRC" "$PROD_MMDB_DIR"    "GeoLite2-City.mmdb"
+mmdb_atomic_swap "$ASN_MMDB_SRC"  "$PROD_MMDB_DIR"    "GeoLite2-ASN.mmdb"
+mmdb_atomic_swap "$CITY_MMDB_SRC" "$STAGING_MMDB_DIR" "GeoLite2-City.mmdb"
+mmdb_atomic_swap "$ASN_MMDB_SRC"  "$STAGING_MMDB_DIR" "GeoLite2-ASN.mmdb"
+echo "  Swapped into $PROD_MMDB_DIR and $STAGING_MMDB_DIR"
+
+echo "Done. GeoLite2 City + ASN updated to $DATE_LABEL (MySQL tables + .mmdb files)."
