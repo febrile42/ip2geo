@@ -108,3 +108,27 @@ Someone came back to the page with `?cancelled=1` in the URL — i.e. they opene
 the Stripe checkout and then clicked the back/cancel button without paying.
 We strip the query param immediately after firing so it doesn't persist in
 browser history.
+
+---
+
+## Home page: Recent lookups (ip2geo-app.js)
+
+Recent lookups is a list kept in the visitor's own browser (localStorage) so
+they can re-run an earlier lookup. It is on by default. None of these events
+carry properties, and none include anything from a lookup.
+
+### `recent_lookups_use`
+Someone clicked a saved lookup and it was restored into the paste box. This is
+the only signal that the feature is actually used; the events below only show
+people turning it on, off, or clearing it. Added in 4.3.3 so there is at least
+30 days of data before deciding whether v5 keeps the feature.
+
+### `recent_lookups_optin` / `recent_lookups_optout`
+Someone turned the feature on, or off. Turning it off with saved entries also
+clears them, with an Undo toast.
+
+### `recent_lookups_clear`
+Someone clicked Clear on the list.
+
+### `recent_lookups_undo`
+Someone clicked Undo on the toast after turning it off or clearing it.

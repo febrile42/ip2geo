@@ -508,12 +508,13 @@
         function fillTextareaFromEntry(idx) {
             var items = loadList();
             var entry = items[idx];
-            if (!entry) return;
+            if (!entry) return false;
             var textarea = document.getElementById('message');
-            if (!textarea) return;
+            if (!textarea) return false;
             textarea.value = entry.ips.join('\n');
             textarea.focus();
             textarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            return true;
         }
 
         // ── Toast with undo ────────────────────────────────────────────────
@@ -631,7 +632,10 @@
             if (!btn) return;
             var idx = parseInt(btn.dataset.idx, 10);
             if (isNaN(idx)) return;
-            fillTextareaFromEntry(idx);
+            // No properties: counts that the feature was used, never what was restored.
+            if (fillTextareaFromEntry(idx)) {
+                try { window.umami && umami.track('recent_lookups_use'); } catch(_) {}
+            }
         }
 
         function handleLookupSubmit(event) {
