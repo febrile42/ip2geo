@@ -546,6 +546,7 @@ function attachHandlers() {
         const textarea = document.getElementById('message');
         if (!textarea) return;
         textarea.value = entry.ips.join('\n');
+        try { window.umami && window.umami.track('recent_lookups_use'); } catch (_) {}
     }
 
     function handleLookupSubmit(event) {
@@ -745,6 +746,28 @@ describe('list item click', () => {
         const textarea = document.getElementById('message');
         expect(textarea.value).toContain('1.1.1.1');
         expect(textarea.value).toContain('2.2.2.2');
+    });
+
+    test('restoring an entry fires recent_lookups_use with no properties', () => {
+        window.umami = { track: jest.fn() };
+        saveOptInState(true);
+        saveList([{ ips: ['1.1.1.1'], count: 1, ts: 100 }]);
+        document.dispatchEvent(new CustomEvent('ip2geo:lookup_submit', {
+            detail: { ips: [], count: 0 }
+        }));
+        const seededBtn = Array.from(document.querySelectorAll('.recent-lookup-item'))
+            .find(b => b.dataset.idx === '0');
+        seededBtn.click();
+        expect(window.umami.track).toHaveBeenCalledTimes(1);
+        expect(window.umami.track).toHaveBeenCalledWith('recent_lookups_use');
+        delete window.umami;
+    });
+
+    test('clicking outside an entry fires nothing', () => {
+        window.umami = { track: jest.fn() };
+        document.getElementById('recent-lookups-list').click();
+        expect(window.umami.track).not.toHaveBeenCalled();
+        delete window.umami;
     });
 });
 

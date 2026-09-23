@@ -10,6 +10,9 @@ render_page_open('Changelog — ip2geo.org', 'Release notes for ip2geo.org.');
         </div>
 
         <div class="prose">
+            <h3>4.3.3 — 2026-09-23</h3>
+            <p>Recent lookups now counts, anonymously, when someone actually reopens a saved lookup. Nothing from the lookup goes with it, just "this got used". Before, I could only see who switched it off. It's a feature your browser keeps for you, and I'd like to know whether it's earning its spot.</p>
+
             <h3>4.3.2 — 2026-09-15</h3>
             <p>Moved analytics off Umami Cloud and onto a copy of <a href="https://umami.is/" target="_blank" rel="noopener">Umami</a> I run myself. Same anonymous visitor counts, still no cookies, they just land on my server now instead of someone else's. No more third party behavior analytics.</p>
 
