@@ -422,9 +422,25 @@ $visitor_ip     = filter_var($visitor_ip_raw, FILTER_VALIDATE_IP) !== false ? $v
 ?><!DOCTYPE HTML>
 <html lang="en" data-theme="dark">
 	<head>
+		<!-- R3: strip a #v= share-link payload into memory before the Umami tracker
+		     loads, so a missed/ignored data-exclude-hash never leaks it. This inline
+		     script is NOT deferred, so it runs at parse time, before the deferred
+		     tracker script below executes (deferred scripts run after the document
+		     is parsed). See assets/js/workbench.js for what reads window.__ip2geoSharedView. -->
+		<script>
+		(function() {
+			var h = window.location.hash;
+			if (h.indexOf('#v=') === 0) {
+				window.__ip2geoSharedView = h.slice(3);
+				if (window.history && window.history.replaceState) {
+					window.history.replaceState(null, '', window.location.pathname + window.location.search);
+				}
+			}
+		})();
+		</script>
 		<!-- Umami (production only) -->
-		<?php if ($_SERVER['HTTP_HOST'] === 'ip2geo.org'): ?>
-		<script defer src="/u/script.js" data-website-id="656d7a15-6282-4079-af1e-b8ed857fba2e" data-domains="ip2geo.org"></script>
+		<?php if (($_SERVER['HTTP_HOST'] === 'ip2geo.org' || getenv('IP2GEO_E2E_FORCE_UMAMI') === '1')): ?>
+		<script defer src="/u/script.js" data-website-id="656d7a15-6282-4079-af1e-b8ed857fba2e" data-domains="ip2geo.org" data-exclude-hash="true"></script>
 		<?php endif; ?>
 		<title>ip2geo — Bulk IP Lookup for Raw Logs, Free</title>
 		<meta charset="utf-8" />
@@ -537,6 +553,57 @@ if (isset($_POST['ip_list'])) {
 <?php if ($_POST): ?>
 <?php echo render_lookup_results($_POST, $visitor_ip); ?>
 <?php endif; ?>
+
+			<!-- Phase 2 workbench mount point (design doc: "Progressive enhancement").
+			     Built and shown by assets/js/workbench.js; the server-rendered
+			     #results above (render_lookup_results()) is the no-JS fallback and
+			     stays untouched. Hidden by default; JS shows it and hides #results
+			     once a browser-side lookup succeeds. -->
+			<section id="workbench-root" class="block" hidden aria-labelledby="workbench-h">
+				<div class="section-head">
+					<h2 id="workbench-h">Lookup Results</h2>
+					<span class="section-tag">01 / Results</span>
+				</div>
+				<div class="wb-toast-host"></div>
+				<p class="wb-recipient-banner" hidden role="status"></p>
+				<div class="wb-paste-bar"></div>
+				<div class="wb-state" hidden></div>
+				<div class="wb-body" hidden>
+					<div id="lookup-summary" class="wb-summary" role="status"></div>
+					<div class="wb-export-hint" hidden></div>
+					<div class="wb-filters">
+						<div class="wb-chips-row"><div class="wb-chips-category"></div></div>
+						<div class="wb-chips-row"><div class="wb-chips-country"></div></div>
+					</div>
+					<div class="wb-toolbar">
+						<div class="wb-export"></div>
+						<button type="button" class="button small wb-share-btn">Copy share link</button>
+						<button type="button" class="button small wb-share-download" hidden>Download view file</button>
+						<button type="button" class="button small" id="wb-toggle-unresolved" hidden>Show unresolved</button>
+						<span class="wb-spacer"></span>
+						<span class="wb-shown-count"></span>
+						<button type="button" class="wb-clear-filters" hidden>Clear filters</button>
+					</div>
+					<div class="table-wrapper" style="overflow-x:auto">
+						<table class="wb-table" id="wb-results-table">
+							<caption style="position:absolute;left:-9999px">Lookup results, one row per IP address</caption>
+							<thead><tr>
+								<th scope="col" data-key="ip">IP</th>
+								<th scope="col" data-key="country"><abbr title="Country Code">CC</abbr></th>
+								<th scope="col" data-key="region" class="cell-region">State/Province</th>
+								<th scope="col" data-key="city" class="cell-city">City</th>
+								<th scope="col" data-key="asn">ASN</th>
+								<th scope="col" data-key="asnOrg" class="cell-asn-org">ASN Org</th>
+								<th scope="col" data-key="category">Category</th>
+								<th scope="col" data-key="hits" aria-sort="descending" style="text-align:right">Hits</th>
+							</tr></thead>
+							<tbody></tbody>
+						</table>
+						<div class="wb-table-sentinel"></div>
+					</div>
+					<p class="wb-empty-filter" hidden style="text-align:center;padding:1em;opacity:0.7">No IPs match the current filter. Try selecting more categories.</p>
+				</div>
+			</section>
 
 			<!-- Contact / Contribute -->
 			<section class="block" id="contribute" aria-labelledby="contact-h">
@@ -666,108 +733,19 @@ if (isset($_POST['ip_list'])) {
 		(function() {
 			var form = document.getElementById('iplookup');
 			if (!form) return;
-			var btn = form.querySelector('input[type="submit"]');
-			if (!btn) return;
 
-			function showNetworkFailureNotice(retry) {
-				var html = '<section id="results" class="block"><div class="section-head"><h2 id="result">Lookup Results</h2><span class="section-tag">01 / Results</span></div>'
-					+ '<p class="notice" role="alert">Couldn’t reach ip2geo. Your paste is still here. <button type="button" id="network-retry" class="button small alt">Retry</button></p></section>';
-				var existing = document.getElementById('results');
-				if (existing) {
-					existing.outerHTML = html;
-				} else {
-					document.getElementById('lookup').insertAdjacentHTML('afterend', html);
-				}
-				var inserted = document.getElementById('results');
-				if (inserted) inserted.scrollIntoView({ behavior: 'smooth' });
-				var retryBtn = document.getElementById('network-retry');
-				if (retryBtn) retryBtn.addEventListener('click', function() { retry(); }, { once: true });
-			}
+			// A prior AJAX layer used to own the submit button's click here,
+			// fetching a server-rendered HTML fragment (FormData POST back to
+			// index.php, re-injecting the #results it got back). The Phase 2
+			// workbench (assets/js/workbench.js, wired in the bootstrap script
+			// below) replaces that: it intercepts the form's `submit` event
+			// directly, extracts IPs client-side, and POSTs JSON to
+			// /api/lookup.php in one request instead of re-rendering server HTML.
+			// Keeping both would double-handle every click — this file no longer
+			// attaches anything to the submit button; the plain, unintercepted
+			// form POST (render_lookup_results()) remains the no-JS fallback
+			// exactly as before.
 
-			btn.addEventListener('click', async function(e) {
-				e.preventDefault();
-				e.stopPropagation();
-
-				var raw = document.getElementById('message').value;
-				var extracted = (window.extractIps ? window.extractIps(raw) : { ips: [], totalUnique: 0, v6Count: 0 });
-				var uniqueCount = extracted.totalUnique;
-				var shownCount = Math.min(uniqueCount, 10000);
-				var v6Suffix = extracted.v6Count > 0 ? ' · ' + extracted.v6Count.toLocaleString() + ' IPv6' : '';
-
-				var overlay = document.createElement('div');
-				overlay.className = 'processing-overlay';
-				var msg = document.createElement('div');
-				msg.className = 'processing-overlay__msg';
-				msg.setAttribute('role', 'status');
-				msg.textContent = 'Looking up ' + shownCount.toLocaleString() + ' unique IP' + (shownCount !== 1 ? 's' : '') + v6Suffix + ' ';
-				var dotSpan = document.createElement('span');
-				dotSpan.className = 'processing-overlay__dots';
-				var dots = ['.', '..', '...'];
-				var dotIdx = 0;
-				dotSpan.textContent = dots[dotIdx];
-				msg.appendChild(dotSpan);
-				var dotTimer = setInterval(function() {
-					dotIdx = (dotIdx + 1) % dots.length;
-					dotSpan.textContent = dots[dotIdx];
-				}, 400);
-				overlay.appendChild(msg);
-				document.body.appendChild(overlay);
-
-				var cleanup = function() {
-					clearInterval(dotTimer);
-					overlay.remove();
-				};
-
-				var isSample = !!window.__ip2geoSampleActive;
-				window.__ip2geoSampleActive = false;
-
-				try {
-					var resp = await fetch(window.location.pathname, {
-						method: 'POST',
-						body: new FormData(form)
-					});
-					if (!resp.ok) throw new Error('HTTP ' + resp.status);
-					var html = await resp.text();
-					var doc = new DOMParser().parseFromString(html, 'text/html');
-					var newResults = doc.getElementById('results');
-					if (!newResults) throw new Error('no results section in response');
-
-					var existing = document.getElementById('results');
-					if (existing) {
-						existing.outerHTML = newResults.outerHTML;
-					} else {
-						document.getElementById('lookup').insertAdjacentHTML('afterend', newResults.outerHTML);
-					}
-					var inserted = document.getElementById('results');
-					cleanup();
-					if (inserted) inserted.scrollIntoView({ behavior: 'smooth' });
-
-					var bucket = uniqueCount === 1 ? '1'
-					             : uniqueCount <= 10   ? '2-10'
-					             : uniqueCount <= 50   ? '11-50'
-					             : uniqueCount <= 100  ? '51-100'
-					             : uniqueCount <= 500  ? '101-500'
-					             : uniqueCount <= 1000 ? '501-1000'
-					             : uniqueCount <= 5000 ? '1001-5000'
-					             :                       '5000+';
-					try { umami.track('lookup_submit', { ip_count_bucket: bucket, sample: isSample }); } catch(_) {}
-
-					// Recent-lookups: notify the opt-in handler with the actual IPs.
-					// Listener lives in assets/js/ip2geo-app.js; it no-ops when opt-in is OFF.
-					try {
-						var flatIps = (extracted.ips || []).map(function (pair) { return pair[0]; });
-						document.dispatchEvent(new CustomEvent('ip2geo:lookup_submit', {
-							detail: { ips: flatIps, count: uniqueCount }
-						}));
-					} catch(_) {}
-
-				} catch (err) {
-					cleanup();
-					showNetworkFailureNotice(function() {
-						btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-					});
-				}
-			});
 		// CSV download (delegated — works after AJAX injection)
 		document.addEventListener('click', function(e) {
 			if (e.target.id !== 'download-csv') return;
@@ -803,6 +781,85 @@ if (isset($_POST['ip_list'])) {
 		})();
 		</script>
 		<script src="assets/js/ip2geo-app.js?v=<?php echo APP_VERSION; ?>"></script>
+
+		<!-- Phase 2 workbench: pure modules, then the DOM orchestration layer, then the bootstrap. -->
+		<script src="assets/js/filters.js?v=<?php echo APP_VERSION; ?>"></script>
+		<script src="assets/js/export-templates.js?v=<?php echo APP_VERSION; ?>"></script>
+		<script src="assets/js/summary.js?v=<?php echo APP_VERSION; ?>"></script>
+		<script src="assets/js/share-link.js?v=<?php echo APP_VERSION; ?>"></script>
+		<script src="assets/js/workbench.js?v=<?php echo APP_VERSION; ?>"></script>
+		<script data-cfasync="false">
+		(function () {
+			var root = document.getElementById('workbench-root');
+			var oldResults = document.getElementById('results');
+			var form = document.getElementById('iplookup');
+			var textarea = document.getElementById('message');
+			if (!root || !form || !textarea || !window.ip2geoWorkbench) return;
+
+			var mounted = window.ip2geoWorkbench.mount(root, form, textarea);
+			if (!mounted) return; // extractIps missing: let the form submit normally (no-JS fallback)
+
+			function hideOldResults() {
+				if (oldResults) oldResults.style.display = 'none';
+			}
+
+			// Wrap startLookup so a successful JS lookup hides the PHP-rendered
+			// #results (if the page happens to have one, e.g. a JS-disabled-then-
+			// re-enabled reload) and scrolls to the workbench, matching the old
+			// form's action="#results" behavior.
+			var realStart = mounted.startLookup;
+			mounted.startLookup = function (text) {
+				return realStart(text).then(function (ok) {
+					if (ok) {
+						hideOldResults();
+						root.scrollIntoView({ block: 'start' });
+					}
+					return ok;
+				});
+			};
+
+			// D8 recipient path: a #v= payload captured by R3's inline script
+			// (must run before this, and before the Umami tracker) before we ever
+			// get here.
+			if (window.__ip2geoSharedView) {
+				var banner = root.querySelector('.wb-recipient-banner');
+				window.ip2geoWorkbench.mountSharedView(root, window.__ip2geoSharedView, function (text) {
+					if (banner) {
+						banner.hidden = false;
+						banner.textContent = text + ' ';
+						var saveBtn = document.createElement('button');
+						saveBtn.type = 'button';
+						saveBtn.className = 'button small';
+						saveBtn.textContent = 'Save as view file';
+						saveBtn.addEventListener('click', function () {
+							// Re-derive the view file from the decoded payload via the share-link module.
+							var decoded = window.ip2geoShareLink.decodeShareState(window.__ip2geoSharedView);
+							if (!decoded) return;
+							var json = window.ip2geoShareLink.buildViewFile(decoded);
+							var a = document.createElement('a');
+							a.href = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+							a.download = 'view.ip2geo.json';
+							a.click();
+							URL.revokeObjectURL(a.href);
+						});
+						banner.appendChild(saveBtn);
+					}
+				}).then(function (ok) {
+					if (ok) hideOldResults();
+				});
+			}
+
+			// D12: an old #results bookmark with no lookup on the page yet.
+			if (window.location.hash === '#results' && !oldResults && root.hidden) {
+				textarea.focus();
+				var hint = document.createElement('p');
+				hint.className = 'notice';
+				hint.setAttribute('role', 'status');
+				hint.textContent = 'Paste a log to see results.';
+				form.parentNode.insertBefore(hint, form.nextSibling);
+			}
+		})();
+		</script>
 
 	</body>
 </html>

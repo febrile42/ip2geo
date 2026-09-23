@@ -31,8 +31,23 @@ function render_page_open(string $title, string $meta_desc = '', array $og = [],
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
-    <?php if ($_SERVER['HTTP_HOST'] === 'ip2geo.org'): ?>
-    <script defer src="/u/script.js" data-website-id="656d7a15-6282-4079-af1e-b8ed857fba2e" data-domains="ip2geo.org"></script>
+    <!-- R3: strip a #v= share-link payload into memory before the Umami tracker
+         loads (matches the inline script in index.php's <head>; see
+         assets/js/workbench.js). Non-lookup pages rarely carry #v=, but this
+         keeps the protection uniform across every page that loads the tracker. -->
+    <script>
+    (function() {
+        var h = window.location.hash;
+        if (h.indexOf('#v=') === 0) {
+            window.__ip2geoSharedView = h.slice(3);
+            if (window.history && window.history.replaceState) {
+                window.history.replaceState(null, '', window.location.pathname + window.location.search);
+            }
+        }
+    })();
+    </script>
+    <?php if (($_SERVER['HTTP_HOST'] === 'ip2geo.org' || getenv('IP2GEO_E2E_FORCE_UMAMI') === '1')): ?>
+    <script defer src="/u/script.js" data-website-id="656d7a15-6282-4079-af1e-b8ed857fba2e" data-domains="ip2geo.org" data-exclude-hash="true"></script>
     <?php endif; ?>
     <title><?php echo $safe_title; ?></title>
     <meta charset="utf-8" />
