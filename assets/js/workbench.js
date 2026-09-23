@@ -621,7 +621,34 @@
       }
 
       root.hidden = false;
-      return runLookup(root, state, uniqueIps, hitCounts, meta);
+      var isSample = !!window.__ip2geoSampleActive;
+      window.__ip2geoSampleActive = false;
+
+      return runLookup(root, state, uniqueIps, hitCounts, meta).then(function (ok) {
+        if (ok) {
+          // Matches the bucket boundaries the old server-fragment AJAX handler
+          // used (index.php, before the workbench replaced it) so the
+          // `lookup_submit` event's ip_count_bucket values stay consistent
+          // across the cutover for ip2geo-admin's dashboards.
+          var uniqueCount = extracted.totalUnique;
+          var bucket = uniqueCount === 1 ? '1'
+                     : uniqueCount <= 10 ? '2-10'
+                     : uniqueCount <= 50 ? '11-50'
+                     : uniqueCount <= 100 ? '51-100'
+                     : uniqueCount <= 500 ? '101-500'
+                     : uniqueCount <= 1000 ? '501-1000'
+                     : uniqueCount <= 5000 ? '1001-5000'
+                     : '5000+';
+          try { window.umami && window.umami.track('lookup_submit', { ip_count_bucket: bucket, sample: isSample }); } catch (e) { /* no-op */ }
+
+          // Recent-lookups (assets/js/ip2geo-app.js's handleLookupSubmit) listens
+          // for this same event name; it no-ops when the opt-in is off.
+          try {
+            document.dispatchEvent(new CustomEvent('ip2geo:lookup_submit', { detail: { ips: uniqueIps, count: uniqueCount } }));
+          } catch (e) { /* no-op */ }
+        }
+        return ok;
+      });
     }
 
     var handle = { state: state, startLookup: startLookup };

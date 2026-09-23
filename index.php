@@ -439,7 +439,7 @@ $visitor_ip     = filter_var($visitor_ip_raw, FILTER_VALIDATE_IP) !== false ? $v
 		})();
 		</script>
 		<!-- Umami (production only) -->
-		<?php if ($_SERVER['HTTP_HOST'] === 'ip2geo.org'): ?>
+		<?php if (($_SERVER['HTTP_HOST'] === 'ip2geo.org' || getenv('IP2GEO_E2E_FORCE_UMAMI') === '1')): ?>
 		<script defer src="/u/script.js" data-website-id="656d7a15-6282-4079-af1e-b8ed857fba2e" data-domains="ip2geo.org" data-exclude-hash="true"></script>
 		<?php endif; ?>
 		<title>ip2geo — Bulk IP Lookup for Raw Logs, Free</title>
@@ -733,108 +733,19 @@ if (isset($_POST['ip_list'])) {
 		(function() {
 			var form = document.getElementById('iplookup');
 			if (!form) return;
-			var btn = form.querySelector('input[type="submit"]');
-			if (!btn) return;
 
-			function showNetworkFailureNotice(retry) {
-				var html = '<section id="results" class="block"><div class="section-head"><h2 id="result">Lookup Results</h2><span class="section-tag">01 / Results</span></div>'
-					+ '<p class="notice" role="alert">Couldn’t reach ip2geo. Your paste is still here. <button type="button" id="network-retry" class="button small alt">Retry</button></p></section>';
-				var existing = document.getElementById('results');
-				if (existing) {
-					existing.outerHTML = html;
-				} else {
-					document.getElementById('lookup').insertAdjacentHTML('afterend', html);
-				}
-				var inserted = document.getElementById('results');
-				if (inserted) inserted.scrollIntoView({ behavior: 'smooth' });
-				var retryBtn = document.getElementById('network-retry');
-				if (retryBtn) retryBtn.addEventListener('click', function() { retry(); }, { once: true });
-			}
+			// A prior AJAX layer used to own the submit button's click here,
+			// fetching a server-rendered HTML fragment (FormData POST back to
+			// index.php, re-injecting the #results it got back). The Phase 2
+			// workbench (assets/js/workbench.js, wired in the bootstrap script
+			// below) replaces that: it intercepts the form's `submit` event
+			// directly, extracts IPs client-side, and POSTs JSON to
+			// /api/lookup.php in one request instead of re-rendering server HTML.
+			// Keeping both would double-handle every click — this file no longer
+			// attaches anything to the submit button; the plain, unintercepted
+			// form POST (render_lookup_results()) remains the no-JS fallback
+			// exactly as before.
 
-			btn.addEventListener('click', async function(e) {
-				e.preventDefault();
-				e.stopPropagation();
-
-				var raw = document.getElementById('message').value;
-				var extracted = (window.extractIps ? window.extractIps(raw) : { ips: [], totalUnique: 0, v6Count: 0 });
-				var uniqueCount = extracted.totalUnique;
-				var shownCount = Math.min(uniqueCount, 10000);
-				var v6Suffix = extracted.v6Count > 0 ? ' · ' + extracted.v6Count.toLocaleString() + ' IPv6' : '';
-
-				var overlay = document.createElement('div');
-				overlay.className = 'processing-overlay';
-				var msg = document.createElement('div');
-				msg.className = 'processing-overlay__msg';
-				msg.setAttribute('role', 'status');
-				msg.textContent = 'Looking up ' + shownCount.toLocaleString() + ' unique IP' + (shownCount !== 1 ? 's' : '') + v6Suffix + ' ';
-				var dotSpan = document.createElement('span');
-				dotSpan.className = 'processing-overlay__dots';
-				var dots = ['.', '..', '...'];
-				var dotIdx = 0;
-				dotSpan.textContent = dots[dotIdx];
-				msg.appendChild(dotSpan);
-				var dotTimer = setInterval(function() {
-					dotIdx = (dotIdx + 1) % dots.length;
-					dotSpan.textContent = dots[dotIdx];
-				}, 400);
-				overlay.appendChild(msg);
-				document.body.appendChild(overlay);
-
-				var cleanup = function() {
-					clearInterval(dotTimer);
-					overlay.remove();
-				};
-
-				var isSample = !!window.__ip2geoSampleActive;
-				window.__ip2geoSampleActive = false;
-
-				try {
-					var resp = await fetch(window.location.pathname, {
-						method: 'POST',
-						body: new FormData(form)
-					});
-					if (!resp.ok) throw new Error('HTTP ' + resp.status);
-					var html = await resp.text();
-					var doc = new DOMParser().parseFromString(html, 'text/html');
-					var newResults = doc.getElementById('results');
-					if (!newResults) throw new Error('no results section in response');
-
-					var existing = document.getElementById('results');
-					if (existing) {
-						existing.outerHTML = newResults.outerHTML;
-					} else {
-						document.getElementById('lookup').insertAdjacentHTML('afterend', newResults.outerHTML);
-					}
-					var inserted = document.getElementById('results');
-					cleanup();
-					if (inserted) inserted.scrollIntoView({ behavior: 'smooth' });
-
-					var bucket = uniqueCount === 1 ? '1'
-					             : uniqueCount <= 10   ? '2-10'
-					             : uniqueCount <= 50   ? '11-50'
-					             : uniqueCount <= 100  ? '51-100'
-					             : uniqueCount <= 500  ? '101-500'
-					             : uniqueCount <= 1000 ? '501-1000'
-					             : uniqueCount <= 5000 ? '1001-5000'
-					             :                       '5000+';
-					try { umami.track('lookup_submit', { ip_count_bucket: bucket, sample: isSample }); } catch(_) {}
-
-					// Recent-lookups: notify the opt-in handler with the actual IPs.
-					// Listener lives in assets/js/ip2geo-app.js; it no-ops when opt-in is OFF.
-					try {
-						var flatIps = (extracted.ips || []).map(function (pair) { return pair[0]; });
-						document.dispatchEvent(new CustomEvent('ip2geo:lookup_submit', {
-							detail: { ips: flatIps, count: uniqueCount }
-						}));
-					} catch(_) {}
-
-				} catch (err) {
-					cleanup();
-					showNetworkFailureNotice(function() {
-						btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-					});
-				}
-			});
 		// CSV download (delegated — works after AJAX injection)
 		document.addEventListener('click', function(e) {
 			if (e.target.id !== 'download-csv') return;

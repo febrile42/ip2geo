@@ -48,3 +48,7 @@ DESIGN.md
 
 # Mac Junk
 .DS_Store
+# Playwright artifacts
+test-results/
+playwright-report/
+blob-report/
