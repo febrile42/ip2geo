@@ -1,38 +1,423 @@
 <?php
 
-require __DIR__ . '/config.php';
-require __DIR__ . '/asn_classification.php';
-require __DIR__ . '/report_functions.php'; // rank_ips(), enrich_abuseipdb(), build_teaser() for the inline threat-score teaser
+declare(strict_types=1);
+
+require_once __DIR__ . '/asn_classification.php';
+require_once __DIR__ . '/report_functions.php'; // ip_in_spamhaus_drop(), REPUTATION_AXIS_ENABLED
+require_once __DIR__ . '/includes/extract.php';  // extract_ips(), EXTRACT_IPS_CAP
+require_once __DIR__ . '/includes/lookup.php';   // lookup_ips(), GeoDbUnavailableException
+require_once __DIR__ . '/includes/summary.php';  // build_summary(), SUMMARY_CATEGORY_LABELS
+require_once __DIR__ . '/includes/version.php';  // APP_VERSION for ?v= asset URLs
 @include_once __DIR__ . '/db_version.php'; // gitignored; written by the monthly DB update script
-require_once __DIR__ . '/includes/version.php'; // APP_VERSION for ?v= asset URLs
-
-// REPUTATION_AXIS_ENABLED (the Spamhaus DROP kill switch) is defined in
-// report_functions.php — required above — so both this lookup page and report.php
-// share one gate. Flip it there to disable the reputation logic instantly.
-
-function getRealIPAddr()
-{
-	// Check for IP from shared internet / proxy
-	if (!empty($_SERVER['HTTP_CLIENT_IP'])) {
-		$ip = $_SERVER['HTTP_CLIENT_IP'];
-	}
-	elseif (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
-		$ip = $_SERVER['HTTP_X_FORWARDED_FOR'];
-	} else {
-		$ip = $_SERVER['REMOTE_ADDR'];
-	}
-
-	return $ip;
+if (is_file(__DIR__ . '/config.php')) {
+    // Optional in v5: index.php no longer talks to MySQL or Stripe (R17), so
+    // the only thing it might still read from here is a GEOIP_MMDB_DIR
+    // override. Other pages (report.php, webhook.php, get-report.php) still
+    // require it directly for their own needs.
+    require_once __DIR__ . '/config.php';
 }
 
 function ipToLong(string $ip): string {
     return sprintf('%u', ip2long($ip)); // Handles unsigned 32-bit int
 }
 
-// view_token mode: show all IPs for a paid/redeemed report without a new submission
-$view_token_mode = !empty($_GET['view_token']) && empty($_POST);
-$view_token_val  = $view_token_mode ? preg_replace('/[^a-f0-9\-]/', '', trim($_GET['view_token'])) : '';
+/**
+ * The visitor's own IP (R16's "(you)" sample line). Prefers Cloudflare's
+ * header — lime sits behind Cloudflare — then falls back to the historical
+ * header order. No anti-spoofing check: R16's accepted scope is "we don't
+ * care if someone is intentionally spoofing, it's a demo" (a spoofed value
+ * only ever mislabels the spoofer's own sample-log row).
+ */
+function getRealIPAddr(): string
+{
+    if (!empty($_SERVER['HTTP_CF_CONNECTING_IP'])) {
+        return $_SERVER['HTTP_CF_CONNECTING_IP'];
+    }
+    if (!empty($_SERVER['HTTP_CLIENT_IP'])) {
+        return $_SERVER['HTTP_CLIENT_IP'];
+    }
+    if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+        return $_SERVER['HTTP_X_FORWARDED_FOR'];
+    }
+    return (string) ($_SERVER['REMOTE_ADDR'] ?? '');
+}
 
+/**
+ * index.php must never be served from a shared cache (R16): the "(you)"
+ * sample line puts the visitor's own IP in the markup. A single helper so
+ * the value is asserted the same way in tests as it's sent on the wire.
+ */
+function ip2geo_index_cache_control(): string
+{
+    return 'private, no-store';
+}
+
+/**
+ * Middle-truncated display form for a canonical IPv6 address, per D15:
+ * "2001:db8::7334" -> "2001:db8…:7334". Mobile-only in CSS (.ip-truncated);
+ * the full address always stays in the DOM (.ip-full, and the cell's title
+ * attribute) for the title tooltip and for CSV/copy.
+ */
+function ipv6_middle_truncate(string $ip): string
+{
+    if (strlen($ip) <= 15) {
+        return $ip;
+    }
+    return substr($ip, 0, 8) . "\u{2026}:" . substr($ip, -4);
+}
+
+/**
+ * All raw IP-shaped candidates in $text, public AND private — used only to
+ * tell the EMPTY state apart from the PRIVATE-ONLY state (D6). This reuses
+ * includes/extract.php's private-range predicates and IPv6 validator rather
+ * than reimplementing them; unlike extract_ips() it keeps private hits
+ * instead of dropping them, which is the one piece of information
+ * extract_ips()'s return value doesn't carry.
+ *
+ * @return string[] unique, normalized IP strings (v4 as-is, v6 canonical)
+ */
+function extract_raw_ip_candidates(string $text): array
+{
+    preg_match_all(
+        "/\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b/",
+        $text,
+        $v4
+    );
+    preg_match_all('/[0-9A-Fa-f:.]+/', $text, $v6c);
+
+    $seen = [];
+    foreach ($v4[0] as $ip) {
+        $seen[$ip] = true;
+    }
+    foreach ($v6c[0] as $token) {
+        if (strpos($token, ':') === false) {
+            continue;
+        }
+        $normalized = extract_ips_validate_v6_candidate($token);
+        if ($normalized !== null) {
+            $seen[$normalized] = true;
+        }
+    }
+    return array_keys($seen);
+}
+
+/**
+ * Renders the #results section for one submitted lookup: the D6/D7 state
+ * table (empty, private-only, over-10k notice, 503), the D4/D5 fixed
+ * summary line, DROP tags, the "(you)" row (R16), and the results table.
+ *
+ * Pulled out of the page flow so it's callable — and unit-testable — without
+ * booting the full HTML page or a real GeoIP database; see
+ * tests/IndexResultsTest.php. Define IP2GEO_SKIP_PAGE_RENDER before
+ * requiring this file to get this function (and the others above) without
+ * executing the page body below.
+ *
+ * @param array{ip_list?: string, countries_filter?: string} $post   like $_POST
+ * @param string      $visitor_ip  the requester's own IP (R16); '' if unknown/invalid
+ * @param string|null $city_db     optional GeoLite2-City.mmdb path override (tests)
+ * @param string|null $asn_db      optional GeoLite2-ASN.mmdb path override (tests)
+ */
+function render_lookup_results(array $post, string $visitor_ip = '', ?string $city_db = null, ?string $asn_db = null): string
+{
+    $section_open  = '<section id="results" class="block"><div class="section-head"><h2 id="result">Lookup Results</h2><span class="section-tag">01 / Results</span></div>';
+    $section_close = '</section>';
+
+    $raw_ip_list = (string) ($post['ip_list'] ?? '');
+
+    // OVER 2 MB (D6)
+    if (strlen($raw_ip_list) > 2097152) {
+        return $section_open
+            . '<p class="notice" role="alert">Paste is over 2 MB. Trim it or paste the busiest part of the log.</p>'
+            . $section_close;
+    }
+
+    $extracted    = extract_ips($raw_ip_list);
+    $ip_freq      = $extracted['ips']; // [ip => count], v4+v6, capped, private-filtered
+    $total_unique = $extracted['total_unique'];
+
+    // EMPTY / PRIVATE-ONLY (D6)
+    if (empty($ip_freq)) {
+        $raw_candidates = extract_raw_ip_candidates($raw_ip_list);
+        if (empty($raw_candidates)) {
+            return $section_open
+                . '<p class="notice" role="status">No IP addresses found in the pasted text.</p>'
+                . $section_close;
+        }
+        $n = count($raw_candidates);
+        return $section_open
+            . '<p class="notice" role="status">Found ' . number_format($n) . ' address' . ($n === 1 ? '' : 'es')
+            . ', all private or internal (10/8, 172.16/12, 192.168/16, ::1, fc00::/7). Nothing to look up.</p>'
+            . $section_close;
+    }
+
+    // OVER 10k UNIQUE notice (D7) — extract_ips() already capped $ip_freq;
+    // total_unique is the pre-cap count, so the gap between them is what got skipped.
+    $notice_html = '';
+    if ($total_unique > EXTRACT_IPS_CAP) {
+        $looked_up = count($ip_freq);
+        $skipped   = $total_unique - $looked_up;
+        $notice_html = '<p class="notice" role="status">Looked up the first ' . number_format($looked_up)
+            . ' of ' . number_format($total_unique) . ' unique IPs. ' . number_format($skipped)
+            . ' skipped. Paste the rest separately to check them.</p>';
+    }
+
+    // Country exclude filter — sanitized 2-letter codes. The DB whitelist
+    // query this used to validate against is gone with MySQL; an unknown
+    // code simply never matches any row, same net effect.
+    $good_countries = array_values(array_filter(
+        array_map(
+            static fn(string $c): string => strtoupper(trim($c)),
+            preg_split('/\s+/', (string) ($post['countries_filter'] ?? ''), -1, PREG_SPLIT_NO_EMPTY) ?: []
+        ),
+        static fn(string $c): bool => (bool) preg_match('/^[A-Z]{2}$/', $c)
+    ));
+
+    // ── GeoIP + ASN lookup, IPv4 AND IPv6 in one pass (R4) ──
+    try {
+        $lookup = lookup_ips(array_keys($ip_freq), $city_db, $asn_db);
+    } catch (GeoDbUnavailableException $e) {
+        // 503 state (D6) — a missing or mid-swap .mmdb file, not a bug in the paste.
+        return $section_open
+            . '<p class="notice" role="alert">Lookup data is updating. Try again in a minute.</p>'
+            . $section_close;
+    }
+
+    $rows_for_summary = [];
+    $rows_html         = '';
+    $no_result_ips      = [];
+    $country_counts      = [];
+    $filtered_total       = 0;
+
+    foreach ($ip_freq as $ip => $freq) {
+        $geo   = $lookup[$ip] ?? null;
+        $is_v6 = strpos($ip, ':') !== false;
+
+        $asn_num      = $geo['autonomous_system_number'] ?? null;
+        $asn_org      = $geo['autonomous_system_org'] ?? '';
+        $country_code = $geo['country_iso_code'] ?? '';
+        $country_name = $geo['country_name'] ?? '';
+        $region       = $geo['subdivision_1_name'] ?? '';
+        $city         = $geo['city_name'] ?? '';
+
+        $has_geo = $geo !== null && ($country_code !== '' || $asn_num !== null);
+        if (!$has_geo) {
+            $no_result_ips[] = $ip;
+            continue;
+        }
+
+        if (in_array($country_code, $good_countries, true)) {
+            $filtered_total++;
+            continue;
+        }
+
+        $category = classify_asn((string) ($asn_num ?? ''), (string) $asn_org);
+        // Spamhaus DROP is an IPv4-only netblock list; v6 rows never match.
+        $drop = (!$is_v6 && REPUTATION_AXIS_ENABLED)
+            ? ip_in_spamhaus_drop((int) ipToLong($ip))
+            : false;
+
+        $rows_for_summary[] = [
+            'category' => $category,
+            'asn'      => $asn_num !== null ? 'AS' . $asn_num : '',
+            'asn_org'  => $asn_org,
+            'drop'     => $drop,
+        ];
+
+        if ($country_code !== '') {
+            $country_counts[$country_code] = ($country_counts[$country_code] ?? 0) + 1;
+        }
+
+        $is_you = $visitor_ip !== '' && $ip === $visitor_ip;
+
+        if ($is_v6) {
+            $ip_safe = htmlspecialchars($ip, ENT_QUOTES, 'UTF-8');
+            $ip_cell = '<span class="ip-full">' . $ip_safe . '</span><span class="ip-truncated">' . htmlspecialchars(ipv6_middle_truncate($ip), ENT_QUOTES, 'UTF-8') . '</span>';
+            $ip_title = ' title="' . $ip_safe . '"';
+        } else {
+            $ip_cell = htmlspecialchars($ip, ENT_QUOTES, 'UTF-8');
+            $ip_title = '';
+        }
+
+        $rows_html .= '<tr data-category="' . htmlspecialchars($category, ENT_QUOTES, 'UTF-8') . '" data-country="' . htmlspecialchars($country_code, ENT_QUOTES, 'UTF-8') . '">';
+        $rows_html .= '<td class="cell-ip"' . $ip_title . '>' . $ip_cell . ($is_you ? ' <span class="you-tag">(you)</span>' : '') . '</td>';
+        $rows_html .= '<td><abbr title="' . htmlspecialchars($country_name, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($country_code, ENT_QUOTES, 'UTF-8') . '</abbr></td>';
+        $rows_html .= '<td class="cell-region">' . htmlspecialchars($region, ENT_QUOTES, 'UTF-8') . '</td>';
+        $rows_html .= '<td class="cell-city">' . htmlspecialchars($city, ENT_QUOTES, 'UTF-8') . '</td>';
+        $rows_html .= '<td>' . htmlspecialchars($asn_num !== null ? 'AS' . $asn_num : '', ENT_QUOTES, 'UTF-8') . '</td>';
+        $rows_html .= '<td class="cell-asn-org" title="' . htmlspecialchars($asn_org, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($asn_org, ENT_QUOTES, 'UTF-8') . '</td>';
+        $rows_html .= '<td class="asn-category asn-category--' . htmlspecialchars($category, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($category, ENT_QUOTES, 'UTF-8')
+            . ($drop ? ' <span class="drop-tag">DROP</span>' : '') . '</td>';
+        $rows_html .= '</tr>';
+    }
+
+    arsort($country_counts);
+
+    $summary       = build_summary($rows_for_summary);
+    $matches_total = $summary['total'];
+    $all_unresolved = $matches_total === 0 && !empty($no_result_ips);
+
+    $html = $section_open;
+
+    if ($notice_html !== '') {
+        $html .= $notice_html;
+    }
+
+    if ($summary['line'] !== '') {
+        // Structured per-fact markup (not just the plain-text 'line') so mobile
+        // CSS can wrap one fact per line and show only the top ASN (D15).
+        $html .= '<div id="lookup-summary" class="lookup-summary" role="status">';
+        $html .= '<span class="lookup-summary-fact lookup-summary-total">'
+            . number_format($summary['total']) . ' IP' . ($summary['total'] === 1 ? '' : 's') . ' looked up</span>';
+        foreach ($summary['categories'] as $cat) {
+            $html .= '<span class="lookup-summary-fact lookup-summary-category lookup-summary-category--' . htmlspecialchars($cat['key'], ENT_QUOTES, 'UTF-8') . '">'
+                . htmlspecialchars($cat['label'], ENT_QUOTES, 'UTF-8') . ' ' . number_format($cat['count']) . ' (' . $cat['pct'] . '%)</span>';
+        }
+        if (!empty($summary['top_asns'])) {
+            $html .= '<span class="lookup-summary-fact lookup-summary-asns">top ASNs: ';
+            foreach ($summary['top_asns'] as $i => $a) {
+                $asn_text = htmlspecialchars(trim($a['asn'] . ' ' . $a['org']), ENT_QUOTES, 'UTF-8');
+                if ($i === 0) {
+                    $html .= '<span class="lookup-summary-asn lookup-summary-asn--top">' . $asn_text . '</span>';
+                } else {
+                    $html .= '<span class="lookup-summary-asn-rest">, ' . $asn_text . '</span>';
+                }
+            }
+            $html .= '</span>';
+        }
+        if ($summary['drop_count'] > 0) {
+            $html .= '<span class="lookup-summary-fact lookup-summary-drop">'
+                . number_format($summary['drop_count']) . ' in Spamhaus DROP netblocks</span>';
+        }
+        $html .= '</div>';
+    }
+
+    // --- Filter & Export (above table) ---
+    $html .= '<div id="filter-export" role="region" aria-label="Filter and Export">';
+    $html .= '<details id="filter-details" open>';
+    $html .= '<summary id="filter-summary">Filter &amp; Export &mdash; Showing <span id="filter-count">' . $matches_total . '</span> of <span id="filter-total">' . $matches_total . '</span> IPs</summary>';
+    $html .= '<div id="filter-layout">';
+
+    // Left column: action buttons + firewall rules output
+    $html .= '<div id="filter-left">';
+
+    $html .= '<div id="action-buttons-primary">';
+    $html .= '<button id="download-csv" class="button small">&#8595; Download CSV</button>';
+    if (!empty($no_result_ips)) {
+        $n = count($no_result_ips);
+        $v6_unresolved = 0;
+        foreach ($no_result_ips as $u) {
+            if (strpos($u, ':') !== false) {
+                $v6_unresolved++;
+            }
+        }
+        $suffix = $v6_unresolved > 0 ? ' (' . $v6_unresolved . ' IPv6)' : '';
+        $verb = $all_unresolved ? 'Hide ' : 'Show ';
+        $html .= '<button id="toggle-unresolved" class="button small alt" data-suffix="' . htmlspecialchars($suffix, ENT_QUOTES, 'UTF-8') . '">' . $verb . $n . ' unresolved IP' . ($n !== 1 ? 's' : '') . $suffix . '</button>';
+    }
+    $html .= '</div>';
+
+    $html .= '<div id="export-buttons">';
+    $html .= '<button class="button small" id="show-iptables">Show iptables rules</button>';
+    $html .= '<button class="button small" id="show-ufw">Show ufw rules</button>';
+    $html .= '<button class="button small" id="show-nginx">Show nginx block</button>';
+    $html .= '</div>';
+
+    $html .= '<div id="rules-iptables" class="rules-block" style="display:none" aria-label="iptables block rules"><button class="button small copy-rules" data-target="rules-iptables-pre">Copy</button><pre id="rules-iptables-pre"></pre></div>';
+    $html .= '<div id="rules-ufw"      class="rules-block" style="display:none" aria-label="ufw deny rules"><button class="button small copy-rules" data-target="rules-ufw-pre">Copy</button><pre id="rules-ufw-pre"></pre></div>';
+    $html .= '<div id="rules-nginx"    class="rules-block" style="display:none" aria-label="nginx geo block"><button class="button small copy-rules" data-target="rules-nginx-pre">Copy</button><pre id="rules-nginx-pre"></pre></div>';
+
+    $html .= '<p class="cbl-callout">Block known scanners reported by the ip2geo community. <a href="/intel.php" target="_blank" rel="noopener noreferrer" class="cbl-link">View the Community Block List <span aria-hidden="true">&rarr;</span></a></p>';
+
+    $html .= '</div>'; // end #filter-left
+
+    // Right column: filter chips
+    $html .= '<div id="filter-right">';
+
+    $category_counts = array_column($summary['categories'], 'count', 'key');
+    $html .= '<div id="filter-categories">';
+    $html .= '<strong>ASN Categories</strong>';
+    foreach (SUMMARY_CATEGORY_LABELS as $cat => $cat_label) {
+        if (($category_counts[$cat] ?? 0) === 0) {
+            continue;
+        }
+        $cat_safe = htmlspecialchars($cat, ENT_QUOTES, 'UTF-8');
+        $html .= '<label class="cat-' . $cat_safe . '"><input type="checkbox" class="filter-category" value="' . $cat_safe . '" checked><span class="chip-label">' . $cat_label . '</span> <span class="chip-count">(' . $category_counts[$cat] . ')</span></label>';
+    }
+    $html .= '</div>';
+
+    $html .= '<div id="filter-countries">';
+    $html .= '<strong>Countries <span class="chip-hint">&#8679; multi-select</span></strong>';
+    $html .= '<div class="filter-chips">';
+    foreach ($country_counts as $cc => $count) {
+        $cc_safe = htmlspecialchars($cc, ENT_QUOTES, 'UTF-8');
+        $html .= '<label><input type="checkbox" class="filter-country" value="' . $cc_safe . '" checked><span class="chip-label">' . $cc_safe . '</span> <span class="chip-count">(' . $count . ')</span></label>';
+    }
+    $html .= '</div>';
+    $html .= '</div>'; // end #filter-countries
+
+    $html .= '</div>'; // end #filter-right
+    $html .= '</div>'; // end #filter-layout
+    $html .= '</details></div>'; // end #filter-details, #filter-export
+
+    // --- Results table ---
+    $html .= '<div class="table-wrapper" style="overflow-x:auto">';
+
+    $html .= '<table id="results-table"><caption style="position:absolute;left:-9999px">Lookup results, one row per IP address</caption><thead><tr>';
+    $html .= '<th scope="col">IP</th>';
+    $html .= '<th scope="col"><abbr title="Country Code">CC</abbr></th><th scope="col" class="cell-region">State/Province</th><th scope="col" class="cell-city">City</th>';
+    $html .= '<th scope="col">ASN</th><th scope="col" class="cell-asn-org">ASN Org</th><th scope="col">Category</th>';
+    $html .= '</tr></thead><tbody>';
+    $html .= $rows_html;
+    $html .= '</tbody>';
+
+    if (!empty($no_result_ips)) {
+        $html .= '<tbody id="unresolved-rows"' . ($all_unresolved ? '' : ' style="display:none"') . '>';
+        foreach ($no_result_ips as $unresolved_ip) {
+            $html .= '<tr><td>' . htmlspecialchars($unresolved_ip, ENT_QUOTES, 'UTF-8') . '</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>';
+        }
+        $html .= '</tbody>';
+    }
+    $html .= '</table>';
+
+    // Empty filter state (shown by JS when all rows filtered out)
+    $html .= '<p id="empty-filter-msg" style="display:none;text-align:center;padding:1em;opacity:0.7">No IPs match the current filter. Try selecting more categories.</p>';
+
+    $html .= '</div>';
+
+    // --- Summary stats ---
+    $submitted = count($ip_freq);
+    $html .= '<table id="stats-table" style="font-family:monospace;font-size:0.8em;border-collapse:collapse;margin-top:0.5em;width:auto">';
+    $html .= '<tr><td>' . $submitted . '</td><td>IP' . ($submitted !== 1 ? 's' : '') . ' submitted (valid, unique, non-private)</td></tr>';
+    $html .= '<tr><td>' . $matches_total . '</td><td>returned geo results</td></tr>';
+    if ($filtered_total > 0) {
+        $html .= '<tr><td>' . $filtered_total . '</td><td>excluded by country filter</td></tr>';
+    }
+    $html .= '<tr><td>' . count($no_result_ips) . '</td><td>returned no geo data</td></tr>';
+    if ($extracted['v6_count'] > 0) {
+        $html .= '<tr><td>' . $extracted['v6_count'] . '</td><td>IPv6 addresses</td></tr>';
+    }
+    if (!empty($good_countries)) {
+        $html .= '<tr><td>&mdash;</td><td>excluded countries: ' . htmlspecialchars(implode(' ', $good_countries), ENT_QUOTES, 'UTF-8') . '</td></tr>';
+    }
+    $html .= '</table>';
+
+    $html .= $section_close;
+
+    return $html;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Page render. Skipped when IP2GEO_SKIP_PAGE_RENDER is defined before this
+// file is required, so tests can pull in the functions above (in particular
+// render_lookup_results()) without booting a full HTTP page — see
+// tests/IndexResultsTest.php.
+// ─────────────────────────────────────────────────────────────────────────
+if (!defined('IP2GEO_SKIP_PAGE_RENDER')):
+
+header('Cache-Control: ' . ip2geo_index_cache_control());
+
+$visitor_ip_raw = getRealIPAddr();
+$visitor_ip     = filter_var($visitor_ip_raw, FILTER_VALIDATE_IP) !== false ? $visitor_ip_raw : '';
 
 ?><!DOCTYPE HTML>
 <html lang="en" data-theme="dark">
@@ -41,9 +426,9 @@ $view_token_val  = $view_token_mode ? preg_replace('/[^a-f0-9\-]/', '', trim($_G
 		<?php if ($_SERVER['HTTP_HOST'] === 'ip2geo.org'): ?>
 		<script defer src="/u/script.js" data-website-id="656d7a15-6282-4079-af1e-b8ed857fba2e" data-domains="ip2geo.org"></script>
 		<?php endif; ?>
-		<title>Bulk IP Lookup & Location Finder - Free IP Geolocation Lookup Tool</title>
+		<title>ip2geo — Bulk IP Lookup for Raw Logs, Free</title>
 		<meta charset="utf-8" />
-		<meta name="description" content="Free tool to filter up to 10,000 IP addresses from an arbitrary text blob and list their geographic location." />
+		<meta name="description" content="Paste any log and pull out up to 10,000 IPv4 and IPv6 addresses. Filter by country, ASN and category. Free, no signup." />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta property="og:title" content="ip2geo · Bulk IP lookup for raw logs" />
 		<meta property="og:description" content="Paste up to 10,000 IPs from any log. Country, ASN and category. Free, no signup." />
@@ -81,7 +466,6 @@ $view_token_val  = $view_token_mode ? preg_replace('/[^a-f0-9\-]/', '', trim($_G
 				<a href="/" class="wordmark" aria-label="ip2geo home">ip2geo</a>
 				<nav class="nav-links" aria-label="primary">
 					<a href="#lookup">Lookup</a>
-					<a href="#reports">Threat Reports</a>
 					<a href="#contribute">Contact</a>
 					<a href="#about">About</a>
 					<button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle color theme">
@@ -102,18 +486,14 @@ $view_token_val  = $view_token_mode ? preg_replace('/[^a-f0-9\-]/', '', trim($_G
 				</div>
 
 				<p class="lead">
-					Enter an IPv4 address (or 10,000) below and hit <strong>Look Up IP Addresses</strong> to find a general geographic area or city the IP is registered to. Any non-IP text is stripped, so feel free to just paste your whole log file, <code>netstat</code> output, or whatever pile of plain text that includes some IPs you want to check (as long as it's less than 2MB).
+					Paste any log, netstat output or ticket text. Up to 10,000 IPs, IPv4 and IPv6, pulled out and looked up in seconds.
 				</p>
 
 				<form class="lookup-form" action="#results" method="post" name="ip_entry" id="iplookup">
-					<label for="message" class="sr-only" style="position:absolute;left:-9999px">Text containing IPv4 Addresses</label>
+					<label for="message" class="sr-only" style="position:absolute;left:-9999px">Text containing IP addresses</label>
 					<div class="form-grid">
-						<textarea class="ip-textarea" name="ip_list" id="message" rows="6" spellcheck="false"><?php
-if ($view_token_mode) {
-	// leave empty — user's IPs not re-populated in view mode
-} elseif (!isset($_POST['ip_list'])) {
-	echo "Here's some example text with the IPs 8.8.8.8 (Google's public DNS) and @#75.75.75.75@#% (Comcast's DNS with some extra characters tucked in the middle). Hit the button below to try it out. We'll see about your IP (".htmlspecialchars(getRealIPAddr(), ENT_QUOTES, 'UTF-8').") too, assuming it's IPv4.";
-} else {
+						<textarea class="ip-textarea" name="ip_list" id="message" rows="6" spellcheck="false" placeholder="Paste a log, netstat output, or any text containing IP addresses…"><?php
+if (isset($_POST['ip_list'])) {
 	echo htmlspecialchars($_POST['ip_list'], ENT_QUOTES, 'UTF-8');
 }
 		?></textarea>
@@ -140,6 +520,8 @@ if ($view_token_mode) {
 					</div>
 				</form>
 
+				<p class="sample-log-link"><a href="#" id="try-sample-log" data-sample-url="assets/sample-fail2ban.txt" data-visitor-ip="<?php echo htmlspecialchars($visitor_ip, ENT_QUOTES, 'UTF-8'); ?>">Try a sample log</a></p>
+
 				<!-- Recent lookups widget — rendered by ip2geo-app.js when opt-in is on + list is nonempty.
 				     Sits below the form so the asymmetric hero stays tight; surfaces returning users'
 				     prior lookups right where they'd reach next. -->
@@ -152,580 +534,15 @@ if ($view_token_mode) {
 				</div>
 			</section>
 
-<?php
-
-
-if ($_POST || $view_token_mode)
-{
-	$con = mysqli_connect($db_host, $db_user, $db_pass, $db_name);
-	if (mysqli_connect_errno())
-	{
-		error_log("ip2geo DB connection failed: " . mysqli_connect_error());
-		echo "Database connection failed. Please try again later.";
-	}
-
-	if ($view_token_mode) {
-		// Load the original IP list from a paid/redeemed report token
-		$stmt = $con->prepare(
-			'SELECT ip_list_json, geo_results_json FROM reports WHERE token = ? AND status IN ("paid","redeemed")'
-		);
-		$stmt->bind_param('s', $view_token_val);
-		$stmt->execute();
-		$vt_row = $stmt->get_result()->fetch_assoc();
-		$stmt->close();
-
-		if (!$vt_row) {
-			echo '<section id="results" class="block"><div class="section-head"><h2 id="result">Lookup Results</h2><span class="section-tag">01 / Results</span></div>';
-			echo '<p>Report not found or access has expired. <a href="/" class="button small">&#8592; New Lookup</a></p>';
-			echo '</section>';
-			mysqli_close($con);
-			$con = null;
-		} else {
-			$vt_ip_data = json_decode($vt_row['ip_list_json'], true) ?? [];
-			$ip_freq = [];
-			foreach ($vt_ip_data as $entry) {
-				$vt_ip = $entry['ip'] ?? '';
-				if ($vt_ip !== '') $ip_freq[$vt_ip] = $entry['freq'] ?? 1;
-			}
-			$ip_list = array_keys($ip_freq);
-			$good_countries = []; // show all IPs — no country filter in view mode
-			$vt_geo_cached = !empty($vt_row['geo_results_json'])
-				? (json_decode($vt_row['geo_results_json'], true) ?? [])
-				: [];
-		}
-	}
-
-	if ($_POST) {
-		// Get Country List
-		$countries_query = 'SELECT DISTINCT(`country_iso_code`) FROM `geoip2_location_current` WHERE `country_iso_code` IS NOT NULL';
-		$countries = mysqli_query($con, $countries_query);
-		while ($row = mysqli_fetch_array($countries))
-		{
-			$countries_all[$row['country_iso_code']] = $row['country_iso_code'];
-		}
-		$countries_all = array_filter($countries_all); // remove spurious empty entries
-
-		// parse country filter: normalize, sanitize, and validate against known country codes
-		$good_countries = array_filter(explode(" ", mysqli_real_escape_string($con, strtoupper($_POST['countries_filter'] ?? ''))));
-		foreach ($good_countries as $key => $value) {
-			if (!in_array($value, $countries_all))
-			{
-				// echo 'unset('.$good_countries[$key].');<br/>';
-				unset($good_countries[$key]);
-			}
-		}
-
-		// Make an Array of valid IPs out of the input
-		if (strlen($_POST['ip_list']) > 2097152) { // 2MB hard limit
-			echo '<section id="results" class="block"><div class="section-head"><h2 id="result">Lookup Results</h2><span class="section-tag">01 / Results</span></div><p>Input exceeds 2MB limit. Please reduce the size of your input.</p></section>';
-			exit;
-		}
-		preg_match_all("/\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b/", $_POST['ip_list'], $ip_list);
-
-		// Count occurrences before dedup — repeat appearances are a meaningful threat signal
-		// (an IP hammering your SSH 400 times ranks higher than one that appeared once).
-		// array_count_values produces [ip => count]; slicing the map preserves the 10K cap
-		// on unique IPs; then private ranges are stripped from the keyset.
-		function test_local($ip) {
-			return !preg_match('/^(127\.|192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.|::1$)/', $ip);
-		}
-		$ip_freq = array_count_values($ip_list[0]);
-		$ip_freq = array_slice($ip_freq, 0, 10000, true);
-		$ip_freq = array_filter($ip_freq, 'test_local', ARRAY_FILTER_USE_KEY);
-		$ip_list = array_keys($ip_freq);
-	}
-
-	// Declared outside `if ($con !== null)` so view_token fast-path can use it
-	// even after the DB connection is established above.
-	$vt_geo_cached = $vt_geo_cached ?? [];
-
-	if ($con !== null) {
-
-	// What're our acceptable countries?
-	// $good_countries = array('US','CA');
-
-	$matches_total = 0;
-	$filtered_total = 0;
-	$no_result_ips = [];
-	$totalduration = 0;
-	$rows_html = '';
-
-	// For CTA threshold and filter UI
-	$scanning_proxy_count = 0;
-	// Spamhaus DROP reputation axis: count of looked-up IPs that fall in a DROP
-	// netblock. Independent of ASN category — this is what lets a residential
-	// fail2ban paste fire the CTA. See the reputation override after the verdict.
-	$reputation_count = 0;
-	$category_counts = ['scanning' => 0, 'cloud' => 0, 'vpn' => 0, 'residential' => 0, 'unknown' => 0];
-	$country_counts = [];
-	// For ip_list_json stored at token creation (Phase A)
-	$ip_classified_data = [];
-	// For geo_results_json cache (view_token fast path)
-	$geo_results_data = [];
-
-	// view_token fast path: serve from geo_results_json cache if available
-	$geo_loop_needed = true;
-	if ($view_token_mode && !empty($vt_geo_cached)) {
-		$geo_loop_needed = false;
-		foreach ($vt_geo_cached as $entry) {
-			$ip           = $entry['ip'] ?? '';
-			$country_code = $entry['country'] ?? '';
-			$category     = $entry['classification'] ?? 'unknown';
-			$asn_num      = ltrim($entry['asn'] ?? '', 'AS');
-			$asn_org      = $entry['asn_org'] ?? '';
-
-			$matches_total++;
-			$category_counts[$category] = ($category_counts[$category] ?? 0) + 1;
-			if ($category === 'scanning' || $category === 'vpn') $scanning_proxy_count++;
-			if ($country_code !== '') $country_counts[$country_code] = ($country_counts[$country_code] ?? 0) + 1;
-
-			$rows_html .= '<tr data-category="'.htmlspecialchars($category, ENT_QUOTES, 'UTF-8').'" data-country="'.htmlspecialchars($country_code, ENT_QUOTES, 'UTF-8').'">';
-			$rows_html .= '<td>'.htmlspecialchars($ip, ENT_QUOTES, 'UTF-8').'</td>';
-			$rows_html .= '<td><abbr title="'.htmlspecialchars($entry['country_name'] ?? '', ENT_QUOTES, 'UTF-8').'">'.htmlspecialchars($country_code, ENT_QUOTES, 'UTF-8').'</abbr></td>';
-			$rows_html .= '<td class="cell-region">'.htmlspecialchars($entry['region'] ?? '', ENT_QUOTES, 'UTF-8').'</td>';
-			$rows_html .= '<td class="cell-city">'.htmlspecialchars($entry['city'] ?? '', ENT_QUOTES, 'UTF-8').'</td>';
-			$rows_html .= '<td>'.htmlspecialchars($entry['asn'] ?? '', ENT_QUOTES, 'UTF-8').'</td>';
-			$rows_html .= '<td class="cell-asn-org" title="'.htmlspecialchars($asn_org, ENT_QUOTES, 'UTF-8').'">'.htmlspecialchars($asn_org, ENT_QUOTES, 'UTF-8').'</td>';
-			$rows_html .= '<td class="asn-category asn-category--'.htmlspecialchars($category, ENT_QUOTES, 'UTF-8').'">'.htmlspecialchars($category, ENT_QUOTES, 'UTF-8').'</td>';
-			$rows_html .= '</tr>';
-		}
-		arsort($country_counts);
-	}
-
-	if ($geo_loop_needed) {
-	foreach ($ip_list as $key => $ip) {
-		$ip = mysqli_real_escape_string($con, $ip);
-		$ip_int = ipToLong($ip);
-		$query = 'SELECT loc.country_iso_code, loc.country_name, loc.subdivision_1_name, loc.city_name,
-			asn_net.autonomous_system_number, asn_net.autonomous_system_org
-		FROM (
-			SELECT geoname_id, network_end_integer
-			FROM geoip2_network_current_int
-			WHERE ' . $ip_int . ' >= network_start_integer
-			ORDER BY network_start_integer DESC LIMIT 1
-		) city_net
-		LEFT JOIN geoip2_location_current loc
-			ON (city_net.geoname_id = loc.geoname_id AND loc.locale_code = "en")
-		LEFT JOIN (
-			SELECT autonomous_system_number, autonomous_system_org
-			FROM geoip2_asn_current_int
-			WHERE ' . $ip_int . ' >= network_start_integer
-			ORDER BY network_start_integer DESC LIMIT 1
-		) asn_net ON 1=1
-		WHERE ' . $ip_int . ' <= city_net.network_end_integer';
-		$starttime = microtime(true);
-		$result = mysqli_query($con, $query);
-		$totalduration += microtime(true) - $starttime;
-		$geo_found = false;
-		while ($row = mysqli_fetch_assoc($result))
-		{
-			$geo_found = true;
-			$asn_num = $row['autonomous_system_number'] ?? '';
-			$asn_org = $row['autonomous_system_org'] ?? '';
-			$category = classify_asn((string)$asn_num, (string)$asn_org);
-			$country_code = $row['country_iso_code'] ?? '';
-			if (!in_array($country_code, $good_countries))
-			{
-				$matches_total++;
-				$category_counts[$category]++;
-				if ($category === 'scanning' || $category === 'vpn') {
-					$scanning_proxy_count++;
-				}
-				// Reputation axis: ASN-agnostic. A DROP hit counts even when the
-				// ASN says residential — $ip_int is the unsigned 32-bit value from
-				// ipToLong() (cast to int for the strict-typed lookup signature).
-				if (REPUTATION_AXIS_ENABLED && ip_in_spamhaus_drop((int) $ip_int)) {
-					$reputation_count++;
-				}
-				if ($country_code !== '') {
-					$country_counts[$country_code] = ($country_counts[$country_code] ?? 0) + 1;
-				}
-				$ip_classified_data[] = [
-					'ip'             => $ip,
-					'asn'            => $asn_num !== '' ? 'AS' . $asn_num : '',
-					'asn_org'        => $asn_org,
-					'classification' => $category,
-					'country'        => $country_code,
-					'freq'           => $ip_freq[$ip] ?? 1,
-				];
-				$geo_results_data[] = [
-					'ip'             => $ip,
-					'country'        => $country_code,
-					'country_name'   => $row['country_name'] ?? '',
-					'region'         => $row['subdivision_1_name'] ?? '',
-					'city'           => $row['city_name'] ?? '',
-					'asn'            => $asn_num !== '' ? 'AS' . $asn_num : '',
-					'asn_org'        => $asn_org,
-					'classification' => $category,
-					'freq'           => $ip_freq[$ip] ?? 1,
-				];
-				$rows_html .= '<tr data-category="'.htmlspecialchars($category, ENT_QUOTES, 'UTF-8').'" data-country="'.htmlspecialchars($country_code, ENT_QUOTES, 'UTF-8').'">';
-				$rows_html .= '<td>'.htmlspecialchars($ip, ENT_QUOTES, 'UTF-8').'</td>';
-				$rows_html .= '<td><abbr title="'.htmlspecialchars($row['country_name'] ?? '', ENT_QUOTES, 'UTF-8').'">'.htmlspecialchars($country_code, ENT_QUOTES, 'UTF-8').'</abbr></td>';
-				$rows_html .= '<td class="cell-region">'.htmlspecialchars($row['subdivision_1_name'] ?? '', ENT_QUOTES, 'UTF-8').'</td>';
-				$rows_html .= '<td class="cell-city">'.htmlspecialchars($row['city_name'] ?? '', ENT_QUOTES, 'UTF-8').'</td>';
-				$rows_html .= '<td>'.htmlspecialchars($asn_num !== '' ? 'AS'.$asn_num : '', ENT_QUOTES, 'UTF-8').'</td>';
-				$rows_html .= '<td class="cell-asn-org" title="'.htmlspecialchars($asn_org, ENT_QUOTES, 'UTF-8').'">'.htmlspecialchars($asn_org, ENT_QUOTES, 'UTF-8').'</td>';
-				$rows_html .= '<td class="asn-category asn-category--'.htmlspecialchars($category, ENT_QUOTES, 'UTF-8').'">'.htmlspecialchars($category, ENT_QUOTES, 'UTF-8').'</td>';
-				$rows_html .= '</tr>';
-			} else {
-				$filtered_total++;
-			}
-		}
-		if (!$geo_found) $no_result_ips[] = $ip;
-	} // end foreach geo query loop
-	} // end if ($geo_loop_needed)
-
-	// Write classification to short-lived cache so get-report.php can skip re-queries.
-	// Cache key = SHA-256 of sorted classified IPs. Best-effort: never fail the page load.
-	if (!empty($ip_classified_data)) {
-		$_cache_ips = array_column($ip_classified_data, 'ip');
-		sort($_cache_ips);
-		$_geo_cache_key  = hash('sha256', implode(',', $_cache_ips));
-		$_geo_ip_json    = json_encode($ip_classified_data);
-		$_geo_res_json   = json_encode($geo_results_data);
-		$_geo_cache_stmt = $con->prepare(
-			'INSERT INTO geo_classification_cache (cache_key, ip_list_json, geo_json, expires_at)
-			 VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL 30 MINUTE))
-			 ON DUPLICATE KEY UPDATE
-			   ip_list_json = VALUES(ip_list_json),
-			   geo_json     = VALUES(geo_json),
-			   expires_at   = DATE_ADD(NOW(), INTERVAL 30 MINUTE)'
-		);
-		if ($_geo_cache_stmt) {
-			$_geo_cache_stmt->bind_param('sss', $_geo_cache_key, $_geo_ip_json, $_geo_res_json);
-			$_geo_cache_stmt->execute();
-			$_geo_cache_stmt->close();
-			$con->query('DELETE FROM geo_classification_cache WHERE expires_at < NOW()');
-		}
-	}
-
-	// --- CTA threshold & verdict ---
-	// "Non-residential" = confirmed scanners/VPNs + cloud/VPS egress.
-	// Cloud IPs hitting your infrastructure at volume is itself suspicious,
-	// so both categories count toward the CTA trigger.
-	$non_residential_count = $scanning_proxy_count + $category_counts['cloud'];
-	$non_residential_pct   = $matches_total > 0 ? $non_residential_count / $matches_total : 0;
-	$scanning_proxy_pct    = $matches_total > 0 ? $scanning_proxy_count / $matches_total : 0;
-	$scanning_pct          = $matches_total > 0 ? round($scanning_proxy_pct * 100) : 0;
-
-	$show_cta = $matches_total >= 5 && (
-		$scanning_proxy_count >= 3 ||
-		$non_residential_pct >= 0.15
-	);
-
-	// Verdict: two independent axes — absolute count and concentration.
-	//
-	// HIGH:     >=250 confirmed scanners (volume)
-	//           OR >=60% scanning AND >=20 scanners (concentration)
-	//           OR >=80% scanning (overwhelming)
-	// LOW:      <10 confirmed scanners
-	//           OR <5% scanning AND <25 scanners (dilute noise)
-	//           ...unless cloud volume is substantial (cloud floor: upgrade to MODERATE)
-	// MODERATE: everything else
-	$cloud_count = $category_counts['cloud'];
-	$cloud_pct   = $matches_total > 0 ? $cloud_count / $matches_total : 0;
-
-	if ($matches_total > 0 && (
-		$scanning_proxy_count >= 250
-		|| ($scanning_proxy_pct >= 0.60 && $scanning_proxy_count >= 20)
-		|| $scanning_proxy_pct >= 0.80
-	)) {
-		$verdict_level = 'HIGH';
-	} elseif ($matches_total > 0 && (
-		$scanning_proxy_count < 10
-		|| ($scanning_proxy_pct < 0.05 && $scanning_proxy_count < 25)
-	)) {
-		// Cloud floor: significant cloud IPs upgrade LOW → MODERATE
-		if ($cloud_count >= 50 || $cloud_pct >= 0.15) {
-			$verdict_level = 'MODERATE';
-		} else {
-			$verdict_level = 'LOW';
-		}
-	} else {
-		$verdict_level = 'MODERATE';
-	}
-
-	// Suppress CTA for LOW verdict — avoids "LOW THREAT + buy report" contradiction
-	if ($verdict_level === 'LOW') {
-		$show_cta = false;
-	}
-
-	// One-sentence reason explaining what triggered the verdict
-	if ($verdict_level === 'HIGH') {
-		if ($scanning_proxy_count >= 250 && $scanning_proxy_pct < 0.60) {
-			$verdict_reason = $scanning_proxy_count . ' confirmed scanners/proxies detected.';
-		} else {
-			$verdict_reason = $scanning_pct . '% of IPs are confirmed scanning or proxy infrastructure.';
-		}
-	} elseif ($verdict_level === 'MODERATE') {
-		if ($scanning_proxy_count < 10 && ($cloud_count >= 50 || $cloud_pct >= 0.15)) {
-			$verdict_reason = $cloud_count . ' cloud infrastructure IPs detected — may indicate botnet use or compromised VMs.';
-		} else {
-			$verdict_reason = $scanning_proxy_count . ' confirmed scanner' . ($scanning_proxy_count === 1 ? '' : 's') . '/proxies detected (' . $scanning_pct . '% of total).';
-		}
-	} else {
-		$verdict_reason = '';
-	}
-
-	// --- Reputation override (Spamhaus DROP axis) ---
-	// Runs AFTER the LOW-suppress above so a DROP hit re-opens a suppressed CTA.
-	// Logic lives in report_functions.php (apply_reputation_override) so it is
-	// unit-testable; the kill switch gates whether we apply it at all.
-	if (REPUTATION_AXIS_ENABLED) {
-		$_rep = apply_reputation_override($verdict_level, $show_cta, $matches_total, $reputation_count, $verdict_reason);
-		$verdict_level  = $_rep['verdict_level'];
-		$show_cta       = $_rep['show_cta'];
-		$verdict_reason = $_rep['verdict_reason'];
-	}
-
-	// --- Inline threat-score teaser (proof scores for the top 1-2 attackers) ---
-	// Only when the CTA shows (MODERATE/HIGH). Enrich at most the top 2 ranked
-	// IPs with a tight 2s timeout so a slow AbuseIPDB never stalls the results
-	// render; degrade to the flagged count on timeout/quota. locked_count comes
-	// from $scanning_proxy_count (already computed) — NOT from enrichment, which
-	// only covers the top 1-2. See report_functions.php build_teaser().
-	//
-	// Large submissions already spend the time budget on geo lookups (the 10k
-	// post-deploy perf gate is 6s), so for those we go CACHE-ONLY: no live API
-	// call, zero added latency, but recurring mass scanners still surface from
-	// cache. Smaller lookups (the common fail2ban-paste case) get the live score.
-	$teaser = ['samples' => [], 'locked_count' => $scanning_proxy_count, 'drop_count' => $reputation_count];
-	if ($show_cta && !$view_token_mode && !empty($ip_classified_data)) {
-		$teaser_live = (isset($ip_list) ? count($ip_list) : 0) <= 2500;
-		$teaser_top  = array_slice(rank_ips($ip_classified_data, 25), 0, 2);
-		$teaser_top  = enrich_abuseipdb($teaser_top, $con, $abuseipdb_api_key ?? '', 2, $teaser_live);
-		$teaser      = build_teaser($teaser_top, $scanning_proxy_count, 80, $reputation_count);
-	}
-
-	arsort($country_counts);
-
-	// --- Output results section ---
-	// Stamp the verdict + CTA-visibility onto the section so the client-side
-	// lookup_submit event can report them (Umami sees only what the DOM carries).
-	$cta_shown_flag = ($show_cta && !$view_token_mode) ? '1' : '0';
-	echo '<section id="results" class="block" data-verdict-level="' . htmlspecialchars(strtolower($verdict_level), ENT_QUOTES, 'UTF-8') . '" data-cta-shown="' . $cta_shown_flag . '"><div class="section-head"><h2 id="result">Lookup Results</h2><span class="section-tag">01 / Results</span></div>';
-	// In view_token mode the page is server-rendered (not injected by AJAX), so
-	// we need a script to scroll to results. The #results hash in the link from
-	// report.php handles the common case; this handles direct URL access without hash.
-	if ($view_token_mode): ?>
-	<script>if(!location.hash)document.getElementById('results').scrollIntoView({behavior:'smooth'});</script>
-	<?php endif;
-
-	// --- Threat CTA (above filter + table) ---
-	if ($show_cta && !$view_token_mode): ?>
-	<div id="threat-cta" class="threat-cta-box threat-cta-box--<?php echo htmlspecialchars(strtolower($verdict_level), ENT_QUOTES, 'UTF-8'); ?>" role="region" aria-label="Threat Assessment">
-		<form method="POST" action="/get-report.php" id="cta-form">
-			<input type="hidden" name="ip_classified_json" id="ip-classified-json"
-				value="<?php echo htmlspecialchars(json_encode($ip_classified_data), ENT_QUOTES, 'UTF-8'); ?>" />
-			<input type="hidden" name="tier" value="free">
-				<input type="hidden" name="acquisition_source" id="acquisition-source" value="">
-			<div class="threat-cta-top">
-				<div class="threat-cta-left">
-					<p class="asn-verdict asn-verdict--<?php echo htmlspecialchars(strtolower($verdict_level), ENT_QUOTES, 'UTF-8'); ?>">
-						<?php echo htmlspecialchars($verdict_level, ENT_QUOTES, 'UTF-8'); ?> THREAT
-					</p>
-					<?php if ($verdict_reason !== ''): ?>
-					<p class="threat-cta-reason"><?php echo htmlspecialchars($verdict_reason, ENT_QUOTES, 'UTF-8'); ?></p>
-					<?php endif; ?>
-					<p class="threat-cta-stats"><?php echo round($non_residential_pct * 100); ?>% of IPs from cloud, scanning, or proxy infrastructure
-						(<?php echo $non_residential_count; ?> of <?php echo $matches_total; ?> IPs)</p>
-					<?php if (!empty($teaser['samples']) || $teaser['locked_count'] > 0 || ($teaser['drop_count'] ?? 0) > 0): ?>
-					<p class="threat-cta-scores">
-						<?php if (!empty($teaser['samples'])): ?>
-						<span class="threat-score-src">AbuseIPDB confidence</span><?php foreach ($teaser['samples'] as $s): ?><span class="threat-score"><span class="threat-score-ip"><?php echo htmlspecialchars($s['ip'], ENT_QUOTES, 'UTF-8'); ?></span> <strong><?php echo (int)$s['score']; ?>/100</strong></span><?php endforeach; ?>
-						<?php endif; ?>
-						<?php if (($teaser['drop_count'] ?? 0) > 0): ?>
-						<span class="threat-score-drop"><strong><?php echo (int)$teaser['drop_count']; ?></strong> IP<?php echo $teaser['drop_count'] === 1 ? '' : 's'; ?> on the Spamhaus DROP list &mdash; confirmed hijacked or criminal netblocks</span>
-						<?php endif; ?>
-						<?php if ($teaser['locked_count'] > 0): ?>
-						<span class="threat-score-locked"><?php echo (int)$teaser['locked_count']; ?> flagged IP<?php echo $teaser['locked_count'] === 1 ? '' : 's'; ?> in this lookup &mdash; full AbuseIPDB scores &amp; whole-network block rules are in the report <span aria-hidden="true">&#128274;</span></span>
-						<?php endif; ?>
-					</p>
-					<?php endif; ?>
-				</div>
-				<div class="threat-cta-right">
-					<?php if (($_GET['error'] ?? '') === 'rate_limit'): ?>
-					<p class="threat-cta-error" style="color:#e07070;margin:0 0 0.6em;font-size:0.9em">Too many free reports generated. Try again in an hour.</p>
-					<?php endif; ?>
-					<ul class="threat-cta-features">
-						<li>Geo + ASN breakdown of your top 25 IPs</li>
-						<li>Shareable link &mdash; send to your team now</li>
-						<li>Saved 7 days free</li>
-					</ul>
-				</div>
-			</div>
-			<div class="threat-cta-bottom">
-				<p class="threat-cta-fine">No account. No payment. 5 seconds.<br>
-					$9 unlocks AbuseIPDB scores for every flagged IP + ASN range block rules + a permanent link.</p>
-				<button type="submit" id="cta-button" class="button">Get Free Threat Report</button>
-			</div>
-		</form>
-	</div>
-	<?php elseif ($view_token_mode): ?>
-	<p style="margin:0 0 1.5em">
-		<a href="/report.php?token=<?php echo htmlspecialchars($view_token_val, ENT_QUOTES, 'UTF-8'); ?>" class="button small alt">&#8592; Back to your report</a>
-	</p>
-	<?php endif;
-
-	// --- Filter & Export (above table) ---
-	echo '<div id="filter-export" role="region" aria-label="Filter and Export">';
-	echo '<details id="filter-details" open>';
-	echo '<summary id="filter-summary">Filter &amp; Export &mdash; Showing <span id="filter-count">'.$matches_total.'</span> of <span id="filter-total">'.$matches_total.'</span> IPs</summary>';
-	echo '<div id="filter-layout">';
-
-	// Left column: action buttons + firewall rules output
-	echo '<div id="filter-left">';
-
-	// Row 1: primary export actions
-	echo '<div id="action-buttons-primary">';
-	echo '<button id="download-csv" class="button small">&#8595; Download CSV</button>';
-	if (!empty($no_result_ips)) {
-		$n = count($no_result_ips);
-		echo '<button id="toggle-unresolved" class="button small alt">Show '.$n.' unresolved IP'.($n !== 1 ? 's' : '').'</button>';
-	}
-	echo '</div>';
-
-	// Row 2: firewall rule generators
-	echo '<div id="export-buttons">';
-	echo '<button class="button small" id="show-iptables">Show iptables rules</button>';
-	echo '<button class="button small" id="show-ufw">Show ufw rules</button>';
-	echo '<button class="button small" id="show-nginx">Show nginx block</button>';
-	echo '</div>';
-
-	// Firewall rule output (shown on demand)
-	echo '<div id="rules-iptables" class="rules-block" style="display:none" aria-label="iptables block rules"><button class="button small copy-rules" data-target="rules-iptables-pre">Copy</button><pre id="rules-iptables-pre"></pre></div>';
-	echo '<div id="rules-ufw"      class="rules-block" style="display:none" aria-label="ufw deny rules"><button class="button small copy-rules" data-target="rules-ufw-pre">Copy</button><pre id="rules-ufw-pre"></pre></div>';
-	echo '<div id="rules-nginx"    class="rules-block" style="display:none" aria-label="nginx geo block"><button class="button small copy-rules" data-target="rules-nginx-pre">Copy</button><pre id="rules-nginx-pre"></pre></div>';
-
-	echo '<p class="cbl-callout">Block known scanners reported by the ip2geo community. <a href="/intel.php" target="_blank" rel="noopener noreferrer" class="cbl-link">View the Community Block List <span aria-hidden="true">&rarr;</span></a></p>';
-
-	echo '</div>'; // end #filter-left
-
-	// Right column: filter chips
-	echo '<div id="filter-right">';
-
-	// ASN category chips (leftmost — highest signal)
-	$cat_labels = ['scanning' => 'Scanning', 'cloud' => 'Cloud exit', 'vpn' => 'VPN/Proxy', 'residential' => 'Residential', 'unknown' => 'Unknown'];
-	echo '<div id="filter-categories">';
-	echo '<strong>ASN Categories</strong>';
-	foreach ($cat_labels as $cat => $cat_label) {
-		if (($category_counts[$cat] ?? 0) === 0) continue;
-		$cat_safe = htmlspecialchars($cat, ENT_QUOTES, 'UTF-8');
-		echo '<label class="cat-'.$cat_safe.'"><input type="checkbox" class="filter-category" value="'.$cat_safe.'" checked><span class="chip-label">'.$cat_label.'</span> <span class="chip-count">('.$category_counts[$cat].')</span></label>';
-	}
-	echo '</div>';
-
-	// Country chips
-	echo '<div id="filter-countries">';
-	echo '<strong>Countries <span class="chip-hint">⇧ multi-select</span></strong>';
-	echo '<div class="filter-chips">';
-	foreach ($country_counts as $cc => $count) {
-		$cc_safe = htmlspecialchars($cc, ENT_QUOTES, 'UTF-8');
-		echo '<label><input type="checkbox" class="filter-country" value="'.$cc_safe.'" checked><span class="chip-label">'.$cc_safe.'</span> <span class="chip-count">('.$count.')</span></label>';
-	}
-	echo '</div>';
-	echo '</div>';
-
-	echo '</div>'; // end #filter-right
-	echo '</div>'; // end #filter-layout
-	echo '</details></div>'; // end #filter-details, #filter-export
-
-	// --- Results table ---
-	echo '<div class="table-wrapper" style="overflow-x:auto">';
-
-	echo '<table id="results-table"><thead><tr>';
-	echo '<th scope="col">IP</th>';
-	echo '<th scope="col"><abbr title="Country Code">CC</abbr></th><th scope="col" class="cell-region">State/Province</th><th scope="col" class="cell-city">City</th>';
-	echo '<th scope="col">ASN</th><th scope="col" class="cell-asn-org">ASN Org</th><th scope="col">Category</th>';
-	echo '</tr></thead><tbody>';
-	echo $rows_html;
-	echo '</tbody>';
-
-	if (!empty($no_result_ips)) {
-		echo '<tbody id="unresolved-rows" style="display:none">';
-		foreach ($no_result_ips as $unresolved_ip) {
-			echo '<tr><td>'.htmlspecialchars($unresolved_ip, ENT_QUOTES, 'UTF-8').'</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>';
-		}
-		echo '</tbody>';
-	}
-	echo '</table>';
-
-	// Empty filter state (shown by JS when all rows filtered out)
-	echo '<p id="empty-filter-msg" style="display:none;text-align:center;padding:1em;opacity:0.7">No IPs match the current filter. Try selecting more categories.</p>';
-
-	echo '</div>';
-
-	// --- Summary stats ---
-	$submitted = count($ip_list);
-	echo '<table id="stats-table" style="font-family:monospace;font-size:0.8em;border-collapse:collapse;margin-top:0.5em;width:auto">';
-	echo '<tr><td>'.$submitted.'</td><td>IP'.($submitted !== 1 ? 's' : '').' submitted (valid, unique, non-private)</td></tr>';
-	echo '<tr><td>'.$matches_total.'</td><td>returned geo results</td></tr>';
-	if ($filtered_total > 0) {
-		echo '<tr><td>'.$filtered_total.'</td><td>excluded by country filter</td></tr>';
-	}
-	echo '<tr><td>'.count($no_result_ips).'</td><td>returned no geo data</td></tr>';
-	echo '<tr><td>'.round($totalduration,3).'s</td><td>query duration</td></tr>';
-	if (!empty($good_countries)) {
-		echo '<tr><td>—</td><td>excluded countries: '.htmlspecialchars(implode(' ', $good_countries)).'</td></tr>';
-	}
-	echo '</table>';
-
-	echo '</section>';
-
-	} // end if ($con !== null)
-}
-else
-{
-	echo '<!--';
-	//echo '<iframe src="/about.php" style="" />';
-	echo '-->';
-}
-
-?>
-
-
-			<!-- Threat Reports -->
-			<section class="block" id="reports" aria-labelledby="reports-h">
-				<div class="section-head">
-					<h2 id="reports-h">Threat Reports</h2>
-					<span class="section-tag">02 / Reports</span>
-				</div>
-
-				<div class="block-body" style="margin-bottom:32px">
-					<p>When a lookup reveals a high proportion of scanning, cloud, or proxy infrastructure, ip2geo generates a threat report. Free instantly, or with full <strong>AbuseIPDB</strong> threat scores and ready-to-run firewall scripts for $9.</p>
-				</div>
-
-				<div class="two-col">
-					<div>
-						<div class="price"><span class="amount">Free</span><span class="label">instant</span></div>
-						<h3 class="subhead">Free report</h3>
-						<ul class="feature-list">
-							<li><strong>Geo + ASN breakdown</strong> of your top 25 IPs</li>
-							<li><strong>Shareable link</strong>, saved 7 days</li>
-						</ul>
-					</div>
-					<div>
-						<div class="price"><span class="amount">$9</span><span class="label">one-time</span></div>
-						<h3 class="subhead">Full report</h3>
-						<ul class="feature-list">
-							<li><strong>AbuseIPDB reputation scores</strong> for your top 25 IPs</li>
-							<li><strong>ASN CIDR ranges</strong> for resilient blocking</li>
-							<li><strong>Firewall scripts</strong> for iptables, ufw, nginx</li>
-							<li><strong>Community intel</strong> (opt-in): see who else reported these IPs</li>
-							<li><strong>Permanent link</strong>, no expiry</li>
-						</ul>
-						<a href="/report.php?token=00000000-0000-0000-0000-000000000000" target="_blank" class="button magenta">See a sample full report &rarr;</a>
-					</div>
-				</div>
-			</section>
-
+<?php if ($_POST): ?>
+<?php echo render_lookup_results($_POST, $visitor_ip); ?>
+<?php endif; ?>
 
 			<!-- Contact / Contribute -->
 			<section class="block" id="contribute" aria-labelledby="contact-h">
 				<div class="section-head">
 					<h2 id="contact-h">Contact / Contribute</h2>
-					<span class="section-tag">03 / Contact</span>
+					<span class="section-tag">02 / Contact</span>
 				</div>
 
 				<div class="block-body" style="margin-bottom:32px">
@@ -753,7 +570,7 @@ else
 			<section class="block" id="about" aria-labelledby="about-h">
 				<div class="section-head">
 					<h2 id="about-h">About ip2geo.org</h2>
-					<span class="section-tag">04 / About</span>
+					<span class="section-tag">03 / About</span>
 				</div>
 
 				<div class="about-prose">
@@ -766,14 +583,14 @@ else
 
 					<h3>The Fix</h3>
 					<p>I was maintaining an aging email system with no password policies and no support &mdash; a perfect storm for account compromises. With no time or budget to overhaul it, I built this tool instead.</p>
-					<p>ip2geo.org lets you paste raw output from tools like <code>netstat</code>, <code>fail2ban</code>, or anything else that spits out IPs. It automatically extracts valid IPv4 addresses, runs a fast geolocation lookup, and gives you clean, actionable data &mdash; instantly. With one glance, I could see login attempts from every corner of the globe and quickly block entire botnets.</p>
+					<p>ip2geo.org lets you paste raw output from tools like <code>netstat</code>, <code>fail2ban</code>, or anything else that spits out IPs. It automatically extracts valid IPv4 and IPv6 addresses, runs a fast geolocation lookup, and gives you clean, actionable data &mdash; instantly. With one glance, I could see login attempts from every corner of the globe and quickly block entire botnets.</p>
 
 					<h3>What It's Grown Into</h3>
-					<p>The free lookup is still here. But over time, ip2geo.org has grown into something more complete. When a lookup shows a high concentration of scanning or proxy infrastructure, you can now generate a <strong>Threat Report</strong> &mdash; free instantly (geo and ASN breakdown, 7-day shareable link), or upgrade for $9 to add AbuseIPDB threat scores, ASN CIDR ranges, and ready-to-run firewall scripts for iptables, ufw, and nginx.</p>
-					<p>There's also a <a href="/intel.php">Community Block List</a> &mdash; a rolling 7-day feed of CIDR ranges reported by opted-in ip2geo users. If you contribute your report, your data joins the aggregate anonymously. If you just want the list, download it and apply it directly to your firewall.</p>
+					<p>The free lookup is still here, and it's the whole tool. Paste a log, get a summary line up front &mdash; how much of it is cloud infrastructure, scanning traffic, VPN/proxy exits, or plain residential, plus which ASNs show up the most and how many IPs sit in Spamhaus's DROP list of known-hijacked netblocks.</p>
+					<p>There's also a <a href="/intel.php">Community Block List</a> &mdash; a rolling feed of CIDR ranges reported by opted-in ip2geo users. If you contribute, your data joins the aggregate anonymously. If you just want the list, download it and apply it directly to your firewall.</p>
 
 					<h3>How It Works</h3>
-					<p>Paste any block of text. ip2geo.org scans it for IPv4 addresses, checks them against a geolocation database, and returns results you can filter by country or infrastructure category &mdash; scanning ranges, cloud exit nodes, VPN and proxy infrastructure, or residential traffic. Want to only see scanning infrastructure hits from outside the US? Done. Focus only on what matters.</p>
+					<p>Paste any block of text. ip2geo.org scans it for IPv4 and IPv6 addresses, checks them against a geolocation database, and returns results you can filter by country or infrastructure category &mdash; scanning ranges, cloud exit nodes, VPN and proxy infrastructure, or residential traffic. Want to only see scanning infrastructure hits from outside the US? Done. Focus only on what matters.</p>
 
 					<h3>Why It's Free</h3>
 					<p>This tool was built using free and open-source resources, and it's free because I wish something like this had existed when I needed it most. If it helps you too, consider <a href="https://www.buymeacoffee.com/ip2geo" target="_blank" rel="noopener">buying me a coffee</a> or tossing a few bucks toward hosting costs.</p>
@@ -839,30 +656,50 @@ else
 		})();
 		</script>
 
+		<!-- Shared IP extraction (browser mirror of includes/extract.php's extract_ips()).
+		     Loaded before ip2geo-app.js and before the inline overlay script below, both
+		     of which call window.extractIps(). -->
+		<script src="assets/js/extract-ips.js?v=<?php echo APP_VERSION; ?>"></script>
+
 		<!-- Scripts -->
 		<script data-cfasync="false">
 		(function() {
-			// Phase 4: set acquisition_source on any server-rendered CTA form
-			var _acqEl = document.getElementById('acquisition-source');
-			if (_acqEl) _acqEl.value = (document.referrer || '').slice(0, 2000);
-
 			var form = document.getElementById('iplookup');
 			if (!form) return;
 			var btn = form.querySelector('input[type="submit"]');
 			if (!btn) return;
+
+			function showNetworkFailureNotice(retry) {
+				var html = '<section id="results" class="block"><div class="section-head"><h2 id="result">Lookup Results</h2><span class="section-tag">01 / Results</span></div>'
+					+ '<p class="notice" role="alert">Couldn’t reach ip2geo. Your paste is still here. <button type="button" id="network-retry" class="button small alt">Retry</button></p></section>';
+				var existing = document.getElementById('results');
+				if (existing) {
+					existing.outerHTML = html;
+				} else {
+					document.getElementById('lookup').insertAdjacentHTML('afterend', html);
+				}
+				var inserted = document.getElementById('results');
+				if (inserted) inserted.scrollIntoView({ behavior: 'smooth' });
+				var retryBtn = document.getElementById('network-retry');
+				if (retryBtn) retryBtn.addEventListener('click', function() { retry(); }, { once: true });
+			}
+
 			btn.addEventListener('click', async function(e) {
 				e.preventDefault();
 				e.stopPropagation();
 
 				var raw = document.getElementById('message').value;
-				var matches = raw.match(/\b(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\b/g);
-				var count = matches ? matches.length : 0;
+				var extracted = (window.extractIps ? window.extractIps(raw) : { ips: [], totalUnique: 0, v6Count: 0 });
+				var uniqueCount = extracted.totalUnique;
+				var shownCount = Math.min(uniqueCount, 10000);
+				var v6Suffix = extracted.v6Count > 0 ? ' · ' + extracted.v6Count.toLocaleString() + ' IPv6' : '';
 
 				var overlay = document.createElement('div');
 				overlay.className = 'processing-overlay';
 				var msg = document.createElement('div');
 				msg.className = 'processing-overlay__msg';
-				msg.textContent = 'Processing ' + count.toLocaleString() + ' IP' + (count !== 1 ? 's' : '') + ' ';
+				msg.setAttribute('role', 'status');
+				msg.textContent = 'Looking up ' + shownCount.toLocaleString() + ' unique IP' + (shownCount !== 1 ? 's' : '') + v6Suffix + ' ';
 				var dotSpan = document.createElement('span');
 				dotSpan.className = 'processing-overlay__dots';
 				var dots = ['.', '..', '...'];
@@ -880,6 +717,9 @@ else
 					clearInterval(dotTimer);
 					overlay.remove();
 				};
+
+				var isSample = !!window.__ip2geoSampleActive;
+				window.__ip2geoSampleActive = false;
 
 				try {
 					var resp = await fetch(window.location.pathname, {
@@ -901,35 +741,31 @@ else
 					var inserted = document.getElementById('results');
 					cleanup();
 					if (inserted) inserted.scrollIntoView({ behavior: 'smooth' });
-					// Phase 4: re-set after AJAX injection (form element was replaced)
-					var acqEl = document.getElementById('acquisition-source');
-					if (acqEl) acqEl.value = (document.referrer || '').slice(0, 2000);
 
-					var bucket = count === 1 ? '1'
-					             : count <= 10   ? '2-10'
-					             : count <= 50   ? '11-50'
-					             : count <= 100  ? '51-100'
-					             : count <= 500  ? '101-500'
-					             : count <= 1000 ? '501-1000'
-					             : count <= 5000 ? '1001-5000'
-					             :                 '5000+';
-					// verdict_level + cta_shown come from data-* stamped on #results
-					// server-side; lets the Umami re-pull measure the real CTA fire rate.
-					var verdictLevel = inserted ? (inserted.dataset.verdictLevel || '') : '';
-					var ctaShown = inserted ? (inserted.dataset.ctaShown === '1') : false;
-					try { umami.track('lookup_submit', { ip_count_bucket: bucket, verdict_level: verdictLevel, cta_shown: ctaShown }); } catch(_) {}
+					var bucket = uniqueCount === 1 ? '1'
+					             : uniqueCount <= 10   ? '2-10'
+					             : uniqueCount <= 50   ? '11-50'
+					             : uniqueCount <= 100  ? '51-100'
+					             : uniqueCount <= 500  ? '101-500'
+					             : uniqueCount <= 1000 ? '501-1000'
+					             : uniqueCount <= 5000 ? '1001-5000'
+					             :                       '5000+';
+					try { umami.track('lookup_submit', { ip_count_bucket: bucket, sample: isSample }); } catch(_) {}
 
 					// Recent-lookups: notify the opt-in handler with the actual IPs.
 					// Listener lives in assets/js/ip2geo-app.js; it no-ops when opt-in is OFF.
 					try {
+						var flatIps = (extracted.ips || []).map(function (pair) { return pair[0]; });
 						document.dispatchEvent(new CustomEvent('ip2geo:lookup_submit', {
-							detail: { ips: matches || [], count: count }
+							detail: { ips: flatIps, count: uniqueCount }
 						}));
 					} catch(_) {}
 
 				} catch (err) {
 					cleanup();
-					HTMLFormElement.prototype.submit.call(form);
+					showNetworkFailureNotice(function() {
+						btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+					});
 				}
 			});
 		// CSV download (delegated — works after AJAX injection)
@@ -944,7 +780,12 @@ else
 				if (tr.classList.contains('row-hidden')) return;
 				var row = [];
 				tr.querySelectorAll('td').forEach(function(td) {
-					var val = td.textContent.replace(/"/g, '""');
+					// Strip UI-only affordances so the CSV gets clean data: the
+					// "(you)" / "DROP" tags, and (mobile) the truncated IPv6 display
+					// — .ip-full (the untruncated address) is what should survive.
+					var clone = td.cloneNode(true);
+					clone.querySelectorAll('.you-tag, .drop-tag, .ip-truncated').forEach(function(el) { el.remove(); });
+					var val = clone.textContent.trim().replace(/"/g, '""');
 					row.push(/[,"\n]/.test(val) ? '"' + val + '"' : val);
 				});
 				rows.push(row);
@@ -965,3 +806,4 @@ else
 
 	</body>
 </html>
+<?php endif; // IP2GEO_SKIP_PAGE_RENDER ?>
