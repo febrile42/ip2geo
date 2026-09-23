@@ -21,12 +21,12 @@ jobs:
       - name: Check all PHP files for syntax errors
         run: find . -name "*.php" -not -path "./.git/*" | xargs -I{} php -l {}
 
-  # ── develop → staging ─────────────────────────────────────────────────────
+  # ── develop → staging (also: manual dispatch of the v5 branch, for v5 QA) ──
   deploy-staging:
     name: Deploy to Staging
     needs: lint
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/develop'
+    if: github.ref == 'refs/heads/develop' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/v5')
     steps:
       - name: Pull develop on server (staging dir)
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
@@ -37,7 +37,7 @@ jobs:
           port: ${{ secrets.DEPLOY_PORT }}
           script: |
             cd ${{ secrets.STAGING_PATH }}
-            git fetch origin && git reset --hard origin/develop
+            git fetch origin && git reset --hard origin/${{ github.ref_name }}
             ~/bin/composer install --no-dev --no-interaction --quiet
             printf "User-agent: *\nDisallow: /\n" > robots.txt
 
@@ -45,7 +45,7 @@ jobs:
     name: Test Staging
     needs: deploy-staging
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/develop'
+    if: github.ref == 'refs/heads/develop' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/v5')
     steps:
       # No checkout needed — all tests use curl directly against the origin
 
