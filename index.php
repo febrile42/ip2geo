@@ -4,7 +4,7 @@ require __DIR__ . '/config.php';
 require __DIR__ . '/asn_classification.php';
 require __DIR__ . '/report_functions.php'; // rank_ips(), enrich_abuseipdb(), build_teaser() for the inline threat-score teaser
 @include_once __DIR__ . '/db_version.php'; // gitignored; written by the monthly DB update script
-require __DIR__ . '/includes/footer.php'; // APP_VERSION
+require_once __DIR__ . '/includes/version.php'; // APP_VERSION for ?v= asset URLs
 
 // REPUTATION_AXIS_ENABLED (the Spamhaus DROP kill switch) is defined in
 // report_functions.php — required above — so both this lookup page and report.php
