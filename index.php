@@ -422,9 +422,25 @@ $visitor_ip     = filter_var($visitor_ip_raw, FILTER_VALIDATE_IP) !== false ? $v
 ?><!DOCTYPE HTML>
 <html lang="en" data-theme="dark">
 	<head>
+		<!-- R3: strip a #v= share-link payload into memory before the Umami tracker
+		     loads, so a missed/ignored data-exclude-hash never leaks it. This inline
+		     script is NOT deferred, so it runs at parse time, before the deferred
+		     tracker script below executes (deferred scripts run after the document
+		     is parsed). See assets/js/workbench.js for what reads window.__ip2geoSharedView. -->
+		<script>
+		(function() {
+			var h = window.location.hash;
+			if (h.indexOf('#v=') === 0) {
+				window.__ip2geoSharedView = h.slice(3);
+				if (window.history && window.history.replaceState) {
+					window.history.replaceState(null, '', window.location.pathname + window.location.search);
+				}
+			}
+		})();
+		</script>
 		<!-- Umami (production only) -->
 		<?php if ($_SERVER['HTTP_HOST'] === 'ip2geo.org'): ?>
-		<script defer src="/u/script.js" data-website-id="656d7a15-6282-4079-af1e-b8ed857fba2e" data-domains="ip2geo.org"></script>
+		<script defer src="/u/script.js" data-website-id="656d7a15-6282-4079-af1e-b8ed857fba2e" data-domains="ip2geo.org" data-exclude-hash="true"></script>
 		<?php endif; ?>
 		<title>ip2geo — Bulk IP Lookup for Raw Logs, Free</title>
 		<meta charset="utf-8" />
@@ -537,6 +553,57 @@ if (isset($_POST['ip_list'])) {
 <?php if ($_POST): ?>
 <?php echo render_lookup_results($_POST, $visitor_ip); ?>
 <?php endif; ?>
+
+			<!-- Phase 2 workbench mount point (design doc: "Progressive enhancement").
+			     Built and shown by assets/js/workbench.js; the server-rendered
+			     #results above (render_lookup_results()) is the no-JS fallback and
+			     stays untouched. Hidden by default; JS shows it and hides #results
+			     once a browser-side lookup succeeds. -->
+			<section id="workbench-root" class="block" hidden aria-labelledby="workbench-h">
+				<div class="section-head">
+					<h2 id="workbench-h">Lookup Results</h2>
+					<span class="section-tag">01 / Results</span>
+				</div>
+				<div class="wb-toast-host"></div>
+				<p class="wb-recipient-banner" hidden role="status"></p>
+				<div class="wb-paste-bar"></div>
+				<div class="wb-state" hidden></div>
+				<div class="wb-body" hidden>
+					<div id="lookup-summary" class="wb-summary" role="status"></div>
+					<div class="wb-export-hint" hidden></div>
+					<div class="wb-filters">
+						<div class="wb-chips-row"><div class="wb-chips-category"></div></div>
+						<div class="wb-chips-row"><div class="wb-chips-country"></div></div>
+					</div>
+					<div class="wb-toolbar">
+						<div class="wb-export"></div>
+						<button type="button" class="button small wb-share-btn">Copy share link</button>
+						<button type="button" class="button small wb-share-download" hidden>Download view file</button>
+						<button type="button" class="button small" id="wb-toggle-unresolved" hidden>Show unresolved</button>
+						<span class="wb-spacer"></span>
+						<span class="wb-shown-count"></span>
+						<button type="button" class="wb-clear-filters" hidden>Clear filters</button>
+					</div>
+					<div class="table-wrapper" style="overflow-x:auto">
+						<table class="wb-table" id="wb-results-table">
+							<caption style="position:absolute;left:-9999px">Lookup results, one row per IP address</caption>
+							<thead><tr>
+								<th scope="col" data-key="ip">IP</th>
+								<th scope="col" data-key="country"><abbr title="Country Code">CC</abbr></th>
+								<th scope="col" data-key="region" class="cell-region">State/Province</th>
+								<th scope="col" data-key="city" class="cell-city">City</th>
+								<th scope="col" data-key="asn">ASN</th>
+								<th scope="col" data-key="asnOrg" class="cell-asn-org">ASN Org</th>
+								<th scope="col" data-key="category">Category</th>
+								<th scope="col" data-key="hits" aria-sort="descending" style="text-align:right">Hits</th>
+							</tr></thead>
+							<tbody></tbody>
+						</table>
+						<div class="wb-table-sentinel"></div>
+					</div>
+					<p class="wb-empty-filter" hidden style="text-align:center;padding:1em;opacity:0.7">No IPs match the current filter. Try selecting more categories.</p>
+				</div>
+			</section>
 
 			<!-- Contact / Contribute -->
 			<section class="block" id="contribute" aria-labelledby="contact-h">
@@ -803,6 +870,85 @@ if (isset($_POST['ip_list'])) {
 		})();
 		</script>
 		<script src="assets/js/ip2geo-app.js?v=<?php echo APP_VERSION; ?>"></script>
+
+		<!-- Phase 2 workbench: pure modules, then the DOM orchestration layer, then the bootstrap. -->
+		<script src="assets/js/filters.js?v=<?php echo APP_VERSION; ?>"></script>
+		<script src="assets/js/export-templates.js?v=<?php echo APP_VERSION; ?>"></script>
+		<script src="assets/js/summary.js?v=<?php echo APP_VERSION; ?>"></script>
+		<script src="assets/js/share-link.js?v=<?php echo APP_VERSION; ?>"></script>
+		<script src="assets/js/workbench.js?v=<?php echo APP_VERSION; ?>"></script>
+		<script data-cfasync="false">
+		(function () {
+			var root = document.getElementById('workbench-root');
+			var oldResults = document.getElementById('results');
+			var form = document.getElementById('iplookup');
+			var textarea = document.getElementById('message');
+			if (!root || !form || !textarea || !window.ip2geoWorkbench) return;
+
+			var mounted = window.ip2geoWorkbench.mount(root, form, textarea);
+			if (!mounted) return; // extractIps missing: let the form submit normally (no-JS fallback)
+
+			function hideOldResults() {
+				if (oldResults) oldResults.style.display = 'none';
+			}
+
+			// Wrap startLookup so a successful JS lookup hides the PHP-rendered
+			// #results (if the page happens to have one, e.g. a JS-disabled-then-
+			// re-enabled reload) and scrolls to the workbench, matching the old
+			// form's action="#results" behavior.
+			var realStart = mounted.startLookup;
+			mounted.startLookup = function (text) {
+				return realStart(text).then(function (ok) {
+					if (ok) {
+						hideOldResults();
+						root.scrollIntoView({ block: 'start' });
+					}
+					return ok;
+				});
+			};
+
+			// D8 recipient path: a #v= payload captured by R3's inline script
+			// (must run before this, and before the Umami tracker) before we ever
+			// get here.
+			if (window.__ip2geoSharedView) {
+				var banner = root.querySelector('.wb-recipient-banner');
+				window.ip2geoWorkbench.mountSharedView(root, window.__ip2geoSharedView, function (text) {
+					if (banner) {
+						banner.hidden = false;
+						banner.textContent = text + ' ';
+						var saveBtn = document.createElement('button');
+						saveBtn.type = 'button';
+						saveBtn.className = 'button small';
+						saveBtn.textContent = 'Save as view file';
+						saveBtn.addEventListener('click', function () {
+							// Re-derive the view file from the decoded payload via the share-link module.
+							var decoded = window.ip2geoShareLink.decodeShareState(window.__ip2geoSharedView);
+							if (!decoded) return;
+							var json = window.ip2geoShareLink.buildViewFile(decoded);
+							var a = document.createElement('a');
+							a.href = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+							a.download = 'view.ip2geo.json';
+							a.click();
+							URL.revokeObjectURL(a.href);
+						});
+						banner.appendChild(saveBtn);
+					}
+				}).then(function (ok) {
+					if (ok) hideOldResults();
+				});
+			}
+
+			// D12: an old #results bookmark with no lookup on the page yet.
+			if (window.location.hash === '#results' && !oldResults && root.hidden) {
+				textarea.focus();
+				var hint = document.createElement('p');
+				hint.className = 'notice';
+				hint.setAttribute('role', 'status');
+				hint.textContent = 'Paste a log to see results.';
+				form.parentNode.insertBefore(hint, form.nextSibling);
+			}
+		})();
+		</script>
 
 	</body>
 </html>

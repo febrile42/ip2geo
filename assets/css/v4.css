@@ -2532,3 +2532,248 @@ button.button.small:hover {
   color: var(--magenta);
   text-decoration-color: var(--magenta);
 }
+
+/* ============================================================
+   21. PHASE 2 WORKBENCH (design doc: results-workbench-20260923)
+   Tokens only — nothing here introduces a new color, radius or font;
+   see DESIGN.md's Component Token Map. Scoped under #workbench-root so
+   it can sit alongside the PR-1 #results markup without collision.
+   ============================================================ */
+
+#workbench-root { margin-top: 8px; }
+
+#workbench-root .wb-toast-host {
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%);
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  pointer-events: none;
+}
+.wb-toast {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 9px 14px;
+  font-size: 13px;
+  color: var(--text);
+  opacity: 1;
+  transition: opacity 0.2s ease;
+}
+.wb-toast--out { opacity: 0; }
+
+.wb-recipient-banner {
+  background: var(--surface-2);
+  color: var(--text-muted);
+  border-radius: var(--r-md);
+  padding: 8px 12px;
+  margin: 8px 0;
+  font-size: 13px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.wb-paste-bar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  color: var(--text-muted);
+  font-size: 13px;
+  margin: 10px 0 14px;
+  flex-wrap: wrap;
+}
+.wb-paste-pill {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 7px 12px;
+  font-family: var(--font-mono);
+  color: var(--text);
+}
+.wb-paste-time { margin-left: auto; }
+
+.wb-state .notice { margin: 8px 0; }
+
+.wb-summary {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 14px 16px;
+  margin-bottom: 14px;
+  font-size: 13.5px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+}
+
+.wb-export-hint {
+  background: var(--surface-2);
+  color: var(--text-muted);
+  border-radius: var(--r-md);
+  padding: 6px 10px;
+  margin-bottom: 10px;
+  font-size: 12.5px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.wb-hint-dismiss {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  margin-left: auto;
+}
+.wb-hint-dismiss:focus-visible { outline: 2px solid var(--accent-purple); outline-offset: 2px; }
+
+.wb-filters { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.wb-chips-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  overflow-x: auto;
+}
+.wb-chip-label {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  margin-right: 6px;
+  white-space: nowrap;
+}
+.wb-chip {
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  padding: 3px 10px;
+  font-size: 12.5px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+.wb-chip input[type="checkbox"] {
+  /* Native checkbox for a11y (D16) but visually replaced by the ✓ prefix
+     and the selected background — kept in the accessibility tree, not
+     display:none, so screen readers and keyboard users still see a real
+     checkbox state. */
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0; border: 0;
+  clip: rect(0,0,0,0);
+  overflow: hidden;
+}
+.wb-chip:focus-within { outline: 2px solid var(--accent-purple); outline-offset: 2px; }
+.wb-chip--sel {
+  background: var(--surface-2);
+  border-color: var(--accent-purple);
+}
+.wb-chip i { font-style: normal; color: var(--text-muted); font-family: var(--font-mono); margin-left: 4px; }
+.wb-chip--more { color: var(--text-muted); cursor: default; }
+
+.wb-search {
+  margin-left: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 6px 10px;
+  width: 260px;
+  max-width: 100%;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.wb-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+  position: relative;
+}
+.wb-spacer { flex: 1; }
+.wb-shown-count { color: var(--text-muted); font-size: 12.5px; }
+.wb-clear-filters {
+  background: none;
+  border: none;
+  color: var(--accent-purple);
+  font-size: 12.5px;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+}
+.wb-share-btn--disabled { color: var(--text-muted); cursor: not-allowed; }
+
+.wb-export { position: relative; display: inline-block; }
+.wb-export-btn { display: inline-flex; gap: 6px; align-items: center; }
+.wb-export-count { color: var(--text-muted); font-family: var(--font-mono); font-size: 11px; }
+.wb-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 6px;
+  width: 320px;
+  max-width: 90vw;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  z-index: 20;
+}
+.wb-menu-item {
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--text);
+  padding: 8px;
+  border-radius: var(--r-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.wb-menu-item:hover, .wb-menu-item:focus-visible {
+  background: rgba(167,139,250,0.14);
+  outline: none;
+}
+.wb-menu-note { color: var(--text-muted); font-size: 11px; }
+
+.wb-table th { cursor: default; }
+.wb-cat {
+  border-radius: var(--r-sm);
+  padding: 1px 7px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: #0A0612;
+}
+
+@media (max-width: 767px) {
+  .wb-toast-host { left: 50%; right: auto; }
+  .wb-recipient-banner { font-size: 12.5px; }
+  .wb-export { position: static; }
+  .wb-menu {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: auto;
+    width: 100%;
+    max-width: none;
+    border-radius: var(--r-lg) var(--r-lg) 0 0;
+  }
+  .wb-menu-item { padding: 12px 10px; min-height: 44px; }
+  .wb-toolbar { position: static; }
+  .wb-chips-row { flex-wrap: nowrap; }
+  .wb-search { width: 100%; margin-left: 0; order: 99; }
+}

@@ -624,12 +624,19 @@
       return runLookup(root, state, uniqueIps, hitCounts, meta);
     }
 
+    var handle = { state: state, startLookup: startLookup };
+
+    // Calls handle.startLookup (not the closed-over startLookup directly) so
+    // a caller can wrap handle.startLookup after mount() returns — e.g.
+    // index.php's bootstrap wraps it to hide the PHP-rendered #results and
+    // scroll to the workbench on success — and have that wrapper actually
+    // run on submit.
     form.addEventListener('submit', function (e) {
       e.preventDefault();
-      startLookup(textarea.value);
+      handle.startLookup(textarea.value);
     });
 
-    return { state: state, startLookup: startLookup };
+    return handle;
   }
 
   /**
