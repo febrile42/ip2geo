@@ -188,6 +188,13 @@ describe('renderSummary (bug: the summary bar rendered empty because nothing eve
     expect(host.textContent).toMatch(/Spamhaus DROP netblocks/);
   });
 
+  test('top ASNs carry the org name from table rows (bug: rows use asnOrg, buildSummary reads asn_org)', () => {
+    var state = WB.makeState();
+    state.rows = rows();
+    WB.renderSummary(root, state);
+    expect(root.querySelector('.wb-summary').textContent).toMatch(/AS14061 DigitalOcean, LLC/);
+  });
+
   test('is fixed (not filter-driven): still describes every resolved row after a chip filters the table', () => {
     var state = WB.makeState();
     state.rows = rows();

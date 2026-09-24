@@ -762,7 +762,8 @@ section#results .table-wrapper {
 /* Sticky header: the workbench table can run to thousands of rows. */
 #wb-results-table thead th {
   position: sticky;
-  top: 56px; /* clears the sticky top nav (§3) */
+  top: 0; /* the table sits in an overflow-x wrapper, which becomes the sticky
+             container; top:56px pushed the header down over the first rows */
   z-index: 2;
 }
 
@@ -845,7 +846,8 @@ section#results .table-wrapper {
 }
 /* Desktop: one line, facts joined by " · ". */
 .lookup-summary-fact + .lookup-summary-fact::before {
-  content: " \00b7 ";
+  content: "\00b7";
+  margin: 0 0.5em; /* spacing via margin: spaces inside content collapsed on staging */
   color: var(--text-muted);
 }
 .lookup-summary-asn-rest { color: var(--text); }
