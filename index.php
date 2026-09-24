@@ -569,7 +569,7 @@ if (isset($_POST['ip_list'])) {
 				<div class="wb-paste-bar"></div>
 				<div class="wb-state" hidden></div>
 				<div class="wb-body" hidden>
-					<div id="lookup-summary" class="wb-summary" role="status"></div>
+					<div class="wb-summary lookup-summary" role="status"></div>
 					<div class="wb-export-hint" hidden></div>
 					<div class="wb-filters">
 						<div class="wb-chips-row"><div class="wb-chips-category"></div></div>
@@ -579,7 +579,7 @@ if (isset($_POST['ip_list'])) {
 						<div class="wb-export"></div>
 						<button type="button" class="button small wb-share-btn">Copy share link</button>
 						<button type="button" class="button small wb-share-download" hidden>Download view file</button>
-						<button type="button" class="button small" id="wb-toggle-unresolved" hidden>Show unresolved</button>
+						<button type="button" class="button small alt wb-toggle-unresolved" hidden>Show unresolved</button>
 						<span class="wb-spacer"></span>
 						<span class="wb-shown-count"></span>
 						<button type="button" class="wb-clear-filters" hidden>Clear filters</button>
@@ -598,6 +598,7 @@ if (isset($_POST['ip_list'])) {
 								<th scope="col" data-key="hits" aria-sort="descending" style="text-align:right">Hits</th>
 							</tr></thead>
 							<tbody></tbody>
+							<tbody class="wb-unresolved-rows" hidden></tbody>
 						</table>
 						<div class="wb-table-sentinel"></div>
 					</div>
