@@ -15,14 +15,7 @@ function seriousOrCritical(results) {
 test.describe('D16: accessibility scan', () => {
   test('the lookup page (pre-results) has no serious/critical axe violations', async ({ page }) => {
     await page.goto('/index.php');
-    // .opt-in-toggle (the recent-lookups "Save recent lookups" checkbox) has
-    // a pre-existing color-contrast violation (.muted-tag on --text-muted,
-    // 3.36:1 vs the 4.5:1 AA minimum) that predates this Phase 2 work and
-    // sits outside its scope — it's part of the existing recent-lookups
-    // feature, not the workbench or its wiring. Excluded here rather than
-    // silently left unasserted; flagged in the handback report as a
-    // pre-existing a11y bug worth its own fix.
-    const results = await new AxeBuilder({ page }).exclude('.opt-in-toggle').analyze();
+    const results = await new AxeBuilder({ page }).analyze();
     expect(seriousOrCritical(results), JSON.stringify(seriousOrCritical(results), null, 2)).toEqual([]);
   });
 
