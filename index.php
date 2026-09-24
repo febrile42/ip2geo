@@ -782,6 +782,7 @@ if (isset($_POST['ip_list'])) {
 		})();
 		</script>
 		<script data-cfasync="false" src="assets/js/ip2geo-app.js?v=<?php echo APP_VERSION; ?>"></script>
+		<script data-cfasync="false" src="assets/js/abbr-popover.js?v=<?php echo APP_VERSION; ?>"></script>
 
 		<!-- Phase 2 workbench: pure modules, then the DOM orchestration layer, then the bootstrap. -->
 		<script data-cfasync="false" src="assets/js/filters.js?v=<?php echo APP_VERSION; ?>"></script>
