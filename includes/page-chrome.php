@@ -35,7 +35,7 @@ function render_page_open(string $title, string $meta_desc = '', array $og = [],
          loads (matches the inline script in index.php's <head>; see
          assets/js/workbench.js). Non-lookup pages rarely carry #v=, but this
          keeps the protection uniform across every page that loads the tracker. -->
-    <script>
+    <script data-cfasync="false">
     (function() {
         var h = window.location.hash;
         if (h.indexOf('#v=') === 0) {
@@ -47,7 +47,7 @@ function render_page_open(string $title, string $meta_desc = '', array $og = [],
     })();
     </script>
     <?php if (($_SERVER['HTTP_HOST'] === 'ip2geo.org' || getenv('IP2GEO_E2E_FORCE_UMAMI') === '1')): ?>
-    <script defer src="/u/script.js" data-website-id="656d7a15-6282-4079-af1e-b8ed857fba2e" data-domains="ip2geo.org" data-exclude-hash="true"></script>
+    <script data-cfasync="false" defer src="/u/script.js" data-website-id="656d7a15-6282-4079-af1e-b8ed857fba2e" data-domains="ip2geo.org" data-exclude-hash="true"></script>
     <?php endif; ?>
     <title><?php echo $safe_title; ?></title>
     <meta charset="utf-8" />
@@ -65,7 +65,7 @@ function render_page_open(string $title, string $meta_desc = '', array $og = [],
     <link rel="stylesheet" href="/assets/css/v4.css?v=<?php echo APP_VERSION; ?>" />
     <link rel="stylesheet" href="/assets/css/ip2geo-print.css?v=<?php echo APP_VERSION; ?>" media="print" />
     <link rel="icon" href="/favicon.ico" />
-    <script>
+    <script data-cfasync="false">
     // Apply theme before paint to avoid a flash. An explicit saved choice wins;
     // otherwise follow the OS setting (prefers-color-scheme). Falls back to the
     // dark data-theme on <html> only if JS is off.
@@ -110,7 +110,7 @@ function render_page_close(): void { ?>
     <?php require __DIR__ . '/footer.php'; ?>
 
     <!-- Theme toggle -->
-    <script>
+    <script data-cfasync="false">
     (function() {
         var btn = document.getElementById('themeToggle');
         if (!btn) return;
@@ -124,7 +124,7 @@ function render_page_close(): void { ?>
     </script>
 
     <!-- Smooth in-page anchor scroll (fixed ~500ms regardless of distance) -->
-    <script>
+    <script data-cfasync="false">
     (function() {
         var DURATION = 500;
         var OFFSET = 72;
