@@ -1163,19 +1163,32 @@ button.button.small:hover {
   section#results .table-wrapper {
     -webkit-overflow-scrolling: touch;
   }
+  /* Both tables: the no-JS #results-table and the workbench's #wb-results-table. */
   #results-table thead th:first-child,
-  #results-table tbody td:first-child {
+  #results-table tbody td:first-child,
+  #wb-results-table thead th:first-child,
+  #wb-results-table tbody td:first-child {
     position: sticky;
     left: 0;
     z-index: 1;
     background: var(--surface);
     box-shadow: 1px 0 0 var(--border);
   }
-  #results-table tbody tr.row-stripe td:first-child {
-    background: rgba(255,255,255,0.03);
+  /* Corner cell sits above both the sticky header and the sticky column. */
+  #results-table thead th:first-child,
+  #wb-results-table thead th:first-child {
+    z-index: 3;
+    background: var(--surface-2);
   }
-  [data-theme="light"] #results-table tbody tr.row-stripe td:first-child {
-    background: rgba(26,19,48,0.03);
+  /* Striped rows: the stripe tint over an opaque base. A bare translucent
+     tint let text scrolling underneath show through the pinned cell. */
+  #results-table tbody tr.row-stripe td:first-child,
+  #wb-results-table tbody tr:nth-child(2n) td:first-child {
+    background: linear-gradient(rgba(255,255,255,0.03), rgba(255,255,255,0.03)), var(--surface);
+  }
+  [data-theme="light"] #results-table tbody tr.row-stripe td:first-child,
+  [data-theme="light"] #wb-results-table tbody tr:nth-child(2n) td:first-child {
+    background: linear-gradient(rgba(26,19,48,0.03), rgba(26,19,48,0.03)), var(--surface);
   }
 }
 
