@@ -453,17 +453,11 @@ main {
 .opt-in .muted-tag { color: var(--text-muted); }
 
 /* Wrapper row for the recent-lookups opt-in checkbox: sits directly below the
-   submit button in the .actions column. Fades on hover so the row stays
-   discoverable without competing with the primary CTA. */
+   submit button in the .actions column. Small, muted text keeps it quiet;
+   no opacity dimming, which pushed it below 4.5:1 contrast. */
 .opt-in-toggle {
   margin-top: 0.6em;
   font-size: 0.75em;
-  opacity: 0.7;
-  transition: opacity 0.15s;
-}
-.opt-in-toggle:hover,
-.opt-in-toggle:focus-within {
-  opacity: 1;
 }
 .opt-in-toggle label {
   cursor: pointer;
