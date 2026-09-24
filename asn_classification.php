@@ -38,7 +38,9 @@ $known_asns = [
     'AS209'    => 'cloud',     // CenturyLink / Lumen Cloud
     'AS6939'   => 'cloud',     // Hurricane Electric
     'AS46484'  => 'scanning',  // Censys scanning infrastructure
-    'AS398705' => 'scanning',  // Censys
+    'AS398324' => 'scanning',  // Censys (CENSYS-ARIN-01)
+    'AS398705' => 'scanning',  // Censys (CENSYS-ARIN-02)
+    'AS398722' => 'scanning',  // Censys (CENSYS-ARIN-03)
     'AS30083'  => 'scanning',  // Shodan
 
     // --- Commercial VPN / proxy providers ---
