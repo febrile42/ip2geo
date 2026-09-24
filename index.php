@@ -427,7 +427,7 @@ $visitor_ip     = filter_var($visitor_ip_raw, FILTER_VALIDATE_IP) !== false ? $v
 		     script is NOT deferred, so it runs at parse time, before the deferred
 		     tracker script below executes (deferred scripts run after the document
 		     is parsed). See assets/js/workbench.js for what reads window.__ip2geoSharedView. -->
-		<script>
+		<script data-cfasync="false">
 		(function() {
 			var h = window.location.hash;
 			if (h.indexOf('#v=') === 0) {
@@ -440,7 +440,7 @@ $visitor_ip     = filter_var($visitor_ip_raw, FILTER_VALIDATE_IP) !== false ? $v
 		</script>
 		<!-- Umami (production only) -->
 		<?php if (($_SERVER['HTTP_HOST'] === 'ip2geo.org' || getenv('IP2GEO_E2E_FORCE_UMAMI') === '1')): ?>
-		<script defer src="/u/script.js" data-website-id="656d7a15-6282-4079-af1e-b8ed857fba2e" data-domains="ip2geo.org" data-exclude-hash="true"></script>
+		<script data-cfasync="false" defer src="/u/script.js" data-website-id="656d7a15-6282-4079-af1e-b8ed857fba2e" data-domains="ip2geo.org" data-exclude-hash="true"></script>
 		<?php endif; ?>
 		<title>ip2geo — Bulk IP Lookup for Raw Logs, Free</title>
 		<meta charset="utf-8" />
@@ -459,7 +459,7 @@ $visitor_ip     = filter_var($visitor_ip_raw, FILTER_VALIDATE_IP) !== false ? $v
 		<link rel="stylesheet" href="assets/css/v4.css?v=<?php echo APP_VERSION; ?>" />
 		<link rel="stylesheet" href="assets/css/ip2geo-print.css?v=<?php echo APP_VERSION; ?>" media="print" />
 		<link rel="icon" href="/favicon.ico" />
-		<script>
+		<script data-cfasync="false">
 		// Apply theme before paint to avoid a flash. An explicit saved choice wins;
 		// otherwise follow the OS setting (prefers-color-scheme). Falls back to the
 		// dark data-theme on <html> only if JS is off.
@@ -675,7 +675,7 @@ if (isset($_POST['ip_list'])) {
 		</div>
 
 		<!-- Theme toggle -->
-		<script>
+		<script data-cfasync="false">
 		(function() {
 			var btn = document.getElementById('themeToggle');
 			if (!btn) return;
@@ -689,7 +689,7 @@ if (isset($_POST['ip_list'])) {
 		</script>
 
 		<!-- Smooth in-page anchor scroll (fixed ~500ms regardless of distance) -->
-		<script>
+		<script data-cfasync="false">
 		(function() {
 			var DURATION = 500;
 			var OFFSET = 72;
@@ -726,7 +726,7 @@ if (isset($_POST['ip_list'])) {
 		<!-- Shared IP extraction (browser mirror of includes/extract.php's extract_ips()).
 		     Loaded before ip2geo-app.js and before the inline overlay script below, both
 		     of which call window.extractIps(). -->
-		<script src="assets/js/extract-ips.js?v=<?php echo APP_VERSION; ?>"></script>
+		<script data-cfasync="false" src="assets/js/extract-ips.js?v=<?php echo APP_VERSION; ?>"></script>
 
 		<!-- Scripts -->
 		<script data-cfasync="false">
@@ -780,14 +780,14 @@ if (isset($_POST['ip_list'])) {
 
 		})();
 		</script>
-		<script src="assets/js/ip2geo-app.js?v=<?php echo APP_VERSION; ?>"></script>
+		<script data-cfasync="false" src="assets/js/ip2geo-app.js?v=<?php echo APP_VERSION; ?>"></script>
 
 		<!-- Phase 2 workbench: pure modules, then the DOM orchestration layer, then the bootstrap. -->
-		<script src="assets/js/filters.js?v=<?php echo APP_VERSION; ?>"></script>
-		<script src="assets/js/export-templates.js?v=<?php echo APP_VERSION; ?>"></script>
-		<script src="assets/js/summary.js?v=<?php echo APP_VERSION; ?>"></script>
-		<script src="assets/js/share-link.js?v=<?php echo APP_VERSION; ?>"></script>
-		<script src="assets/js/workbench.js?v=<?php echo APP_VERSION; ?>"></script>
+		<script data-cfasync="false" src="assets/js/filters.js?v=<?php echo APP_VERSION; ?>"></script>
+		<script data-cfasync="false" src="assets/js/export-templates.js?v=<?php echo APP_VERSION; ?>"></script>
+		<script data-cfasync="false" src="assets/js/summary.js?v=<?php echo APP_VERSION; ?>"></script>
+		<script data-cfasync="false" src="assets/js/share-link.js?v=<?php echo APP_VERSION; ?>"></script>
+		<script data-cfasync="false" src="assets/js/workbench.js?v=<?php echo APP_VERSION; ?>"></script>
 		<script data-cfasync="false">
 		(function () {
 			var root = document.getElementById('workbench-root');
