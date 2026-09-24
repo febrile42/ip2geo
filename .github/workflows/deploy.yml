@@ -9,6 +9,10 @@ on:
   # fire the push event, leaving the required "PHP Syntax Check" unreported on
   # promotion PRs. `gh workflow run deploy.yml --ref develop` fills that gap.
   workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+      - develop
 
 jobs:
 
@@ -21,10 +25,41 @@ jobs:
       - name: Check all PHP files for syntax errors
         run: find . -name "*.php" -not -path "./.git/*" | xargs -I{} php -l {}
 
+  # ── Unit + browser tests (both branches, PRs, and v5 dispatches) ──────────
+  tests:
+    name: Tests (PHPUnit, Jest, Playwright)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
+        with:
+          php-version: '8.4'
+          tools: composer
+      - name: PHPUnit
+        run: |
+          composer install --no-interaction --no-progress
+          vendor/bin/phpunit
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Jest
+        run: |
+          npm ci
+          npx jest
+      - name: Playwright (R3 privacy + D16 accessibility)
+        run: |
+          cp config.sample.php config.php
+          mkdir -p data/geoip
+          cp tests/fixtures/mmdb/GeoIP2-City-Test.mmdb data/geoip/GeoLite2-City.mmdb
+          cp tests/fixtures/mmdb/GeoLite2-ASN-Test.mmdb data/geoip/GeoLite2-ASN.mmdb
+          npx playwright install --with-deps chromium
+          IP2GEO_E2E_FORCE_UMAMI=1 npx playwright test
+
   # ── develop → staging (also: manual dispatch of the v5 branch, for v5 QA) ──
   deploy-staging:
     name: Deploy to Staging
-    needs: lint
+    needs: [lint, tests]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/develop' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/v5')
     steps:
@@ -131,13 +166,17 @@ jobs:
   # ── main → production ─────────────────────────────────────────────────────
   deploy-production:
     name: Deploy to Production
-    needs: lint
+    needs: [lint, tests]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     steps:
       - name: Pull main on server (production dir)
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
+        env:
+          MAXMIND_ACCOUNT_ID: ${{ secrets.MAXMIND_ACCOUNT_ID }}
+          MAXMIND_LICENSE_KEY: ${{ secrets.MAXMIND_LICENSE_KEY }}
         with:
+          envs: MAXMIND_ACCOUNT_ID,MAXMIND_LICENSE_KEY
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
@@ -146,6 +185,8 @@ jobs:
             cd ${{ secrets.DEPLOY_PATH }}
             git fetch origin && git reset --hard origin/main
             ~/bin/composer install --no-dev --no-interaction --quiet
+            # .mmdb lookup data (v5): only downloads when missing or >35 days old
+            if [ -f scripts/fetch-mmdb.sh ]; then bash scripts/fetch-mmdb.sh "$PWD"; fi
 
       - name: Smoke test — production origin returns HTTP 200
         run: |
@@ -159,3 +200,14 @@ jobs:
             exit 1
           fi
           echo "Production smoke test passed"
+
+      - name: Production lookup data is not web-reachable (GeoLite2 license)
+        run: |
+          CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Host: ip2geo.org" \
+            "http://${{ secrets.DEPLOY_HOST }}/data/geoip/GeoLite2-City.mmdb")
+          if [ "$CODE" != "403" ] && [ "$CODE" != "404" ]; then
+            echo "data/geoip is web-reachable on production: HTTP $CODE"
+            exit 1
+          fi
+          echo "data/geoip blocked: HTTP $CODE"
