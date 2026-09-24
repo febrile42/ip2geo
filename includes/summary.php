@@ -14,6 +14,10 @@
 
 declare(strict_types=1);
 
+// Hover text for every DROP label (table tag + summary). assets/js/workbench.js
+// carries the same string; tests/DropExplainerTest.php keeps the two identical.
+const DROP_EXPLAINER = "Spamhaus DROP (Don't Route Or Peer): this IP is in a netblock Spamhaus lists as hijacked or run by spam or cybercrime operations. Legitimate traffic from these ranges is rare.";
+
 const SUMMARY_CATEGORY_LABELS = [
     'scanning'    => 'Scanning',
     'cloud'       => 'Cloud exit',

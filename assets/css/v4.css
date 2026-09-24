@@ -769,7 +769,8 @@ section#results .table-wrapper {
 
 /* abbr tooltips inside results table */
 #results-table abbr[title],
-#wb-results-table abbr[title] {
+#wb-results-table abbr[title],
+.lookup-summary abbr[title] {
     text-decoration: underline dotted;
     text-decoration-color: var(--text-muted);
     cursor: help;

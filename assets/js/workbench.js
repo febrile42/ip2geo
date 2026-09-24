@@ -45,6 +45,9 @@
 
   // ── small DOM helpers ───────────────────────────────────────────────────
 
+  // Same text as DROP_EXPLAINER in includes/summary.php (tests/DropExplainerTest.php).
+  var DROP_EXPLAINER = 'Spamhaus DROP (Don\'t Route Or Peer): this IP is in a netblock Spamhaus lists as hijacked or run by spam or cybercrime operations. Legitimate traffic from these ranges is rare.';
+
   function el(tag, attrs, children) {
     var e = document.createElement(tag);
     attrs = attrs || {};
@@ -159,7 +162,9 @@
 
     if (summary.drop_count > 0) {
       host.appendChild(el('span', { class: 'lookup-summary-fact lookup-summary-drop' }, [
-        summary.drop_count.toLocaleString() + ' in Spamhaus DROP netblocks'
+        summary.drop_count.toLocaleString() + ' in ',
+        el('abbr', { title: DROP_EXPLAINER }, ['Spamhaus DROP']),
+        ' netblocks'
       ]));
     }
   }
@@ -435,7 +440,7 @@
 
     var catCell = el('td', {}, [
       el('span', { class: 'wb-cat', style: 'background:' + catColor(row.category) }, [CATEGORY_LABELS[row.category] || row.category]),
-      row.drop ? el('span', { class: 'drop-tag' }, ['DROP']) : null
+      row.drop ? el('abbr', { class: 'drop-tag', title: DROP_EXPLAINER }, ['DROP']) : null
     ]);
 
     return el('tr', { 'data-category': row.category, 'data-country': row.country }, [
