@@ -61,6 +61,11 @@
     return e;
   }
 
+  function formatLookupTime(ms) {
+    if (ms < 100) return '<0.1 s';
+    return (ms / 1000).toFixed(1) + ' s';
+  }
+
   function ipv6MiddleTruncate(ip) {
     // Mirrors index.php's ipv6_middle_truncate(): "2001:db8::7334" -> "2001:db8…:7334".
     if (ip.length <= 15) return ip;
@@ -111,6 +116,82 @@
       sort: { key: 'hits', dir: 'desc' },
       pasteMeta: { lines: 0, unique: 0, v6: 0, lookupMs: null, rawText: '' },
       recipient: null // {count, categories, countries} when opened from a share link
+    };
+  }
+
+  // ── summary line (D4/D5: fixed, not filter-driven — always describes
+  // every resolved IP in the lookup) ──────────────────────────────────────
+
+  function renderSummary(root, state) {
+    var host = root.querySelector('.wb-summary');
+    if (!host) return;
+    host.innerHTML = '';
+
+    var summary = Summary.buildSummary(state.rows);
+    if (summary.line === '') return;
+
+    host.appendChild(el('span', { class: 'lookup-summary-fact lookup-summary-total' }, [
+      summary.total.toLocaleString() + ' IP' + (summary.total === 1 ? '' : 's') + ' looked up'
+    ]));
+
+    summary.categories.forEach(function (cat) {
+      host.appendChild(el('span', { class: 'lookup-summary-fact lookup-summary-category lookup-summary-category--' + cat.key }, [
+        cat.label + ' ' + cat.count.toLocaleString() + ' (' + cat.pct + '%)'
+      ]));
+    });
+
+    if (summary.top_asns.length > 0) {
+      var asnsFact = el('span', { class: 'lookup-summary-fact lookup-summary-asns' }, ['top ASNs: ']);
+      summary.top_asns.forEach(function (a, i) {
+        var text = (a.asn + ' ' + a.org).trim();
+        if (i === 0) {
+          asnsFact.appendChild(el('span', { class: 'lookup-summary-asn lookup-summary-asn--top' }, [text]));
+        } else {
+          asnsFact.appendChild(el('span', { class: 'lookup-summary-asn-rest' }, [', ' + text]));
+        }
+      });
+      host.appendChild(asnsFact);
+    }
+
+    if (summary.drop_count > 0) {
+      host.appendChild(el('span', { class: 'lookup-summary-fact lookup-summary-drop' }, [
+        summary.drop_count.toLocaleString() + ' in Spamhaus DROP netblocks'
+      ]));
+    }
+  }
+
+  // ── unresolved IPs toggle ────────────────────────────────────────────
+
+  function renderUnresolved(root, state) {
+    var btn = root.querySelector('.wb-toggle-unresolved');
+    var body = root.querySelector('.wb-unresolved-rows');
+    if (!btn || !body) return;
+
+    var n = state.unresolved.length;
+    if (n === 0) {
+      btn.hidden = true;
+      body.hidden = true;
+      body.innerHTML = '';
+      return;
+    }
+
+    btn.hidden = false;
+    body.innerHTML = '';
+    state.unresolved.forEach(function (ip) {
+      body.appendChild(el('tr', { class: 'wb-unresolved-row' }, [
+        el('td', {}, [ip]), el('td', {}, []), el('td', {}, []), el('td', {}, []),
+        el('td', {}, []), el('td', {}, []), el('td', {}, []), el('td', {}, [])
+      ]));
+    });
+
+    function setLabel(shown) {
+      btn.textContent = (shown ? 'Hide ' : 'Show ') + n.toLocaleString() + ' unresolved IP' + (n === 1 ? '' : 's');
+    }
+    body.hidden = true;
+    setLabel(false);
+    btn.onclick = function () {
+      body.hidden = !body.hidden;
+      setLabel(!body.hidden);
     };
   }
 
@@ -455,7 +536,7 @@
     bar.appendChild(el('button', { type: 'button', class: 'button small', 'aria-haspopup': 'true' }, ['Recent ▾']));
     bar.lastChild.addEventListener('click', onRecent);
     if (m.lookupMs != null) {
-      bar.appendChild(el('span', { class: 'wb-paste-time' }, ['looked up in ' + (m.lookupMs / 1000).toFixed(1) + ' s']));
+      bar.appendChild(el('span', { class: 'wb-paste-time' }, ['looked up in ' + formatLookupTime(m.lookupMs)]));
     }
   }
 
@@ -520,7 +601,7 @@
     state.pasteMeta = meta;
     renderState(root, 'loading', 'Looking up ' + uniqueIps.length.toLocaleString() + ' unique IPs…' + (meta.v6 ? ' (' + meta.v6 + ' IPv6)' : ''));
 
-    var startedAt = Date.now();
+    var startedAt = (window.performance && performance.now) ? performance.now() : Date.now();
     return fetch('/api/lookup.php', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -546,10 +627,13 @@
       return resp.json().then(function (data) {
         state.rows = buildRows(data.results || [], hitCounts);
         state.unresolved = data.unresolved || [];
-        meta.lookupMs = Date.now() - startedAt;
+        var finishedAt = (window.performance && performance.now) ? performance.now() : Date.now();
+        meta.lookupMs = finishedAt - startedAt;
         state.pasteMeta = meta;
         clearState(root);
         renderPasteBar(root, state, root._wbOnEdit, root._wbOnNew, root._wbOnRecent);
+        renderSummary(root, state);
+        renderUnresolved(root, state);
         renderAll(root, state);
         maybeShowExportHint(root);
         return true;
@@ -697,6 +781,8 @@
           countries: new Set(decoded.countries),
           search: decoded.search || ''
         };
+        renderSummary(root, state);
+        renderUnresolved(root, state);
         renderAll(root, state);
       }
       return ok;
@@ -709,6 +795,9 @@
     buildRows: buildRows,
     makeState: makeState,
     renderAll: renderAll,
+    renderSummary: renderSummary,
+    renderUnresolved: renderUnresolved,
+    formatLookupTime: formatLookupTime,
     renderPasteBar: renderPasteBar,
     renderState: renderState,
     clearState: clearState,
