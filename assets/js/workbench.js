@@ -127,7 +127,11 @@
     if (!host) return;
     host.innerHTML = '';
 
-    var summary = Summary.buildSummary(state.rows);
+    // Table rows name the org field asnOrg; buildSummary() (a port of
+    // includes/summary.php) reads asn_org. Without this map every org was blank.
+    var summary = Summary.buildSummary(state.rows.map(function (r) {
+      return { category: r.category, asn: r.asn, asn_org: r.asnOrg, drop: r.drop };
+    }));
     if (summary.line === '') return;
 
     host.appendChild(el('span', { class: 'lookup-summary-fact lookup-summary-total' }, [
