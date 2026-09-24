@@ -508,7 +508,7 @@ $visitor_ip     = filter_var($visitor_ip_raw, FILTER_VALIDATE_IP) !== false ? $v
 				<form class="lookup-form" action="#results" method="post" name="ip_entry" id="iplookup">
 					<label for="message" class="sr-only" style="position:absolute;left:-9999px">Text containing IP addresses</label>
 					<div class="form-grid">
-						<textarea class="ip-textarea" name="ip_list" id="message" rows="6" spellcheck="false" placeholder="Paste a log, netstat output, or any text containing IP addresses…"><?php
+						<textarea class="ip-textarea" name="ip_list" id="message" rows="6" spellcheck="false" placeholder="Paste a log, netstat output or any text with IP addresses… or try a sample log with the link below."><?php
 if (isset($_POST['ip_list'])) {
 	echo htmlspecialchars($_POST['ip_list'], ENT_QUOTES, 'UTF-8');
 }
@@ -536,7 +536,7 @@ if (isset($_POST['ip_list'])) {
 					</div>
 				</form>
 
-				<p class="sample-log-link"><a href="#" id="try-sample-log" data-sample-url="assets/sample-fail2ban.txt" data-visitor-ip="<?php echo htmlspecialchars($visitor_ip, ENT_QUOTES, 'UTF-8'); ?>">Try a sample log</a></p>
+				<p class="sample-log-link"><a href="#" id="try-sample-log" data-sample-url="assets/sample-fail2ban.txt" data-visitor-ip="<?php echo htmlspecialchars($visitor_ip, ENT_QUOTES, 'UTF-8'); ?>">Try a sample log <span aria-hidden="true">→</span></a></p>
 
 				<!-- Recent lookups widget — rendered by ip2geo-app.js when opt-in is on + list is nonempty.
 				     Sits below the form so the asymmetric hero stays tight; surfaces returning users'
