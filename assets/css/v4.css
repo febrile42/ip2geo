@@ -776,6 +776,27 @@ section#results .table-wrapper {
     cursor: help;
 }
 
+/* Tap-to-explain popover for DROP labels (assets/js/abbr-popover.js): title
+   tooltips never show on touch screens. */
+.abbr-pop {
+    position: absolute;
+    z-index: 60;
+    max-width: min(320px, calc(100vw - 16px));
+    padding: 8px 10px;
+    background: var(--surface-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    font-size: 13px;
+    line-height: 1.45;
+}
+abbr.drop-tag:focus-visible,
+.lookup-summary-drop abbr:focus-visible {
+    outline: 2px solid var(--accent-purple);
+    outline-offset: 2px;
+}
+
 /* No row hover: the table is for scanning and reading, not interaction.
    A row-bg change reads as "this row is selectable/clickable" but rows
    aren't actionable, so the affordance lies. */
