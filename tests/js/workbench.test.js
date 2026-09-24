@@ -152,6 +152,8 @@ describe('renderAll smoke test', () => {
     WB.renderAll(root, state);
     var dropTags = root.querySelectorAll('.drop-tag');
     expect(dropTags.length).toBe(1);
+    expect(dropTags[0].tagName).toBe('ABBR');
+    expect(dropTags[0].getAttribute('title')).toMatch(/Don't Route Or Peer/);
   });
 
   test('table has a caption and aria-sort on the sorted column', () => {

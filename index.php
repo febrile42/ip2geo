@@ -246,7 +246,7 @@ function render_lookup_results(array $post, string $visitor_ip = '', ?string $ci
         $rows_html .= '<td>' . htmlspecialchars($asn_num !== null ? 'AS' . $asn_num : '', ENT_QUOTES, 'UTF-8') . '</td>';
         $rows_html .= '<td class="cell-asn-org" title="' . htmlspecialchars($asn_org, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($asn_org, ENT_QUOTES, 'UTF-8') . '</td>';
         $rows_html .= '<td class="asn-category asn-category--' . htmlspecialchars($category, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($category, ENT_QUOTES, 'UTF-8')
-            . ($drop ? ' <span class="drop-tag">DROP</span>' : '') . '</td>';
+            . ($drop ? ' <abbr class="drop-tag" title="' . htmlspecialchars(DROP_EXPLAINER, ENT_QUOTES, 'UTF-8') . '">DROP</abbr>' : '') . '</td>';
         $rows_html .= '</tr>';
     }
 
@@ -286,7 +286,7 @@ function render_lookup_results(array $post, string $visitor_ip = '', ?string $ci
         }
         if ($summary['drop_count'] > 0) {
             $html .= '<span class="lookup-summary-fact lookup-summary-drop">'
-                . number_format($summary['drop_count']) . ' in Spamhaus DROP netblocks</span>';
+                . number_format($summary['drop_count']) . ' in <abbr title="' . htmlspecialchars(DROP_EXPLAINER, ENT_QUOTES, 'UTF-8') . '">Spamhaus DROP</abbr> netblocks</span>';
         }
         $html .= '</div>';
     }
