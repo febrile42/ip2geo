@@ -696,7 +696,12 @@ section#results .table-wrapper {
   overflow-x: auto;
 }
 
-#results-table {
+/* #wb-results-table (Phase 2 workbench, §21) reuses every rule below —
+   its first 7 columns (IP, CC, Region, City, ASN, ASN Org, Category) are
+   in the same order as #results-table's, so the nth-child column rules
+   line up; its 8th (Hits) is styled separately, just below. */
+#results-table,
+#wb-results-table {
   width: 100%;
   border-collapse: collapse;
   font-family: var(--font-sans);
@@ -704,7 +709,8 @@ section#results .table-wrapper {
   margin: 0;
 }
 
-#results-table thead th {
+#results-table thead th,
+#wb-results-table thead th {
   text-align: left;
   font-family: var(--font-mono);
   font-weight: 500;
@@ -717,7 +723,8 @@ section#results .table-wrapper {
   background: var(--surface-2);
   white-space: nowrap;
 }
-#results-table tbody td {
+#results-table tbody td,
+#wb-results-table tbody td {
   padding: 8px 14px;
   border-bottom: 1px solid var(--border);
   vertical-align: middle;
@@ -725,20 +732,43 @@ section#results .table-wrapper {
      .asn-category--scanning/cloud/vpn/etc. set their own color, and a
      specific selector here would override them. */
 }
-#results-table tbody tr:last-child td { border-bottom: 0; }
+#results-table tbody tr:last-child td,
+#wb-results-table tbody tr:last-child td { border-bottom: 0; }
 
 /* IP, CC, ASN columns -> mono so digits align across rows */
 #results-table tbody td:first-child,
 #results-table tbody td:nth-child(2),
-#results-table tbody td:nth-child(5) {
+#results-table tbody td:nth-child(5),
+#wb-results-table tbody td:first-child,
+#wb-results-table tbody td:nth-child(2),
+#wb-results-table tbody td:nth-child(5) {
   font-family: var(--font-mono);
   font-size: 12px;
   font-feature-settings: "tnum" 1;
 }
-#results-table tbody td:nth-child(2) { color: var(--text-muted); }
+#results-table tbody td:nth-child(2),
+#wb-results-table tbody td:nth-child(2) { color: var(--text-muted); }
+
+/* Hits column (workbench-only, 8th): right-aligned mono counts. */
+#wb-results-table th[data-key="hits"] { text-align: right; }
+#wb-results-table td.num {
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-feature-settings: "tnum" 1;
+  color: var(--text-muted);
+}
+
+/* Sticky header: the workbench table can run to thousands of rows. */
+#wb-results-table thead th {
+  position: sticky;
+  top: 56px; /* clears the sticky top nav (§3) */
+  z-index: 2;
+}
 
 /* abbr tooltips inside results table */
-#results-table abbr[title] {
+#results-table abbr[title],
+#wb-results-table abbr[title] {
     text-decoration: underline dotted;
     text-decoration-color: var(--text-muted);
     cursor: help;
@@ -751,22 +781,28 @@ section#results .table-wrapper {
 /* JS-driven stripe (ip2geo-app.js toggles .row-stripe on visible rows,
    .row-hidden on filtered rows). The nth-child reset stops the theme's
    default odd-row stripe from leaking back in once rows hide. */
-#results-table tbody tr:nth-child(2n + 1) { background-color: transparent; }
-#results-table tbody tr.row-stripe        { background-color: rgba(255,255,255,0.03); }
+#results-table tbody tr:nth-child(2n + 1),
+#wb-results-table tbody tr:nth-child(2n + 1) { background-color: transparent; }
+#results-table tbody tr.row-stripe,
+#wb-results-table tbody tr:nth-child(2n)     { background-color: rgba(255,255,255,0.03); }
 #results-table tbody tr.row-hidden        { display: none; }
-[data-theme="light"] #results-table tbody tr.row-stripe { background-color: rgba(26,19,48,0.03); }
+[data-theme="light"] #results-table tbody tr.row-stripe,
+[data-theme="light"] #wb-results-table tbody tr:nth-child(2n) { background-color: rgba(26,19,48,0.03); }
 
 /* Column overflow absorption — ASN Org is the prime overflow culprit; State and
    City are secondary. Truncate at a fixed em cap, expose full text via the
    markup's title attribute on hover. */
-#results-table .cell-asn-org {
+#results-table .cell-asn-org,
+#wb-results-table .cell-asn-org {
     max-width: 14em;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 #results-table .cell-region,
-#results-table .cell-city {
+#results-table .cell-city,
+#wb-results-table .cell-region,
+#wb-results-table .cell-city {
     max-width: 10em;
     white-space: nowrap;
     overflow: hidden;
@@ -2543,7 +2579,17 @@ button.button.small:hover {
    it can sit alongside the PR-1 #results markup without collision.
    ============================================================ */
 
-#workbench-root { margin-top: 8px; }
+/* Overrides the generic `section.block` rule (§10: 72px top padding + a
+   border-top divider, meant for separating major page sections like
+   Contact/About). The workbench sits directly under the paste bar as a
+   continuation of the same lookup flow, not a new section, so it gets a
+   small top margin and no divider — matching the mockup's tight spacing
+   between the paste bar and "Lookup Results". */
+#workbench-root.block {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 0;
+}
 
 #workbench-root .wb-toast-host {
   position: fixed;
@@ -2603,17 +2649,13 @@ button.button.small:hover {
 
 .wb-state .notice { margin: 8px 0; }
 
-.wb-summary {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  padding: 14px 16px;
-  margin-bottom: 14px;
-  font-size: 13.5px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 20px;
-}
+/* .wb-summary is a bare DOM hook (assets/js/workbench.js queries it to
+   render the summary line); it also carries .lookup-summary (§16b-2),
+   which is what actually styles the card, the mono numerals and the
+   " · " fact separators — reused as-is rather than duplicated here so
+   the two summary renderers (PHP's build_summary() and JS's
+   ip2geoSummary) always look identical. */
+.wb-summary { margin-bottom: 14px; }
 
 .wb-export-hint {
   background: var(--surface-2);
@@ -2776,7 +2818,31 @@ button.button.small:hover {
     border-radius: var(--r-lg) var(--r-lg) 0 0;
   }
   .wb-menu-item { padding: 12px 10px; min-height: 44px; }
-  .wb-toolbar { position: static; }
+
+  /* Toolbar (D15/bug 5): Export and Copy share link sit side by side
+     (each half-width, matching row); Download view file / Show unresolved
+     / Clear filters stack full-width below; "N shown" gets its own line.
+     No wb-toolbar child is allowed to force horizontal overflow — only
+     the results table itself scrolls sideways (.table-wrapper). */
+  .wb-toolbar {
+    position: static;
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  .wb-toolbar .wb-export,
+  .wb-toolbar .wb-share-btn {
+    flex: 1 1 calc(50% - 4px);
+    min-width: 0;
+  }
+  .wb-export-btn { width: 100%; justify-content: space-between; }
+  .wb-toolbar .wb-share-download,
+  .wb-toolbar .wb-toggle-unresolved {
+    flex: 1 1 100%;
+  }
+  .wb-spacer { flex-basis: 100%; height: 0; }
+  .wb-shown-count { flex: 1 1 100%; order: 5; }
+  .wb-clear-filters { flex: 1 1 100%; text-align: left; order: 6; }
+
   .wb-chips-row { flex-wrap: nowrap; }
   .wb-search { width: 100%; margin-left: 0; order: 99; }
 }

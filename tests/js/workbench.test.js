@@ -17,12 +17,14 @@ function buildDom() {
       <div class="wb-paste-bar"></div>
       <div class="wb-state" hidden></div>
       <div class="wb-body">
+        <div class="wb-summary lookup-summary" role="status"></div>
         <div class="wb-export-hint" hidden></div>
         <div class="wb-chips-category"></div>
         <div class="wb-chips-country"></div>
         <div class="wb-export"></div>
         <button type="button" class="wb-share-btn"></button>
         <button type="button" class="wb-share-download" hidden></button>
+        <button type="button" class="wb-toggle-unresolved" hidden></button>
         <button type="button" class="wb-clear-filters" hidden></button>
         <span class="wb-shown-count"></span>
         <p class="wb-empty-filter" hidden>No IPs match the current filter.</p>
@@ -34,6 +36,7 @@ function buildDom() {
             <th data-key="category">Category</th><th data-key="hits" aria-sort="descending">Hits</th>
           </tr></thead>
           <tbody></tbody>
+          <tbody class="wb-unresolved-rows" hidden></tbody>
         </table>
         <div class="wb-table-sentinel"></div>
       </div>
@@ -157,6 +160,103 @@ describe('renderAll smoke test', () => {
     WB.renderAll(root, state);
     expect(root.querySelector('.wb-table caption')).toBeTruthy();
     expect(root.querySelector('.wb-table th[data-key="hits"]').getAttribute('aria-sort')).toBe('descending');
+  });
+});
+
+describe('renderSummary (bug: the summary bar rendered empty because nothing ever called buildSummary)', () => {
+  var root;
+  beforeEach(() => {
+    root = buildDom();
+  });
+
+  function rows() {
+    return [
+      { ip: '1.1.1.1', country: 'US', region: 'CA', city: 'Fremont', asn: 'AS14061', asnOrg: 'DigitalOcean, LLC', category: 'cloud', drop: false, hits: 5 },
+      { ip: '2.2.2.2', country: 'CN', region: '', city: '', asn: 'AS4134', asnOrg: 'Chinanet', category: 'scanning', drop: true, hits: 12 },
+      { ip: '3.3.3.3', country: 'US', region: 'NY', city: 'New York', asn: 'AS16509', asnOrg: 'Amazon.com, Inc.', category: 'cloud', drop: false, hits: 1 },
+    ];
+  }
+
+  test('renders non-empty text into .wb-summary for a fixture result set', () => {
+    var state = WB.makeState();
+    state.rows = rows();
+    WB.renderSummary(root, state);
+
+    var host = root.querySelector('.wb-summary');
+    expect(host.textContent.trim()).not.toBe('');
+    expect(host.textContent).toMatch(/3 IPs looked up/);
+    expect(host.textContent).toMatch(/Spamhaus DROP netblocks/);
+  });
+
+  test('is fixed (not filter-driven): still describes every resolved row after a chip filters the table', () => {
+    var state = WB.makeState();
+    state.rows = rows();
+    WB.renderSummary(root, state);
+    var before = root.querySelector('.wb-summary').textContent;
+
+    WB.renderAll(root, state); // build chips/table so there's something to click
+    var scanningChip = Array.from(root.querySelectorAll('.wb-chips-category .wb-chip'))
+      .find(function (l) { return l.textContent.indexOf('Scanning') !== -1; });
+    scanningChip.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+
+    expect(root.querySelector('.wb-shown-count').textContent).toBe('1 shown');
+    expect(root.querySelector('.wb-summary').textContent).toBe(before);
+  });
+
+  test('joins facts with " · " (space, middot, space) — no run-together separators', () => {
+    var state = WB.makeState();
+    state.rows = rows();
+    WB.renderSummary(root, state);
+    var facts = Array.from(root.querySelectorAll('.wb-summary .lookup-summary-fact')).map(function (f) { return f.textContent; });
+    expect(facts.length).toBeGreaterThan(1);
+    // Each fact is its own element with no leading/trailing space of its
+    // own; the " · " separator is CSS generated content (::before) between
+    // adjacent .lookup-summary-fact siblings, so nothing here should carry
+    // a stray leading/trailing space that would double up with it.
+    facts.forEach(function (t) { expect(t).toBe(t.trim()); });
+  });
+});
+
+describe('renderUnresolved (bug: "Show N unresolved" never appeared)', () => {
+  var root;
+  beforeEach(() => {
+    root = buildDom();
+  });
+
+  test('hides the toggle when there are no unresolved IPs', () => {
+    var state = WB.makeState();
+    state.rows = [];
+    state.unresolved = [];
+    WB.renderUnresolved(root, state);
+    expect(root.querySelector('.wb-toggle-unresolved').hidden).toBe(true);
+  });
+
+  test('shows "Show N unresolved" and reveals rows on click', () => {
+    var state = WB.makeState();
+    state.rows = [];
+    state.unresolved = ['not-an-ip', '999.1.2.3'];
+    WB.renderUnresolved(root, state);
+
+    var btn = root.querySelector('.wb-toggle-unresolved');
+    expect(btn.hidden).toBe(false);
+    expect(btn.textContent).toBe('Show 2 unresolved IPs');
+
+    var body = root.querySelector('.wb-unresolved-rows');
+    expect(body.hidden).toBe(true);
+    btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    expect(body.hidden).toBe(false);
+    expect(btn.textContent).toBe('Hide 2 unresolved IPs');
+    expect(body.querySelectorAll('tr').length).toBe(2);
+  });
+});
+
+describe('formatLookupTime (bug: always showed "0.0 s" for sub-100ms lookups)', () => {
+  test('shows "<0.1 s" under 100ms', () => {
+    expect(WB.formatLookupTime(42)).toBe('<0.1 s');
+  });
+  test('shows one decimal place at and above 100ms', () => {
+    expect(WB.formatLookupTime(342)).toBe('0.3 s');
+    expect(WB.formatLookupTime(1000)).toBe('1.0 s');
   });
 });
 
