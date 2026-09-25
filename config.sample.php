@@ -16,9 +16,10 @@ $db_name = 'your_db_name';
 // GeoIP .mmdb directory (R4) — where scripts/update-geoip.sh atomically drops
 // GeoLite2-City.mmdb and GeoLite2-ASN.mmdb each month, and where
 // includes/lookup.php's lookup_ips() reads them from by default. Defaults to
-// /var/www/geoip if left undefined; override here if prod/staging use a
-// different path (e.g. a staging copy under /var/www/ip2geo-staging/geoip).
-// Must be readable by the PHP-FPM/webserver user. Missing or corrupt files
+// <app>/data/geoip (the same fallback includes/lookup.php uses), which is
+// gitignored and denied to the web by data/.htaccess; scripts/fetch-mmdb.sh
+// fills it on every deploy. Override only if the files live elsewhere.
+// Must be readable by the webserver user. Missing or corrupt files
 // make lookup_ips() throw GeoDbUnavailableException, which api/lookup.php
 // turns into a 503.
 if (!defined('GEOIP_MMDB_DIR')) {

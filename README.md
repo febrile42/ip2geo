@@ -2,25 +2,24 @@
 
 Two tools in one place.
 
-**Bulk lookup:** paste in a wall of text, log output, or a raw list of IPs — it extracts the addresses, queries the database, and returns country, region, city, ASN, and threat classification for each one. Handles up to 10,000 IPs per request. Threat Reports (the paid one-time report and its free precursor) were retired in v5.0.0 — see "Threat Reports (retired in v5.0.0)" below.
+**Bulk lookup:** paste in a wall of text, log output, or a raw list of IPs. It extracts the IPv4 and IPv6 addresses and returns country, region, city, ASN, a category (scanning, VPN/proxy, cloud, residential…) and a Spamhaus DROP flag for each one. Up to 10,000 unique IPs per lookup. Results can be filtered, exported (TSV, CSV, KQL, SPL, iptables, ufw, nginx) and shared as a link whose IPs live only in the URL fragment. Threat Reports (the paid one-time report and its free precursor) were retired in v5.0.0; see "Threat Reports (retired in v5.0.0)" below.
 
-**Community Block List:** a rolling 7-day feed of CIDR ranges reported by opted-in ip2geo users. Ranges corroborated by three or more independent users (with quality filters to exclude coarse ISP blocks) appear on [`/intel.php`](https://ip2geo.org/intel.php), downloadable as iptables, ufw, nginx, or plain CIDR format.
+**Community Block List:** a rolling 7-day feed of CIDR ranges reported by opted-in ip2geo users, on [`/intel.php`](https://ip2geo.org/intel.php). Its future is an open question (see below).
 
-Live at [ip2geo.org](https://ip2geo.org) since 2017.
+Live at [ip2geo.org](https://ip2geo.org) since 2017. **Picking this up cold? Read [`HANDOFF.md`](HANDOFF.md) first.**
 
 ---
 
 ## Stack
 
-- **PHP** — all server-side logic
-- **MySQL / MariaDB** — MaxMind geo data and ASN ranges
-- **MaxMind GeoLite2-City + GeoLite2-ASN** — geolocation and ASN data, updated automatically on the 1st of each month
-- **HTML/CSS** — based on [Hyperspace](https://html5up.net/hyperspace) by HTML5 UP (CCA 3.0)
-- **GitHub Actions** — CI/CD pipeline (staging → production) and monthly DB updates
-- **APCu** — server-side page cache for `/intel.php` (15-min TTL; downloads bypass)
-- **PHPUnit** — covering verdict/Spamhaus DROP logic, ASN classification, community consent flow, and intel page cache logic
-
-No frameworks. No npm. No build step. It's fast on purpose.
+- **PHP 8.4**: all server-side logic. No framework.
+- **MaxMind GeoLite2-City + GeoLite2-ASN `.mmdb` files**: the lookup reads them with `maxmind-db/reader` (`includes/lookup.php`). Production also has the `php-maxminddb` C extension, which the reader uses automatically. It makes a 10k-IP lookup take ~0.2–0.5 s instead of ~3.5 s.
+- **MySQL / MariaDB**: Community Block List tables, plus the legacy GeoIP integer-range tables (`geoip2_*_current_int`). v5 lookups no longer read those tables, but `community-consent.php` still does. They are dropped once v5 has run cleanly for a while.
+- **Vanilla JS, no build step**: the v5 workbench (`assets/js/*.js`) extracts IPs in the browser, POSTs only the IPs to `/api/lookup.php`, and renders, filters and exports on the client. Without JS, `index.php` falls back to a server-rendered results table.
+- **Cloudflare** in front of the origin. Rocket Loader is on for the zone, so every `<script>` tag carries `data-cfasync="false"` (enforced by `tests/RocketLoaderOptOutTest.php`), and every asset URL carries `?v=<APP_VERSION>` so a release is never paired with day-old cached JS.
+- **APCu**: `/intel.php` page cache (15-min TTL) and the `/api/lookup.php` rate limit.
+- **GitHub Actions**: CI/CD (tests → staging → production), monthly GeoLite2 refresh, and Spamhaus DROP / ASN-DROP syncs.
+- **Tests**: PHPUnit, plus Jest and Playwright (dev-only; nothing Node-based is deployed).
 
 ---
 
@@ -28,156 +27,176 @@ No frameworks. No npm. No build step. It's fast on purpose.
 
 ### Prerequisites
 
-- PHP 8.x
-- MySQL or MariaDB
-- [`geoip2-csv-converter`](https://github.com/maxmind/geoip2-csv-converter) installed on the server
+- PHP 8.4 with APCu. `php-maxminddb` is strongly recommended for speed.
+- MySQL or MariaDB, with the server time zone set to UTC (see the comment at the top of `config.sample.php`)
+- Composer
 - A MaxMind account with a GeoLite2 license key ([free signup](https://dev.maxmind.com/geoip/geolite2-free-geolocation-data))
+- For the legacy MySQL GeoIP tables only: [`geoip2-csv-converter`](https://github.com/maxmind/geoip2-csv-converter)
+
+### Lookup data (`.mmdb`)
+
+```bash
+MAXMIND_ACCOUNT_ID=... MAXMIND_LICENSE_KEY=... scripts/fetch-mmdb.sh "$PWD"
+```
+
+This writes `data/geoip/GeoLite2-{City,ASN}.mmdb`. The script:
+
+- verifies SHA256
+- spot-checks 8.8.8.8 → US / AS15169
+- swaps the files in atomically
+- does nothing if both files are less than 35 days old
+
+Credentials come from the environment and are never passed as arguments. `data/geoip/` is gitignored, and `data/.htaccess` denies web access, because the GeoLite2 license forbids redistribution. CI checks that the directory returns 403 on staging and production.
+
+For local development and tests, copy the tiny MaxMind test databases instead:
+
+```bash
+mkdir -p data/geoip
+cp tests/fixtures/mmdb/GeoIP2-City-Test.mmdb data/geoip/GeoLite2-City.mmdb
+cp tests/fixtures/mmdb/GeoLite2-ASN-Test.mmdb data/geoip/GeoLite2-ASN.mmdb
+```
 
 ### Database
 
-#### Geo tables
-
-Two tables, populated from MaxMind's GeoLite2-City CSV files:
-
-| Table | Contents |
-|-------|----------|
-| `geoip2_network_current_int` | IPv4 network ranges as integer pairs for fast range lookups |
-| `geoip2_location_current` | GeoName ID → country, region, city |
-| `geoip2_asn_current_int` | ASN number + org + integer range pairs (populated from GeoLite2-ASN) |
-
-To populate initially: download the GeoLite2-City and GeoLite2-ASN CSV packages from MaxMind, run `geoip2-csv-converter` on the blocks file with `-include-integer-range`, then import via `LOAD DATA LOCAL INFILE`. See `scripts/update-geoip.sh` — it's the same procedure that runs automatically each month.
-
-#### Community Block List tables
-
-Run `scripts/migrate-community.sql` once to add the community tables:
-
-```bash
-mysql -u youruser -p yourdb < scripts/migrate-community.sql
-```
-
-This creates:
+Run `scripts/migrate-community.sql` once to create the Community Block List tables:
 
 | Table | Contents |
 |-------|----------|
 | `community_cidr_stats` | Per-CIDR daily report counts and hit totals from opted-in users |
 | `community_ip_stats` | Per-IP daily stats for CIDR aggregation |
-| `community_ip_first_seen` | Deduplication table — prevents one user from counting the same IP twice per day |
-| `community_weekly_stats` | Daily opted-in report counter; used to gate the public feed (minimum 5 reports in a rolling 7-day window) |
+| `community_ip_first_seen` | Deduplication table: one user can count the same IP only once per day |
+| `community_weekly_stats` | Daily opted-in report counter. The public feed needs at least 5 reports in a rolling 7-day window |
 
-Data older than 52 weeks is pruned automatically by the monthly `update-db.yml` workflow.
+The legacy GeoIP tables (`geoip2_network_current_int`, `geoip2_location_current`, `geoip2_asn_current_int`) are built and refreshed by `scripts/update-geoip.sh`.
 
 ### Configuration
-
-Copy `config.sample.php` to `config.php` and fill in your credentials:
 
 ```bash
 cp config.sample.php config.php
 ```
 
-`config.php` is gitignored and should never be committed. On the server it lives alongside the codebase and survives deploys untouched.
-
-| Variable | Purpose |
-|----------|---------|
-| `$db_host`, `$db_user`, `$db_pass`, `$db_name` | Database connection |
+`config.php` holds the DB credentials and, optionally, a `GEOIP_MMDB_DIR` override (default `<app>/data/geoip`). It is gitignored. On the server it lives beside the code and survives deploys.
 
 ---
 
 ## Threat Reports (retired in v5.0.0)
 
-Through v4, ip2geo also offered a free and a paid ($9) Threat Report: paste a batch of IPs, get back a verdict, AbuseIPDB abuse scores, ASN CIDR ranges, and ready-to-run block scripts, paid via Stripe Checkout and delivered by email via Resend.
+Through v4, ip2geo also offered a free and a paid ($9) Threat Report. You pasted a batch of IPs and got back a verdict, AbuseIPDB abuse scores, ASN CIDR ranges and ready-to-run block scripts. Payment went through Stripe Checkout and the report was emailed via Resend.
 
-That flow is gone as of v5.0.0. `report.php` now returns a static HTTP 410 for every token, including the old demo token, and touches no database. `webhook.php`, `get-report.php`, `send-report-link.php`, `email_helper.php`, and the report-generation half of `report_functions.php` were deleted outright, along with the Stripe and Resend Composer dependencies. `migrations/retire_reports_v5.sql` has the (manual, backup-first) steps to retire the demo token row and, optionally, drop the `reports`, `report_events`, `report_event_rl`, `abuseipdb_cache`, and `abuseipdb_daily_usage` tables.
+That flow is gone as of v5.0.0:
 
-The Spamhaus DROP reputation axis that used to feed both the lookup CTA and the reports lives on in `report_functions.php` — it's still part of how the free lookup flags residential attackers.
+- **`report.php`** now returns a static HTTP 410 for every token, including the old demo token, and touches no database.
+- **Deleted outright:**
+  - `webhook.php`, `get-report.php`, `send-report-link.php` and `email_helper.php`
+  - the report-generation half of `report_functions.php`
+  - the Stripe and Resend Composer dependencies
+- **`migrations/retire_reports_v5.sql`** has the manual, backup-first steps to:
+  - retire the demo token row
+  - optionally drop the `reports`, `report_events`, `report_event_rl`, `abuseipdb_cache` and `abuseipdb_daily_usage` tables
+
+The Spamhaus DROP check lives on in `report_functions.php` and in the lookup's DROP flag. It is a local list (`spamhaus_drop_data.php`, synced weekly), not an API call, so it has no quota.
 
 ---
 
 ## How Community Block List Works
 
-1. ⚠️ **Currently orphaned.** Consent used to be collected on the Threat Report page, which posted the report's IP list to `community-consent.php` via AJAX after opt-in. That page is gone as of v5.0.0 (see "Threat Reports" above), so `community-consent.php` has no caller left in the app. The community tables and `/intel.php` feed below are untouched (Open Question 4 — whether to keep, fold into DROP intel, or retire the Community Block List — is still open), but new opt-ins can't happen until that question is settled and a new consent entry point is built.
-2. The consent endpoint ingests IPs, computes CIDR ranges via `geoip2_asn_current_int`, and writes daily rows to `community_cidr_stats` and `community_ip_stats`. Each IP is deduplicated per user per day via `community_ip_first_seen` — one user reporting the same IP 100 times counts as one report.
-3. `/intel.php` queries the rolling 7-day window. A range appears on the public list only if it passes all three quality filters:
-   - **3+ independent reports** — corroborated by at least three distinct opted-in users
-   - **Prefix /16 or more specific** — excludes coarse ASN-level blocks covering millions of IPs
-   - **Hit density ≥ 0.1%** — at least 1 observed hit per 1,000 addresses in the range (filters incidental overlap)
-4. The page is APCu-cached for 15 minutes. Downloads (iptables, ufw, nginx, plain CIDR) bypass the cache and always query the database directly.
-5. The public feed requires a minimum of 5 opted-in reports in the past 7 days before any data is shown. Below that threshold, the page displays a "not enough data yet" message rather than a sparse or misleading list.
+1. ⚠️ **Currently orphaned.** Consent used to be collected on the Threat Report page, which posted the report's IP list to `community-consent.php`. That page is gone as of v5.0.0, so `community-consent.php` has no caller. The tables and the `/intel.php` feed are untouched. Open Question 4 is still unresolved: keep the list, fold it into DROP intel, or retire it. New opt-ins can't happen until that is settled.
+2. The consent endpoint ingests IPs, computes CIDR ranges via `geoip2_asn_current_int`, and writes daily rows to `community_cidr_stats` and `community_ip_stats`, deduplicated per user per day.
+3. `/intel.php` queries the rolling 7-day window. A range is listed only if it has:
+   - reports from **3 or more** independent users
+   - a prefix of **/16 or more specific**
+   - hit density of at least **0.1%**
+4. The page is APCu-cached for 15 minutes. Downloads (iptables, ufw, nginx, plain CIDR) bypass the cache.
+5. Nothing is shown until there are at least 5 opted-in reports in the past 7 days.
 
-Residential IPs are never collected — the consent flow only ingests IPs classified as scanning, proxy, VPN, or cloud infrastructure. Data is retained for 52 weeks.
+Residential IPs are never collected. Data is retained for 52 weeks.
 
 ---
 
 ## Development
 
-### Workflow
+### Branches
 
-Two-branch model:
+- **`develop`**: pushes deploy to staging and run the staging tests.
+- **`main`**: production. It is updated only by merging `develop` in via PR, and every push deploys to production. Promotions are squash-merged, so run `scripts/rebase-develop.sh` afterwards to realign `develop`.
+- **`v5`** (until the 5.0.0 release): the whole v5 rewrite. It is kept off `develop` on purpose, because the Spamhaus syncs (the weekly DROP sync and the monthly ASN-DROP sync) auto-promote `develop` → `main` whenever the delta is only their data files. Deploy it to staging with `gh workflow run deploy.yml --ref v5`, and re-run that after every Monday DROP sync. See `HANDOFF.md` for the release steps.
 
-- **`develop`** — working branch. Push here freely. Automatically deploys to staging and runs tests.
-- **`main`** — production branch. Only updated by merging from `develop` via PR. Automatically deploys to production.
-
-```bash
-# Day to day
-git checkout develop
-# ... make changes ...
-git add -p && git commit -m "..."
-git push origin develop
-# Pipeline: staging deploy → smoke + functional + performance tests
-
-# When ready to go live
-# Open a PR from develop → main, merge, pipeline deploys to production
-```
+Commit messages on `v5` are plain declarative sentences saying what the user now sees ("Tapping a DROP label opens a popover…"). Earlier history uses `chore:`/`feat:` prefixes.
 
 ### Tests
 
 ```bash
-composer install
-./vendor/bin/phpunit --testdox
+composer install && vendor/bin/phpunit          # PHP: no network, no MySQL (SQLite mirrors + test .mmdb fixtures)
+npm ci && npx jest                               # JS units (jsdom)
+cp config.sample.php config.php                  # then copy the test .mmdb files (see "Lookup data")
+npx playwright test                              # browser specs; starts php -S on 127.0.0.1:8935
 ```
 
-No network calls, no database required — geo lookups and DB interactions are tested against in-memory SQLite mirrors of the production schema.
+`IP2GEO_E2E_FORCE_UMAMI=1` makes the privacy spec load the analytics script so it can assert what gets sent. CI sets it. If port 8935 is taken by a stray `php -S`, Playwright reuses that server locally, so kill it first if it belongs to another checkout.
 
-Test files:
-
-| File | What it covers |
-|------|----------------|
-| `SpamhausDropTest.php` | Spamhaus DROP lookup, the generator, and `apply_reputation_override()` — the CTA override on residential attackers |
-| `AsnClassificationTest.php` | `classify_asn()` — known ASN lookups, keyword fallback, edge cases |
-| `CommunityConsentTest.php` | Opt-in ingestion, CIDR aggregation, deduplication, decline path, malformed input guards |
-| `IntelCacheTest.php` | APCu cache key format, hit/miss/absent paths, ob failure guard, download bypass |
-| `ReportRetiredTest.php` | `report.php` returns HTTP 410 for any token (or none) and never touches the database |
+| Suite | Covers |
+|-------|--------|
+| `ExtractIpsTest.php`, `tests/js/extract-ips.test.js` | IP extraction, locked to shared golden fixtures in `tests/fixtures/extract` (PHP and JS must agree) |
+| `LookupTest.php`, `LookupAutoloadTest.php` | `lookup_ips()` against test `.mmdb` files; Composer autoload in a fresh process |
+| `ApiLookupTest.php` | `/api/lookup.php` contract: 413 caps, 429 rate limit, 503 on missing data |
+| `IndexResultsTest.php`, `SummaryTest.php`, `DropExplainerTest.php` | No-JS results page, summary line, and the DROP explainer text staying identical in PHP and JS |
+| `SampleLogTest.php` | "Try a sample log" never labels a real person's IP |
+| `SpamhausDropTest.php`, `AsnClassificationTest.php` | DROP lookup and generator; ASN classification |
+| `CommunityConsentTest.php`, `IntelCacheTest.php` | Community Block List ingestion and `/intel.php` cache |
+| `ReportRetiredTest.php`, `IpValidationTest.php` | `report.php` 410; IP validation |
+| `RocketLoaderOptOutTest.php` | Every script tag carries `data-cfasync="false"` |
+| `tests/js/*.test.js` | Filters, exports, share links, summary, workbench rendering, DROP popover, Recent lookups |
+| `tests/e2e/privacy.spec.js` | No paste text in any request; IPs only in the `/api/lookup.php` body; no `#v=` content in analytics |
+| `tests/e2e/a11y.spec.js` | axe scan of the results page and workbench (fails on serious or critical issues) |
+| `tests/e2e/drop-tap.spec.js` | On phones: tap a DROP label for the explanation; the IP column stays pinned while scrolling sideways |
 
 ### CI/CD Pipeline
 
-Tests run on GitHub's infrastructure, not on the server. Smoke and functional tests hit the origin directly with `Host:` headers, bypassing Cloudflare so results reflect actual PHP and DB performance rather than whatever the CDN cached.
+`.github/workflows/deploy.yml` works like this:
 
-The performance test compares staging against production and fails if staging regresses by more than 25% against an absolute 6-second ceiling. This has caught real problems.
+1. **Every push, PR and dispatch:** PHP lint plus the full test job.
+2. **Staging deploy:** a push to `develop`, or a dispatch on `v5`. It runs:
+   - `git reset --hard` to the branch
+   - `composer install --no-dev`
+   - `scripts/fetch-mmdb.sh`
+3. **Staging tests:** these hit the origin directly with `Host:` headers, bypassing Cloudflare:
+   - smoke test
+   - `data/geoip` returns 403
+   - known-IP functional check
+   - a 10k-IP performance test, which fails over 6 s or on a >25% regression against production
+4. **Production:** a push to `main` runs the same deploy steps plus smoke and 403 checks.
 
-See `.github/workflows/` for the full pipeline definition.
+Other workflows:
+
+| Workflow | Schedule | What it does |
+|---|---|---|
+| `update-db.yml` | Monthly | Runs `~/bin/update-geoip.sh` on the server |
+| `sync-spamhaus-drop.yml` | Weekly | Syncs Spamhaus DROP and auto-promotes if the delta is pure data |
+| `sync-spamhaus.yml` | Monthly | Regenerates the ASN-DROP auto-sync block in `asn_classification.php` on `develop`, and auto-promotes if the delta is pure Spamhaus |
 
 ### Database Updates
 
-`scripts/update-geoip.sh` handles the monthly GeoLite2 refresh:
+`scripts/update-geoip.sh` does the monthly GeoLite2 refresh for both the `.mmdb` files and the legacy MySQL tables. It runs on the server from `~/bin`, triggered by `update-db.yml`. For the MySQL tables it:
 
-1. Downloads the latest GeoLite2-City and GeoLite2-ASN CSVs from MaxMind
-2. Converts network blocks to integer ranges via `geoip2-csv-converter`
-3. Imports into shadow tables
-4. Verifies row counts (≥90% of current) and spot-checks a known IP (8.8.8.8 → US)
-5. Atomically swaps shadow tables into production via `RENAME TABLE`
-6. Rolls back automatically if anything looks wrong
+1. imports the CSVs into shadow tables
+2. verifies row counts (at least 90% of current) and spot-checks 8.8.8.8
+3. swaps the shadow tables in with `RENAME TABLE`
+4. rolls back if anything looks wrong
 
-Runs on the 1st of each month via `update-db.yml`. Also triggers a Spamhaus ASN-DROP diff to flag ASNs newly added to the blocklist — these are reviewed and fed into `asn_classification.php` as needed.
+For the `.mmdb` files it:
+
+1. verifies the checksums and spot-checks 8.8.8.8
+2. `mv`s the files into production's and staging's `GEOIP_MMDB_DIR`
 
 ---
 
 ## Design Notes
 
-A few intentional choices worth noting:
-
-- **No Composer packages in production.** `maxmind-db/reader` reads the `.mmdb` geo/ASN files. Everything else is plain PHP. PHPUnit is dev-only.
-- **Speed is a priority.** The app runs on shared hosting with constrained resources. IPs are pre-converted to unsigned 32-bit integers for range queries — this cut lookup time by ~60% over `INET6_ATON()`. A 10,000-IP batch completes in under 2 seconds of database time.
-- **`config.php` is the only secret.** DB credentials live there. It's gitignored and the only file that needs to be managed separately on the server.
-- **Private IPs are filtered server-side.** RFC 1918 ranges, loopback, and duplicates are stripped before any database queries happen.
+- **Speed is the product.** The `.mmdb` reader with the C extension, client-side extraction (a 2 MB worst-case paste parses in ~55 ms), and client-side filtering keep a 10k-IP triage interactive.
+- **The paste stays in the browser when JS is on.** Only the extracted IPs are sent, and nothing is logged. Share links keep their IPs in the `#v=` fragment, which is stripped before analytics runs. `privacy.php` describes both the JS and no-JS paths exactly. Keep it true.
+- **Composer in production is `maxmind-db/reader` only.** PHPUnit, Jest and Playwright are dev-only.
+- **`config.php` is the only server-managed file** besides `data/geoip/`.
+- **Private and reserved IPs are filtered before lookup** (RFC 1918, loopback, link-local, ULA and the like).
 
 ---
 

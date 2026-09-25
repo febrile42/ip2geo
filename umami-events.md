@@ -18,7 +18,9 @@ page has nothing left to click.
 ## Home page (index.php)
 
 ### `lookup_submit`
-Someone hit the Submit button and got results. Fields:
+Someone hit the Submit button and got results. In v5 this fires from the
+workbench (`assets/js/workbench.js`) once the lookup returns; it also fires
+the `ip2geo:lookup_submit` DOM event that Recent lookups listens for. Fields:
 - `ip_count_bucket` — how many unique IPs they pasted in (`1`, `2-10`,
   `11-50`, `51-100`, `101-500`, `501-1000`, `1001-5000`, `5000+`)
 - `sample` — `true` when the lookup came from "Try a sample log" without the
@@ -29,8 +31,22 @@ at what scale. `verdict_level` and `cta_shown` no longer appear: v5 has no
 CTA or verdict to report (R17).
 
 ### `download_csv`
-Someone downloaded the results table as a CSV from the home page. Signals a
+Someone downloaded the results table as a CSV from the no-JS results page. Signals a
 power user who wants the data for their own processing.
+
+---
+
+## Home page: workbench (workbench.js, v5)
+
+### `copy_export_<format>`
+Someone copied the current filtered rows in an export format. The suffix is
+the format key from `assets/js/export-templates.js`: `tsv`, `csv`, `kql`,
+`spl`, `iptables`, `ufw`, `nginx`. No properties; nothing from the paste.
+
+### `share_link_created`
+Someone copied a `#v=` share link. No properties. The IPs live only in the URL
+fragment, and the fragment is stripped before the tracker loads (R3), so
+opening a shared link never sends its contents to analytics.
 
 ---
 
@@ -48,6 +64,13 @@ This is the stronger signal — they actually grabbed the rules to use somewhere
 ---
 
 ## Home page — filters (ip2geo-app.js)
+
+⚠️ **v5 gap:** these two handlers bind to the server-rendered results table
+(`#filter-countries`, `.filter-category`), which v5 visitors with JS never
+see. The workbench's own filter chips (`assets/js/filters.js`) fire no event
+yet, so filter usage stops being measured once 5.0.0 ships. The approved plan
+(design doc D9) is a `filter_<dim>` event carrying the dimension, never the
+value. Not implemented as of 2026-09-25.
 
 ### `filter_country`
 Someone used the country filter chips. No properties (R9/D8): the country
