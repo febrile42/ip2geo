@@ -214,8 +214,8 @@ class SpamhausPromoteValidatorTest extends TestCase
     {
         // Guards against the generator and the validator drifting apart.
         $out = spamhaus_drop_render(
-            [[16777216, 16777471], [3758096128, 3758096383]],
-            [[16777216, 16777471, '1.0.0.0/24'], [3758096128, 3758096383, '224.0.0.0/24']],
+            [[16777216, 16777471], [3758096384, 3758096639]],
+            [[16777216, 16777471, '1.0.0.0/24'], [3758096384, 3758096639, '224.0.0.0/24']],
         );
         [$code, $err] = $this->runDrop($out);
         $this->assertSame(0, $code, $err);
@@ -272,6 +272,45 @@ class SpamhausPromoteValidatorTest extends TestCase
             'empty file' => [
                 fn(string $s) => '',
             ],
+            // Well-shaped rows whose values are not what the generator writes.
+            'leading zero reinterpreted as octal in a range row' => [
+                fn(string $s) => self::replaceLine($s, '~^    \[\d+, \d+\],$~', '    [017436672, 17440767],'),
+            ],
+            'invalid octal digit in a range row (PHP parse fatal)' => [
+                fn(string $s) => self::replaceLine($s, '~^    \[\d+, \d+\],$~', '    [018436672, 17440767],'),
+            ],
+            'leading zero reinterpreted as octal in a CIDR row' => [
+                fn(string $s) => self::replaceLine($s, "~^    \[\d+, \d+, '~", "    [018436672, 17440767, '1.10.16.0/20'],"),
+            ],
+            'out-of-order range rows break the binary search' => [
+                fn(string $s) => self::swapRows($s, '~^    \[\d+, \d+\],$~'),
+            ],
+            'out-of-order CIDR rows break the binary search' => [
+                fn(string $s) => self::swapRows($s, "~^    \[\d+, \d+, '~"),
+            ],
+            'overlapping range rows' => [
+                fn(string $s) => preg_replace('~^(    \[\d+, \d+\],)$~m', "\$1\n\$1", $s, 1),
+            ],
+            'range start after its end' => [
+                fn(string $s) => self::replaceLine($s, '~^    \[\d+, \d+\],$~', '    [17440767, 17436672],'),
+            ],
+            'value above the 32-bit range' => [
+                fn(string $s) => self::replaceLine($s, '~^    \[\d+, \d+\],$~', '    [9999999999, 9999999999],'),
+            ],
+            'CIDR row whose start/end do not match its CIDR' => [
+                fn(string $s) => self::replaceLine($s, "~^    \[\d+, \d+, '~", "    [17436672, 17440767, '9.9.9.0/24'],"),
+            ],
         ];
+    }
+
+    /** Swap the first two lines matching $regex. */
+    private static function swapRows(string $src, string $regex): string
+    {
+        $lines = explode("\n", $src);
+        $hits = array_keys(array_filter($lines, fn($l) => preg_match($regex, $l) === 1));
+        self::assertGreaterThanOrEqual(2, count($hits), "fewer than 2 lines match $regex");
+        [$a, $b] = $hits;
+        [$lines[$a], $lines[$b]] = [$lines[$b], $lines[$a]];
+        return implode("\n", $lines);
     }
 }
