@@ -3,6 +3,9 @@
  * IPG-38: the results paste bar has no "New lookup" button, and "Edit
  * paste" only moves focus to the textarea — it must not hide the results,
  * clear filters/sort, or reset the pill (spec on IPG-31, acceptance 1-3).
+ *
+ * IPG-41: the paste bar's Recent button was a dead stub and is now gone
+ * entirely — Recent moved next to the primary submit button (#rl-recent-btn).
  */
 const path = require('path');
 const { test, expect } = require('@playwright/test');
@@ -29,8 +32,9 @@ test('the paste bar has no New lookup button', async ({ page }) => {
 
   const bar = page.locator('.wb-paste-bar');
   await expect(bar.getByRole('button', { name: 'Edit paste' })).toBeVisible();
-  await expect(bar.getByRole('button', { name: /^Recent/ })).toBeVisible();
+  await expect(bar.getByRole('button', { name: /^Recent/ })).toHaveCount(0);
   await expect(bar.getByRole('button', { name: 'New lookup' })).toHaveCount(0);
+  await expect(page.locator('#recent-lookups')).toHaveCount(0);
 });
 
 test('Edit paste keeps filters/chip/search and moves focus to the textarea with the caret at the end', async ({ page }) => {
@@ -70,6 +74,6 @@ test('a shared #v= link shows no Edit paste button', async ({ page }) => {
   await page.waitForSelector('.wb-recipient-banner:not([hidden])', { timeout: 10000 });
 
   const bar = page.locator('.wb-paste-bar');
-  await expect(bar.getByRole('button', { name: /^Recent/ })).toBeVisible();
   await expect(bar.getByRole('button', { name: 'Edit paste' })).toHaveCount(0);
+  await expect(bar.getByRole('button', { name: /^Recent/ })).toHaveCount(0);
 });

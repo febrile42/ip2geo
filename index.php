@@ -564,9 +564,19 @@ if (isset($_POST['ip_list'])) {
 							</div>
 
 							<div class="actions">
-								<input type="submit" class="button submit" value="Look Up IP Addresses" />
+								<div class="actions-row">
+									<input type="submit" class="button submit" value="Look Up IP Addresses" />
+									<!-- Recent lookups menu (IPG-30): opens #rl-menu, populated by
+									     ip2geo-app.js. Ships hidden; JS reveals it using the same rule
+									     as #rl-optin-row below (opt-in on + localStorage available). -->
+									<button type="button" id="rl-recent-btn" class="button alt rl-recent-btn"
+									        aria-haspopup="menu" aria-expanded="false" aria-controls="rl-menu" hidden>
+										Recent <span aria-hidden="true">▾</span>
+									</button>
+									<div id="rl-menu" class="wb-menu rl-menu" role="menu" aria-labelledby="rl-recent-btn" hidden></div>
+								</div>
 								<!-- Opt-out toggle for recent-lookups (default on; localStorage only).
-								     Lives under the submit button: discoverable but unobtrusive. -->
+								     Lives under the submit/Recent row: discoverable but unobtrusive. -->
 								<div id="rl-optin-row" class="opt-in-toggle" hidden>
 									<label class="opt-in" title="Stored in your browser only. Never sent to our server.">
 										<input type="checkbox" id="rl-optin" name="rl-optin">
@@ -579,17 +589,6 @@ if (isset($_POST['ip_list'])) {
 				</form>
 
 				<p class="sample-log-link"><a href="#" id="try-sample-log" data-sample-url="assets/sample-fail2ban.txt" data-visitor-ip="<?php echo htmlspecialchars($visitor_ip, ENT_QUOTES, 'UTF-8'); ?>">Try a sample log <span aria-hidden="true">→</span></a></p>
-
-				<!-- Recent lookups widget — rendered by ip2geo-app.js when opt-in is on + list is nonempty.
-				     Sits below the form so the asymmetric hero stays tight; surfaces returning users'
-				     prior lookups right where they'd reach next. -->
-				<div id="recent-lookups" hidden>
-					<div id="recent-lookups-header">
-						<h3>Recent lookups <small>(this browser only)</small></h3>
-						<button type="button" id="recent-lookups-clear" class="button small">Clear</button>
-					</div>
-					<ul id="recent-lookups-list"></ul>
-				</div>
 			</section>
 
 <?php if ($nojs_lookup !== null): ?>

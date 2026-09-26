@@ -64,4 +64,67 @@ test.describe('D16: accessibility scan', () => {
     const focused = page.locator('.wb-menu-item:focus');
     await expect(focused).toContainText('iptables');
   });
+
+  // IPG-41/IPG-30 spec §11 item 14: the Recent menu must pass with the menu
+  // open and closed, in both themes.
+  test('the Recent menu has no serious/critical axe violations, open and closed, in light and dark', async ({ page }) => {
+    await page.goto('/index.php');
+    await page.evaluate(() => {
+      localStorage.setItem('rl_optin', '1');
+      localStorage.setItem('rl_list', JSON.stringify([
+        { ips: ['203.0.113.9', '198.51.100.5', '9.9.9.9'], count: 3, ts: Date.now() },
+      ]));
+    });
+    await page.reload();
+    await expect(page.locator('#rl-recent-btn')).toBeVisible();
+
+    // Scoped to the Recent control itself (like the workbench-scoped test
+    // above) so this doesn't also assert on unrelated, pre-existing page
+    // content — this ticket is the Recent menu, not a full-page theme audit.
+    for (const theme of ['dark', 'light']) {
+      await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme);
+
+      const closedResults = await new AxeBuilder({ page }).include('.actions-row').analyze();
+      expect(seriousOrCritical(closedResults), `${theme}, closed: ` + JSON.stringify(seriousOrCritical(closedResults), null, 2)).toEqual([]);
+
+      await page.locator('#rl-recent-btn').click();
+      await expect(page.locator('#rl-menu')).toBeVisible();
+
+      const openResults = await new AxeBuilder({ page }).include('.actions-row').analyze();
+      expect(seriousOrCritical(openResults), `${theme}, open: ` + JSON.stringify(seriousOrCritical(openResults), null, 2)).toEqual([]);
+
+      await page.keyboard.press('Escape');
+      await expect(page.locator('#rl-menu')).toBeHidden();
+    }
+  });
+
+  test('the Recent menu is keyboard operable (arrow/Home/End/Esc, D16 menu-button pattern)', async ({ page }) => {
+    await page.goto('/index.php');
+    await page.evaluate(() => {
+      localStorage.setItem('rl_optin', '1');
+      localStorage.setItem('rl_list', JSON.stringify([
+        { ips: ['203.0.113.9'], count: 1, ts: Date.now() },
+        { ips: ['198.51.100.5'], count: 1, ts: Date.now() },
+      ]));
+    });
+    await page.reload();
+
+    const btn = page.locator('#rl-recent-btn');
+    await btn.focus();
+    await expect(btn).toHaveAttribute('aria-expanded', 'false');
+    await page.keyboard.press('Enter');
+    await expect(btn).toHaveAttribute('aria-expanded', 'true');
+
+    const items = page.locator('#rl-menu .wb-menu-item');
+    await expect(items.first()).toBeFocused();
+    await page.keyboard.press('End');
+    await expect(items.last()).toBeFocused();
+    await expect(items.last()).toHaveClass(/rl-menu-clear/);
+    await page.keyboard.press('Home');
+    await expect(items.first()).toBeFocused();
+
+    await page.keyboard.press('Escape');
+    await expect(btn).toHaveAttribute('aria-expanded', 'false');
+    await expect(btn).toBeFocused();
+  });
 });

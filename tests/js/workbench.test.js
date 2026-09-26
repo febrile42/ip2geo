@@ -603,52 +603,59 @@ describe('formatIpSplit (IPG-39: pill/loading-line IPv4/IPv6 split)', () => {
   });
 });
 
-describe('renderPasteBar (IPG-38: New lookup removed, Edit paste kept; IPG-39: pill IPv4/IPv6 split)', () => {
+describe('renderPasteBar (IPG-38: New lookup removed, Edit paste kept; IPG-39: pill IPv4/IPv6 split; IPG-41: Recent button removed)', () => {
   var root;
   beforeEach(() => {
     root = buildDom();
   });
 
-  test('renders exactly two buttons, Edit paste and Recent ▾, with no New lookup', () => {
+  test('renders exactly one button, Edit paste, with no Recent and no New lookup', () => {
     var state = WB.makeState();
-    WB.renderPasteBar(root, state, function () {}, function () {});
+    WB.renderPasteBar(root, state, function () {});
 
     var buttons = root.querySelectorAll('.wb-paste-bar button');
     var labels = Array.prototype.map.call(buttons, function (b) { return b.textContent; });
-    expect(labels).toEqual(['Edit paste', 'Recent ▾']);
+    expect(labels).toEqual(['Edit paste']);
 
     var editBtn = root.querySelector('.wb-paste-bar button');
     expect(editBtn.getAttribute('aria-controls')).toBe('message');
   });
 
-  test('hides Edit paste when state.recipient is set (shared-view link)', () => {
+  test('hides Edit paste when state.recipient is set (shared-view link), leaving no buttons', () => {
     var state = WB.makeState();
     state.recipient = { count: 3, categories: [], countries: [] };
-    WB.renderPasteBar(root, state, function () {}, function () {});
+    WB.renderPasteBar(root, state, function () {});
 
     var buttons = root.querySelectorAll('.wb-paste-bar button');
-    var labels = Array.prototype.map.call(buttons, function (b) { return b.textContent; });
-    expect(labels).toEqual(['Recent ▾']);
+    expect(buttons.length).toBe(0);
+  });
+
+  test('exposes the raw paste text via root._wbLastRawText() for the Recent-lookups module', () => {
+    var state = WB.makeState();
+    state.pasteMeta = { lines: 1, v4: 1, v6: 0, overCap: false, lookupMs: null, rawText: '203.0.113.9' };
+    WB.renderPasteBar(root, state, function () {});
+    expect(typeof root._wbLastRawText).toBe('function');
+    expect(root._wbLastRawText()).toBe('203.0.113.9');
   });
 
   test('singular "1 line" plus the Unique: split', () => {
     var state = WB.makeState();
     state.pasteMeta = { lines: 1, v4: 3, v6: 2, overCap: false, lookupMs: null, rawText: '' };
-    WB.renderPasteBar(root, state, () => {}, () => {}, () => {});
+    WB.renderPasteBar(root, state, () => {});
     expect(root.querySelector('.wb-paste-pill').textContent).toBe('1 line · Unique: 3 IPv4 / 2 IPv6');
   });
 
   test('plural line count', () => {
     var state = WB.makeState();
     state.pasteMeta = { lines: 4, v4: 3, v6: 2, overCap: false, lookupMs: null, rawText: '' };
-    WB.renderPasteBar(root, state, () => {}, () => {}, () => {});
+    WB.renderPasteBar(root, state, () => {});
     expect(root.querySelector('.wb-paste-pill').textContent).toBe('4 lines · Unique: 3 IPv4 / 2 IPv6');
   });
 
   test('omits the lines span and separator when lines is null (shared-view recipient form)', () => {
     var state = WB.makeState();
     state.pasteMeta = { lines: null, v4: 3, v6: 2, overCap: false, lookupMs: null, rawText: '' };
-    WB.renderPasteBar(root, state, () => {}, () => {}, () => {});
+    WB.renderPasteBar(root, state, () => {});
     var pill = root.querySelector('.wb-paste-pill');
     expect(pill.textContent).toBe('Unique: 3 IPv4 / 2 IPv6');
     expect(pill.children.length).toBe(1);
@@ -657,7 +664,7 @@ describe('renderPasteBar (IPG-38: New lookup removed, Edit paste kept; IPG-39: p
   test('labels "Looked up:" instead of "Unique:" when over the cap', () => {
     var state = WB.makeState();
     state.pasteMeta = { lines: 2, v4: 8000, v6: 2000, overCap: true, lookupMs: null, rawText: '' };
-    WB.renderPasteBar(root, state, () => {}, () => {}, () => {});
+    WB.renderPasteBar(root, state, () => {});
     expect(root.querySelector('.wb-paste-pill').textContent).toBe('2 lines · Looked up: 8,000 IPv4 / 2,000 IPv6');
   });
 
@@ -668,8 +675,8 @@ describe('renderPasteBar (IPG-38: New lookup removed, Edit paste kept; IPG-39: p
       overCapNotice: 'Looked up the first 10,000 of 12,000 unique IPs. 2,000 skipped. Paste the rest separately to check them.',
       lookupMs: null, rawText: ''
     };
-    WB.renderPasteBar(root, state, () => {}, () => {}, () => {});
-    WB.renderPasteBar(root, state, () => {}, () => {}, () => {});
+    WB.renderPasteBar(root, state, () => {});
+    WB.renderPasteBar(root, state, () => {});
     var notices = root.querySelectorAll('.wb-overcap');
     expect(notices.length).toBe(1);
     expect(notices[0].tagName).toBe('P');
@@ -680,11 +687,11 @@ describe('renderPasteBar (IPG-38: New lookup removed, Edit paste kept; IPG-39: p
   test('a later render without overCapNotice removes the stale notice', () => {
     var state = WB.makeState();
     state.pasteMeta = { lines: 2, v4: 8000, v6: 2000, overCap: true, overCapNotice: 'Looked up the first 10,000…', lookupMs: null, rawText: '' };
-    WB.renderPasteBar(root, state, () => {}, () => {}, () => {});
+    WB.renderPasteBar(root, state, () => {});
     expect(root.querySelectorAll('.wb-overcap').length).toBe(1);
 
     state.pasteMeta = { lines: 2, v4: 3, v6: 2, overCap: false, lookupMs: null, rawText: '' };
-    WB.renderPasteBar(root, state, () => {}, () => {}, () => {});
+    WB.renderPasteBar(root, state, () => {});
     expect(root.querySelectorAll('.wb-overcap').length).toBe(0);
   });
 });

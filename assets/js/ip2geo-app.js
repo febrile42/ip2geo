@@ -430,45 +430,66 @@
             return diffDays === 1 ? '1 day ago' : diffDays + ' days ago';
         }
 
-        // ── DOM rendering ──────────────────────────────────────────────────
-        function renderList() {
-            var widget = document.getElementById('recent-lookups');
-            var listEl = document.getElementById('recent-lookups-list');
-            if (!widget || !listEl) return;
+        // ── Menu rendering (IPG-30: replaces the pill list) ──────────────────
+        var btn = null;
+        var menu = null;
 
-            var optIn = loadOptInState();
+        function lastRawText() {
+            var root = document.getElementById('workbench-root');
+            return (root && typeof root._wbLastRawText === 'function') ? root._wbLastRawText() : '';
+        }
+
+        function menuItems() {
+            return menu ? Array.from(menu.querySelectorAll('.wb-menu-item')) : [];
+        }
+
+        // Rebuilt from scratch every time the menu opens, so ages are current.
+        function renderMenu() {
+            menu.innerHTML = '';
+
+            var listWrap = document.createElement('div');
+            listWrap.className = 'rl-menu-list';
+            listWrap.setAttribute('role', 'group');
+            listWrap.setAttribute('aria-label', 'Saved lookups');
+            menu.appendChild(listWrap);
+
             var items = loadList();
 
-            // Hide widget unless opt-in ON and list nonempty
-            if (!optIn || !items.length) {
-                widget.hidden = true;
-                listEl.innerHTML = '';
+            if (!items.length) {
+                var empty = document.createElement('button');
+                empty.type = 'button';
+                empty.className = 'wb-menu-item';
+                empty.setAttribute('role', 'menuitem');
+                empty.setAttribute('tabindex', '-1');
+                empty.setAttribute('aria-disabled', 'true');
+                empty.appendChild(document.createElement('span')).textContent = 'No saved lookups yet';
+                var emptyNote = document.createElement('span');
+                emptyNote.className = 'wb-menu-note';
+                emptyNote.textContent = 'Lookups you run are saved here, in this browser only.';
+                empty.appendChild(emptyNote);
+                listWrap.appendChild(empty);
                 return;
             }
 
-            widget.hidden = false;
-            listEl.innerHTML = '';
             var now = Date.now();
 
-            // Render newest first as pill chips: "10,000 IPs · 2 min ago".
-            // The IP preview (first 3 + ellipsis) lives on the title attribute
-            // for hover-to-peek without cluttering the chip surface.
+            // Newest first: count, age and a 3-IP preview as visible text
+            // (not a title tooltip, so touch and keyboard users can read it).
             items.slice().reverse().forEach(function (entry, revIdx) {
                 var origIdx = items.length - 1 - revIdx;
-                var li = document.createElement('li');
-                var btn = document.createElement('button');
-                btn.type = 'button';
-                btn.className = 'recent-lookup-item';
-                btn.dataset.idx = String(origIdx);
+                var itemBtn = document.createElement('button');
+                itemBtn.type = 'button';
+                itemBtn.className = 'wb-menu-item';
+                itemBtn.setAttribute('role', 'menuitem');
+                itemBtn.setAttribute('tabindex', '-1');
+                itemBtn.dataset.idx = String(origIdx);
 
-                var preview = entry.ips.slice(0, 3).join(', ');
-                if (entry.count > 3) preview += ', …';
-                btn.title = preview;
+                var head = document.createElement('span');
+                head.className = 'rl-item-head';
 
-                var countLabel = entry.count.toLocaleString() + ' IP' + (entry.count !== 1 ? 's' : '');
                 var countEl = document.createElement('span');
                 countEl.className = 'recent-lookup-count';
-                countEl.textContent = countLabel;
+                countEl.textContent = entry.count.toLocaleString() + ' IP' + (entry.count !== 1 ? 's' : '');
 
                 var dotEl = document.createElement('span');
                 dotEl.className = 'recent-lookup-dot';
@@ -479,31 +500,106 @@
                 timeEl.className = 'recent-lookup-time';
                 timeEl.textContent = relativeTime(entry.ts, now);
 
-                btn.appendChild(countEl);
-                btn.appendChild(dotEl);
-                btn.appendChild(timeEl);
-                li.appendChild(btn);
-                listEl.appendChild(li);
+                head.appendChild(countEl);
+                head.appendChild(dotEl);
+                head.appendChild(timeEl);
+
+                var preview = entry.ips.slice(0, 3).join(', ');
+                if (entry.count > 3) preview += ', +' + (entry.count - 3).toLocaleString() + ' more';
+                var previewEl = document.createElement('span');
+                previewEl.className = 'wb-menu-note rl-item-preview';
+                previewEl.textContent = preview;
+
+                itemBtn.appendChild(head);
+                itemBtn.appendChild(previewEl);
+                listWrap.appendChild(itemBtn);
             });
+
+            // Pinned below the scrolling list rather than placed at its end,
+            // so it never scrolls out of reach even at the 20-entry cap.
+            var sep = document.createElement('div');
+            sep.className = 'rl-menu-sep';
+            sep.setAttribute('role', 'separator');
+            menu.appendChild(sep);
+
+            var clearBtn = document.createElement('button');
+            clearBtn.type = 'button';
+            clearBtn.className = 'wb-menu-item rl-menu-clear';
+            clearBtn.setAttribute('role', 'menuitem');
+            clearBtn.setAttribute('tabindex', '-1');
+            clearBtn.textContent = 'Clear saved lookups';
+            menu.appendChild(clearBtn);
         }
 
-        function fillTextareaFromEntry(idx) {
-            var items = loadList();
-            var entry = items[idx];
-            if (!entry) return false;
-            var textarea = document.getElementById('message');
-            if (!textarea) return false;
-            textarea.value = entry.ips.join('\n');
-            textarea.focus();
-            textarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            return true;
+        function syncButtonVisibility() {
+            if (btn) btn.hidden = !loadOptInState();
+        }
+
+        // ── Open / close (WAI-ARIA menu button pattern, matches Export ▾'s
+        // renderExportMenu() in workbench.js, plus Home/End) ─────────────────
+        function openMenu() {
+            renderMenu();
+            menu.hidden = false;
+            btn.setAttribute('aria-expanded', 'true');
+            var first = menuItems()[0];
+            if (first) first.focus();
+            document.addEventListener('click', onDocClick, true);
+        }
+
+        function closeMenu(returnFocus) {
+            menu.hidden = true;
+            btn.setAttribute('aria-expanded', 'false');
+            document.removeEventListener('click', onDocClick, true);
+            if (returnFocus) btn.focus();
+        }
+
+        function onDocClick(event) {
+            if (!btn.contains(event.target) && !menu.contains(event.target)) closeMenu();
+        }
+
+        function onMenuKeydown(event) {
+            var list = menuItems();
+            var idx = list.indexOf(document.activeElement);
+            if (event.key === 'ArrowDown') {
+                event.preventDefault();
+                list[(idx + 1) % list.length].focus();
+            } else if (event.key === 'ArrowUp') {
+                event.preventDefault();
+                list[(idx - 1 + list.length) % list.length].focus();
+            } else if (event.key === 'Home') {
+                event.preventDefault();
+                list[0].focus();
+            } else if (event.key === 'End') {
+                event.preventDefault();
+                list[list.length - 1].focus();
+            } else if (event.key === 'Escape') {
+                event.preventDefault();
+                closeMenu(true);
+            } else if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                document.activeElement.click();
+            } else if (event.key === 'Tab') {
+                closeMenu();
+            }
+        }
+
+        function onMenuClick(event) {
+            var itemBtn = event.target.closest && event.target.closest('.wb-menu-item');
+            if (!itemBtn || itemBtn.getAttribute('aria-disabled') === 'true') return;
+            if (itemBtn.classList.contains('rl-menu-clear')) {
+                handleClear();
+                return;
+            }
+            var idx = parseInt(itemBtn.dataset.idx, 10);
+            if (!isNaN(idx)) handleSelect(idx);
         }
 
         // ── Toast with undo ────────────────────────────────────────────────
         var toastTimer = null;
         var pendingUndo = null;
+        var pendingUndoTracked = true; // recent_lookups_undo fires only for clear/opt-out, not the forgiveness toast
 
-        function showToast(message, undoFn) {
+        function showToast(message, undoFn, trackUndo) {
             var toast = document.getElementById('rl-toast');
             var msgEl = document.getElementById('rl-toast-msg');
             var undoBtn = document.getElementById('rl-toast-undo');
@@ -518,6 +614,7 @@
 
             msgEl.textContent = message;
             pendingUndo = undoFn;
+            pendingUndoTracked = trackUndo !== false;
             toast.hidden = false;
             // Force reflow for slide-in transition
             void toast.offsetWidth;
@@ -533,9 +630,12 @@
             if (!toast) return;
             if (viaUndo && typeof pendingUndo === 'function') {
                 try { pendingUndo(); } catch (_) {}
-                try { window.umami && umami.track('recent_lookups_undo'); } catch(_) {}
+                if (pendingUndoTracked) {
+                    try { window.umami && umami.track('recent_lookups_undo'); } catch(_) {}
+                }
             }
             pendingUndo = null;
+            pendingUndoTracked = true;
             if (toastTimer) {
                 clearTimeout(toastTimer);
                 toastTimer = null;
@@ -552,7 +652,7 @@
             if (checked) {
                 saveOptInState(true);
                 try { window.umami && umami.track('recent_lookups_optin'); } catch(_) {}
-                renderList();
+                syncButtonVisibility();
                 return;
             }
 
@@ -562,20 +662,21 @@
                 // Empty list: silent off, no toast
                 saveOptInState(false);
                 try { window.umami && umami.track('recent_lookups_optout'); } catch(_) {}
-                renderList();
+                syncButtonVisibility();
                 return;
             }
 
             // Nonempty: optimistic clear + toast with undo
             saveOptInState(false);
             clearList();
-            renderList();
+            syncButtonVisibility();
+            closeMenu();
 
-            showToast('Cleared ' + listSnapshot.length + ' lookup' + (listSnapshot.length !== 1 ? 's' : '') + '.', function undo() {
+            showToast('Saving turned off. Cleared ' + listSnapshot.length + ' saved lookup' + (listSnapshot.length !== 1 ? 's' : '') + '.', function undo() {
                 // Restore both the list and the opt-in flag, re-check the toggle
                 saveOptInState(true);
                 saveList(listSnapshot);
-                renderList();
+                syncButtonVisibility();
                 var optInEl = document.getElementById('rl-optin');
                 if (optInEl) optInEl.checked = true;
             });
@@ -589,17 +690,16 @@
             }, TOAST_TIMEOUT_MS + 50);
         }
 
-        function handleClearClick() {
+        function handleClear() {
             var listSnapshot = loadList();
+            closeMenu(true);
             if (!listSnapshot.length) return; // nothing to clear
 
             clearList();
-            renderList();
 
-            showToast('Cleared ' + listSnapshot.length + ' lookup' + (listSnapshot.length !== 1 ? 's' : '') + '.', function undo() {
+            showToast('Cleared ' + listSnapshot.length + ' saved lookup' + (listSnapshot.length !== 1 ? 's' : '') + '.', function undo() {
                 // Restore list; opt-in stays on
                 saveList(listSnapshot);
-                renderList();
             });
 
             setTimeout(function () {
@@ -609,52 +709,78 @@
             }, TOAST_TIMEOUT_MS + 50);
         }
 
-        function handleListClick(event) {
-            var btn = event.target.closest && event.target.closest('.recent-lookup-item');
-            if (!btn) return;
-            var idx = parseInt(btn.dataset.idx, 10);
-            if (isNaN(idx)) return;
+        // Selecting an entry fills the textarea and runs the lookup through
+        // the same path as clicking "Look Up IP Addresses" (form.requestSubmit()
+        // triggers workbench.js's own submit listener). If the textarea held
+        // unsent text, that text is preserved via an undo toast first.
+        function handleSelect(idx) {
+            var items = loadList();
+            var entry = items[idx];
+            if (!entry) return;
+
+            var textarea = document.getElementById('message');
+            var form = document.getElementById('iplookup');
+            if (!textarea || !form) return;
+
             // No properties: counts that the feature was used, never what was restored.
-            if (fillTextareaFromEntry(idx)) {
-                try { window.umami && umami.track('recent_lookups_use'); } catch(_) {}
+            try { window.umami && umami.track('recent_lookups_use'); } catch(_) {}
+
+            closeMenu(true);
+
+            var priorText = textarea.value;
+            var isUnsent = priorText !== '' && priorText !== lastRawText();
+
+            textarea.value = entry.ips.join('\n');
+            form.requestSubmit();
+
+            if (isUnsent) {
+                showToast('Replaced your unsent paste.', function undo() {
+                    textarea.value = priorText;
+                }, false); // forgiveness toast: no recent_lookups_undo event
             }
         }
 
         function handleLookupSubmit(event) {
             var detail = event.detail || {};
             appendLookup(detail.ips, detail.count);
-            renderList();
         }
 
         // ── Init ───────────────────────────────────────────────────────────
         function init() {
-            if (!isStorageAvailable()) return; // toggle row stays hidden
+            if (!isStorageAvailable()) return; // toggle row + Recent button stay hidden
 
             var row = document.getElementById('rl-optin-row');
             var optInEl = document.getElementById('rl-optin');
-            if (!row || !optInEl) return;
+            btn = document.getElementById('rl-recent-btn');
+            menu = document.getElementById('rl-menu');
+            if (!row || !optInEl || !btn || !menu) return;
 
             // Reveal toggle row only when storage is available
             row.hidden = false;
 
             // Restore toggle state from localStorage
             optInEl.checked = loadOptInState();
+            syncButtonVisibility();
 
             // Wire up
             optInEl.addEventListener('change', handleToggleChange);
 
-            var clearBtn = document.getElementById('recent-lookups-clear');
-            if (clearBtn) clearBtn.addEventListener('click', handleClearClick);
-
-            var listEl = document.getElementById('recent-lookups-list');
-            if (listEl) listEl.addEventListener('click', handleListClick);
+            btn.addEventListener('click', function () {
+                if (menu.hidden) openMenu(); else closeMenu();
+            });
+            btn.addEventListener('keydown', function (event) {
+                if (event.key === 'ArrowDown' || event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    openMenu();
+                }
+            });
+            menu.addEventListener('keydown', onMenuKeydown);
+            menu.addEventListener('click', onMenuClick);
 
             var undoBtn = document.getElementById('rl-toast-undo');
             if (undoBtn) undoBtn.addEventListener('click', function () { hideToast(true); });
 
             document.addEventListener('ip2geo:lookup_submit', handleLookupSubmit);
-
-            renderList();
         }
 
         return { init: init };
