@@ -263,7 +263,7 @@
     // 1 version byte + 4 count bytes + per-ip (1 type + 4 bytes) ~ 5 bytes/ip for IPv4-heavy sets,
     // base64 inflates by 4/3 => chars ~= bytes * 4/3. Solve for ip count at the char cap.
     var approxCapIps = Math.floor(((URL_CAP_CHARS * 3) / 4 - 5) / 5);
-    return 'Too many IPs for a link (' + ipCount.toLocaleString() + ' / ~' + approxCapIps.toLocaleString() + ')';
+    return 'Too many IPs for a link (' + ipCount.toLocaleString('en-US') + ' / ~' + approxCapIps.toLocaleString('en-US') + ')';
   }
 
   /** D8: the .ip2geo.json view-file fallback when a link would be over cap. */

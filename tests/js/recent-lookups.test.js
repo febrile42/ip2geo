@@ -507,7 +507,7 @@ function attachHandlers() {
             head.className = 'rl-item-head';
             const countEl = document.createElement('span');
             countEl.className = 'recent-lookup-count';
-            countEl.textContent = `${entry.count.toLocaleString()} IP${entry.count !== 1 ? 's' : ''}`;
+            countEl.textContent = `${entry.count.toLocaleString('en-US')} IP${entry.count !== 1 ? 's' : ''}`;
             const timeEl = document.createElement('span');
             timeEl.className = 'recent-lookup-time';
             timeEl.textContent = relativeTime(entry.ts, now);
@@ -515,7 +515,7 @@ function attachHandlers() {
             head.appendChild(timeEl);
 
             let preview = entry.ips.slice(0, 3).join(', ');
-            if (entry.count > 3) preview += `, +${(entry.count - 3).toLocaleString()} more`;
+            if (entry.count > 3) preview += `, +${(entry.count - 3).toLocaleString('en-US')} more`;
             const previewEl = document.createElement('span');
             previewEl.className = 'wb-menu-note rl-item-preview';
             previewEl.textContent = preview;
