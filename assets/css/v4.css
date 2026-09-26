@@ -2616,6 +2616,10 @@ button.button.small:hover {
   color: var(--text);
 }
 .wb-paste-pill > span { white-space: nowrap; }
+/* Over-cap notice sits under the pill it explains, 12px above the filters
+   like .wb-summary. Longhands, so the ≤767px full-bleed side margins on
+   .notice survive (IPG-75). */
+.wb-overcap { margin-top: 0; margin-bottom: 12px; }
 .wb-paste-time { margin-left: auto; }
 
 .wb-state .notice { margin: 8px 0; }
