@@ -2640,6 +2640,17 @@ button.button.small:hover {
   align-items: center;
   overflow-x: auto;
 }
+/* Each .wb-chips-row has one child (index.php), so the row's gap never
+   reached the chips; the inner div is the real flex container. 6px between
+   chips, 8px between wrapped lines to match .wb-filters (IPG-78). */
+.wb-chips-category,
+.wb-chips-country {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 6px;
+  min-width: 0;
+}
 .wb-chip-label {
   color: var(--text-muted);
   font-size: 12px;
