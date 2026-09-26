@@ -38,6 +38,7 @@ const SUMMARY_CATEGORY_LABELS = [
  *   categories: list<array{key: string, label: string, count: int, pct: int}>,
  *   top_asns: list<array{asn: string, org: string, count: int}>,
  *   drop_count: int,
+ *   top_asn: ?array{asn: string, org: string, count: int},
  *   line: string,
  * }
  */
@@ -51,6 +52,7 @@ function build_summary(array $rows): array
             'categories' => [],
             'top_asns' => [],
             'drop_count' => 0,
+            'top_asn' => null,
             'line' => '',
         ];
     }
@@ -114,21 +116,25 @@ function build_summary(array $rows): array
     usort($top_asns, static fn(array $a, array $b): int => $b['count'] <=> $a['count']);
     $top_asns = array_slice($top_asns, 0, 3);
 
-    // ── Render the line ──────────────────────────────────────────────────
+    // Single leading ASN (IPG-33): only claim a "Top ASN" when the leader
+    // actually leads — at least 2 IPs, and strictly more than the runner-up.
+    // A 1-IP "top" or a tie between the top two is not a finding.
+    $top_asn = null;
+    if (!empty($top_asns) && $top_asns[0]['count'] >= 2
+        && (count($top_asns) === 1 || $top_asns[0]['count'] > $top_asns[1]['count'])) {
+        $top_asn = $top_asns[0];
+    }
+
+    // ── Render the line (IPG-33: DROP count + single top ASN only) ────────
     $parts = [];
-    $parts[] = number_format($total) . ' IP' . ($total === 1 ? '' : 's') . ' looked up';
-    foreach ($categories as $cat) {
-        $parts[] = $cat['label'] . ' ' . number_format($cat['count']) . ' (' . $cat['pct'] . '%)';
+    if ($drop_count === 1) {
+        $parts[] = '1 IP in a Spamhaus DROP netblock';
+    } elseif ($drop_count > 1) {
+        $parts[] = number_format($drop_count) . ' IPs in Spamhaus DROP netblocks';
     }
-    if (!empty($top_asns)) {
-        $asn_bits = array_map(
-            static fn(array $a): string => trim($a['asn'] . ' ' . $a['org']),
-            $top_asns
-        );
-        $parts[] = 'top ASNs: ' . implode(', ', $asn_bits);
-    }
-    if ($drop_count > 0) {
-        $parts[] = number_format($drop_count) . ' in Spamhaus DROP netblocks';
+    if ($top_asn !== null) {
+        $asn_text = trim($top_asn['asn'] . ' ' . $top_asn['org']);
+        $parts[] = 'Top ASN: ' . $asn_text . ' (' . number_format($top_asn['count']) . ' IPs)';
     }
 
     return [
@@ -136,6 +142,7 @@ function build_summary(array $rows): array
         'categories' => $categories,
         'top_asns' => $top_asns,
         'drop_count' => $drop_count,
+        'top_asn' => $top_asn,
         'line' => implode(' · ', $parts),
     ];
 }

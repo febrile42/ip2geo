@@ -36,13 +36,13 @@
 
   /**
    * @param {Array<{category: string, asn?: string, asn_org?: string, drop?: boolean}>} rows
-   * @returns {{total:number, categories:Array, top_asns:Array, drop_count:number, line:string}}
+   * @returns {{total:number, categories:Array, top_asns:Array, drop_count:number, top_asn:?object, line:string}}
    */
   function buildSummary(rows) {
     var total = rows.length;
 
     if (total === 0) {
-      return { total: 0, categories: [], top_asns: [], drop_count: 0, line: '' };
+      return { total: 0, categories: [], top_asns: [], drop_count: 0, top_asn: null, line: '' };
     }
 
     var counts = {};
@@ -88,17 +88,24 @@
     topAsns.sort(function (a, b) { return b.count - a.count; });
     topAsns = topAsns.slice(0, 3);
 
-    var parts = [];
-    parts.push(numberFormat(total) + ' IP' + (total === 1 ? '' : 's') + ' looked up');
-    categories.forEach(function (cat) {
-      parts.push(cat.label + ' ' + numberFormat(cat.count) + ' (' + cat.pct + '%)');
-    });
-    if (topAsns.length > 0) {
-      var asnBits = topAsns.map(function (a) { return (a.asn + ' ' + a.org).trim(); });
-      parts.push('top ASNs: ' + asnBits.join(', '));
+    // Single leading ASN (IPG-33): only claim a "Top ASN" when the leader
+    // actually leads — at least 2 IPs, and strictly more than the runner-up.
+    // A 1-IP "top" or a tie between the top two is not a finding.
+    var topAsn = null;
+    if (topAsns.length > 0 && topAsns[0].count >= 2
+        && (topAsns.length === 1 || topAsns[0].count > topAsns[1].count)) {
+      topAsn = topAsns[0];
     }
-    if (dropCount > 0) {
-      parts.push(numberFormat(dropCount) + ' in Spamhaus DROP netblocks');
+
+    var parts = [];
+    if (dropCount === 1) {
+      parts.push('1 IP in a Spamhaus DROP netblock');
+    } else if (dropCount > 1) {
+      parts.push(numberFormat(dropCount) + ' IPs in Spamhaus DROP netblocks');
+    }
+    if (topAsn !== null) {
+      var asnText = (topAsn.asn + ' ' + topAsn.org).trim();
+      parts.push('Top ASN: ' + asnText + ' (' + numberFormat(topAsn.count) + ' IPs)');
     }
 
     return {
@@ -106,6 +113,7 @@
       categories: categories,
       top_asns: topAsns,
       drop_count: dropCount,
+      top_asn: topAsn,
       line: parts.join(' · ')
     };
   }

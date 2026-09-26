@@ -148,36 +148,28 @@
     var summary = Summary.buildSummary(state.rows.map(function (r) {
       return { category: r.category, asn: r.asn, asn_org: r.asnOrg, drop: r.drop };
     }));
-    if (summary.line === '') return;
 
-    host.appendChild(el('span', { class: 'lookup-summary-fact lookup-summary-total' }, [
-      summary.total.toLocaleString() + ' IP' + (summary.total === 1 ? '' : 's') + ' looked up'
-    ]));
-
-    summary.categories.forEach(function (cat) {
-      host.appendChild(el('span', { class: 'lookup-summary-fact lookup-summary-category lookup-summary-category--' + cat.key }, [
-        cat.label + ' ' + cat.count.toLocaleString() + ' (' + cat.pct + '%)'
-      ]));
-    });
-
-    if (summary.top_asns.length > 0) {
-      var asnsFact = el('span', { class: 'lookup-summary-fact lookup-summary-asns' }, ['top ASNs: ']);
-      summary.top_asns.forEach(function (a, i) {
-        var text = (a.asn + ' ' + a.org).trim();
-        if (i === 0) {
-          asnsFact.appendChild(el('span', { class: 'lookup-summary-asn lookup-summary-asn--top' }, [text]));
-        } else {
-          asnsFact.appendChild(el('span', { class: 'lookup-summary-asn-rest' }, [', ' + text]));
-        }
-      });
-      host.appendChild(asnsFact);
-    }
+    var hasFacts = summary.drop_count > 0 || summary.top_asn !== null;
+    host.hidden = !hasFacts;
+    if (!hasFacts) return;
 
     if (summary.drop_count > 0) {
-      host.appendChild(el('span', { class: 'lookup-summary-fact lookup-summary-drop' }, [
-        summary.drop_count.toLocaleString() + ' in ',
-        el('abbr', { title: DROP_EXPLAINER }, ['Spamhaus DROP']),
-        ' netblocks'
+      var n = el('span', { class: 'lookup-summary-n' }, [summary.drop_count.toLocaleString()]);
+      var dropAbbr = el('abbr', { title: DROP_EXPLAINER }, ['Spamhaus DROP']);
+      var dropChildren = summary.drop_count === 1
+        ? [n, ' IP in a ', dropAbbr, ' netblock']
+        : [n, ' IPs in ', dropAbbr, ' netblocks'];
+      host.appendChild(el('span', { class: 'lookup-summary-fact lookup-summary-drop' }, dropChildren));
+    }
+
+    if (summary.top_asn !== null) {
+      var asnText = (summary.top_asn.asn + ' ' + summary.top_asn.org).trim();
+      host.appendChild(el('span', { class: 'lookup-summary-fact lookup-summary-asns' }, [
+        'Top ASN: ',
+        el('span', { class: 'lookup-summary-asn' }, [asnText]),
+        ' (',
+        el('span', { class: 'lookup-summary-n' }, [summary.top_asn.count.toLocaleString()]),
+        ' IPs)'
       ]));
     }
   }

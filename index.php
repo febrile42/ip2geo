@@ -263,31 +263,23 @@ function render_lookup_results(array $post, string $visitor_ip = '', ?string $ci
         $html .= $notice_html;
     }
 
-    if ($summary['line'] !== '') {
-        // Structured per-fact markup (not just the plain-text 'line') so mobile
-        // CSS can wrap one fact per line and show only the top ASN (D15).
+    // IPG-33: slim summary — DROP count + single top ASN only, keyed on
+    // "no facts" (not on $summary['line'] === '') so the div is omitted
+    // whenever there is nothing to say.
+    if ($summary['drop_count'] > 0 || $summary['top_asn'] !== null) {
         $html .= '<div id="lookup-summary" class="lookup-summary" role="status">';
-        $html .= '<span class="lookup-summary-fact lookup-summary-total">'
-            . number_format($summary['total']) . ' IP' . ($summary['total'] === 1 ? '' : 's') . ' looked up</span>';
-        foreach ($summary['categories'] as $cat) {
-            $html .= '<span class="lookup-summary-fact lookup-summary-category lookup-summary-category--' . htmlspecialchars($cat['key'], ENT_QUOTES, 'UTF-8') . '">'
-                . htmlspecialchars($cat['label'], ENT_QUOTES, 'UTF-8') . ' ' . number_format($cat['count']) . ' (' . $cat['pct'] . '%)</span>';
-        }
-        if (!empty($summary['top_asns'])) {
-            $html .= '<span class="lookup-summary-fact lookup-summary-asns">top ASNs: ';
-            foreach ($summary['top_asns'] as $i => $a) {
-                $asn_text = htmlspecialchars(trim($a['asn'] . ' ' . $a['org']), ENT_QUOTES, 'UTF-8');
-                if ($i === 0) {
-                    $html .= '<span class="lookup-summary-asn lookup-summary-asn--top">' . $asn_text . '</span>';
-                } else {
-                    $html .= '<span class="lookup-summary-asn-rest">, ' . $asn_text . '</span>';
-                }
-            }
-            $html .= '</span>';
-        }
         if ($summary['drop_count'] > 0) {
-            $html .= '<span class="lookup-summary-fact lookup-summary-drop">'
-                . number_format($summary['drop_count']) . ' in <abbr title="' . htmlspecialchars(DROP_EXPLAINER, ENT_QUOTES, 'UTF-8') . '">Spamhaus DROP</abbr> netblocks</span>';
+            $drop_abbr = '<abbr title="' . htmlspecialchars(DROP_EXPLAINER, ENT_QUOTES, 'UTF-8') . '">Spamhaus DROP</abbr>';
+            $n = '<span class="lookup-summary-n">' . number_format($summary['drop_count']) . '</span>';
+            $html .= '<span class="lookup-summary-fact lookup-summary-drop">' . ($summary['drop_count'] === 1
+                ? $n . ' IP in a ' . $drop_abbr . ' netblock'
+                : $n . ' IPs in ' . $drop_abbr . ' netblocks') . '</span>';
+        }
+        if ($summary['top_asn'] !== null) {
+            $asn_text = htmlspecialchars(trim($summary['top_asn']['asn'] . ' ' . $summary['top_asn']['org']), ENT_QUOTES, 'UTF-8');
+            $html .= '<span class="lookup-summary-fact lookup-summary-asns">Top ASN: '
+                . '<span class="lookup-summary-asn">' . $asn_text . '</span> ('
+                . '<span class="lookup-summary-n">' . number_format($summary['top_asn']['count']) . '</span> IPs)</span>';
         }
         $html .= '</div>';
     }
