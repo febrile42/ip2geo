@@ -489,7 +489,7 @@
 
                 var countEl = document.createElement('span');
                 countEl.className = 'recent-lookup-count';
-                countEl.textContent = entry.count.toLocaleString() + ' IP' + (entry.count !== 1 ? 's' : '');
+                countEl.textContent = entry.count.toLocaleString('en-US') + ' IP' + (entry.count !== 1 ? 's' : '');
 
                 var dotEl = document.createElement('span');
                 dotEl.className = 'recent-lookup-dot';
@@ -505,7 +505,7 @@
                 head.appendChild(timeEl);
 
                 var preview = entry.ips.slice(0, 3).join(', ');
-                if (entry.count > 3) preview += ', +' + (entry.count - 3).toLocaleString() + ' more';
+                if (entry.count > 3) preview += ', +' + (entry.count - 3).toLocaleString('en-US') + ' more';
                 var previewEl = document.createElement('span');
                 previewEl.className = 'wb-menu-note rl-item-preview';
                 previewEl.textContent = preview;
