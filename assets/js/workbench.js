@@ -545,14 +545,15 @@
 
   // ── paste bar ────────────────────────────────────────────────────────
 
-  function renderPasteBar(root, state, onEdit, onNew, onRecent) {
+  function renderPasteBar(root, state, onEdit, onRecent) {
     var bar = root.querySelector('.wb-paste-bar');
     bar.innerHTML = '';
     var m = state.pasteMeta;
     var summary = m.lines.toLocaleString() + ' lines · ' + m.unique.toLocaleString() + ' unique IPs' + (m.v6 ? ' · ' + m.v6.toLocaleString() + ' IPv6' : '');
     bar.appendChild(el('span', { class: 'wb-paste-pill' }, [summary]));
-    bar.appendChild(el('button', { type: 'button', class: 'button small', onclick: onEdit }, ['Edit paste']));
-    bar.appendChild(el('button', { type: 'button', class: 'button small', onclick: onNew }, ['New lookup']));
+    if (!state.recipient) {
+      bar.appendChild(el('button', { type: 'button', class: 'button small', 'aria-controls': 'message', onclick: onEdit }, ['Edit paste']));
+    }
     bar.appendChild(el('button', { type: 'button', class: 'button small', 'aria-haspopup': 'true' }, ['Recent ▾']));
     bar.lastChild.addEventListener('click', onRecent);
     if (m.lookupMs != null) {
@@ -629,7 +630,7 @@
         meta.lookupMs = finishedAt - startedAt;
         state.pasteMeta = meta;
         clearState(root);
-        renderPasteBar(root, state, root._wbOnEdit, root._wbOnNew, root._wbOnRecent);
+        renderPasteBar(root, state, root._wbOnEdit, root._wbOnRecent);
         renderSummary(root, state);
         renderUnresolved(root, state);
         renderAll(root, state);
@@ -663,13 +664,12 @@
     }
 
     root._wbOnEdit = function () {
-      root.hidden = true;
-      textarea.focus();
-    };
-    root._wbOnNew = function () {
-      textarea.value = '';
-      root.hidden = true;
-      textarea.focus();
+      var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      var end = textarea.value.length;
+      textarea.focus({ preventScroll: true });
+      textarea.setSelectionRange(end, end);      // caret at the end, nothing selected
+      textarea.scrollTop = textarea.scrollHeight; // show the end of a long paste inside the box
+      textarea.scrollIntoView({ block: 'center', behavior: reduce ? 'auto' : 'smooth' });
     };
     root._wbOnRecent = function () { /* wired by the Recent-lookups module, if present */ };
 
