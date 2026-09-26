@@ -322,8 +322,24 @@
 
   function renderChipRow(root, selector, dim, label, allValues, counts, state, onChange) {
     var wrap = root.querySelector(selector);
-    wrap.innerHTML = '';
-    wrap.appendChild(el('span', { class: 'wb-chip-label' }, [label]));
+    // The search box (categories row only) is created once and never
+    // removed from the DOM on re-render: detaching a focused element (even
+    // via appendChild to move it) blurs it, which is what dropped focus and
+    // caret position after every keystroke (IPG-29). Everything else in
+    // this row is rebuilt fresh each render, inserted before the cached
+    // search node so it keeps its place at the end of the row.
+    var search = wrap._wbSearch;
+
+    Array.prototype.slice.call(wrap.childNodes).forEach(function (node) {
+      if (node !== search) wrap.removeChild(node);
+    });
+
+    function append(node) {
+      if (search) wrap.insertBefore(node, search);
+      else wrap.appendChild(node);
+    }
+
+    append(el('span', { class: 'wb-chip-label' }, [label]));
 
     var shown = dim === 'countries' ? allValues.slice(0, RECENT_CHIP_COUNT) : allValues;
     var rest = dim === 'countries' ? allValues.slice(RECENT_CHIP_COUNT) : [];
@@ -357,26 +373,31 @@
           onChange(value, { shift: e.shiftKey, ctrl: e.ctrlKey || e.metaKey });
         }
       });
-      wrap.appendChild(chipLabel);
+      append(chipLabel);
     });
 
     if (rest.length > 0) {
-      wrap.appendChild(el('span', { class: 'wb-chip wb-chip--more', text: '+' + rest.length + ' more' }));
+      append(el('span', { class: 'wb-chip wb-chip--more', text: '+' + rest.length + ' more' }));
     }
 
     if (dim === 'categories') {
-      var search = el('input', {
-        type: 'search',
-        class: 'wb-search',
-        placeholder: 'Filter IP, ASN, org…',
-        'aria-label': 'Filter results by IP, ASN or organization',
-        value: state.filters.search
-      });
-      search.addEventListener('input', function () {
-        state.filters = { categories: state.filters.categories, countries: state.filters.countries, search: search.value };
-        renderAll(root, state);
-      });
-      wrap.appendChild(search);
+      if (!search) {
+        search = el('input', {
+          type: 'search',
+          class: 'wb-search',
+          placeholder: 'Filter IP, ASN, org…',
+          'aria-label': 'Filter results by IP, ASN or organization'
+        });
+        search.addEventListener('input', function () {
+          var current = wrap._wbState;
+          current.filters = { categories: current.filters.categories, countries: current.filters.countries, search: search.value };
+          renderAll(root, current);
+        });
+        wrap.appendChild(search);
+        wrap._wbSearch = search;
+      }
+      wrap._wbState = state;
+      if (search.value !== state.filters.search) search.value = state.filters.search;
     }
   }
 

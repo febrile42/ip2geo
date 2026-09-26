@@ -163,6 +163,52 @@ describe('renderAll smoke test', () => {
     expect(root.querySelector('.wb-table caption')).toBeTruthy();
     expect(root.querySelector('.wb-table th[data-key="hits"]').getAttribute('aria-sort')).toBe('descending');
   });
+
+  test('typing in the search box keeps focus and caret, and still filters live (IPG-29)', () => {
+    var state = WB.makeState();
+    state.rows = rows();
+    WB.renderAll(root, state);
+
+    var search = root.querySelector('.wb-search');
+    search.focus();
+    expect(document.activeElement).toBe(search);
+
+    // Type "1.1.1" one character at a time, the way a real keyboard does,
+    // firing a native `input` event (not `fill()`) after each keystroke.
+    var term = '1.1.1';
+    for (var i = 0; i < term.length; i++) {
+      search.value = term.slice(0, i + 1);
+      search.setSelectionRange(search.value.length, search.value.length);
+      search.dispatchEvent(new Event('input', { bubbles: true }));
+
+      // The re-render triggered by this keystroke must not have rebuilt
+      // (and thereby blurred) the input.
+      expect(root.querySelector('.wb-search')).toBe(search);
+      expect(document.activeElement).toBe(search);
+      expect(search.selectionStart).toBe(search.value.length);
+    }
+
+    expect(root.querySelector('.wb-shown-count').textContent).toBe('1 shown');
+
+    // Clearing the field (e.g. the native × or a Backspace run) restores all rows.
+    search.value = '';
+    search.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(document.activeElement).toBe(search);
+    expect(root.querySelector('.wb-shown-count').textContent).toBe('3 shown');
+  });
+
+  test('chip filters still work once the search box has been rendered (IPG-29 regression guard)', () => {
+    var state = WB.makeState();
+    state.rows = rows();
+    WB.renderAll(root, state);
+
+    var scanningChip = Array.from(root.querySelectorAll('.wb-chips-category .wb-chip'))
+      .find(function (l) { return l.textContent.indexOf('Scanning') !== -1; });
+    scanningChip.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+
+    expect(root.querySelector('.wb-shown-count').textContent).toBe('1 shown');
+    expect(root.querySelectorAll('.wb-search').length).toBe(1);
+  });
 });
 
 describe('renderSummary (bug: the summary bar rendered empty because nothing ever called buildSummary)', () => {
