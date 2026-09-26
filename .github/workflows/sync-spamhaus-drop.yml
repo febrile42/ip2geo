@@ -129,13 +129,18 @@ jobs:
           set -euo pipefail
           git fetch origin main develop
 
-          if [ "$(git rev-parse origin/develop)" = "$(git rev-parse origin/main)" ]; then
+          # Pin the develop commit the checks below inspect, and merge only that
+          # commit (--match-head-commit). Otherwise a push to develop landing
+          # between the checks and the merge would ride the auto-promote to prod.
+          DEVELOP_SHA=$(git rev-parse origin/develop)
+
+          if [ "$DEVELOP_SHA" = "$(git rev-parse origin/main)" ]; then
             echo "develop is already at main; nothing to promote."
             echo "promoted=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          OTHER_FILES=$(git diff origin/main..origin/develop --name-only \
+          OTHER_FILES=$(git diff "origin/main..$DEVELOP_SHA" --name-only \
             | grep -v '^spamhaus_drop_data.php$' || true)
           if [ -n "$OTHER_FILES" ]; then
             echo "develop has unreleased non-DROP changes; not auto-promoting:"
@@ -159,7 +164,7 @@ jobs:
             echo "Reusing existing PR #${PR_NUMBER}."
           fi
 
-          if gh pr merge "$PR_NUMBER" --squash; then
+          if gh pr merge "$PR_NUMBER" --squash --match-head-commit "$DEVELOP_SHA"; then
             echo "Merged PR #${PR_NUMBER}."
             echo "promoted=true" >> "$GITHUB_OUTPUT"
           else
