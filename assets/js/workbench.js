@@ -81,9 +81,9 @@
   // Single source of truth for the "N IPv4 / M IPv6" phrasing so the paste
   // pill and the loading line can't drift apart (IPG-34/IPG-39).
   function formatIpSplit(v4, v6) {
-    if (v4 && v6) return v4.toLocaleString() + ' IPv4 / ' + v6.toLocaleString() + ' IPv6';
-    if (v6) return v6.toLocaleString() + ' IPv6';
-    return v4.toLocaleString() + ' IPv4';
+    if (v4 && v6) return v4.toLocaleString('en-US') + ' IPv4 / ' + v6.toLocaleString('en-US') + ' IPv6';
+    if (v6) return v6.toLocaleString('en-US') + ' IPv6';
+    return v4.toLocaleString('en-US') + ' IPv4';
   }
 
   function ipv6MiddleTruncate(ip) {
@@ -595,7 +595,7 @@
 
     var pillChildren = [];
     if (m.lines != null) {
-      pillChildren.push(el('span', {}, [m.lines.toLocaleString() + ' line' + (m.lines === 1 ? '' : 's')]));
+      pillChildren.push(el('span', {}, [m.lines.toLocaleString('en-US') + ' line' + (m.lines === 1 ? '' : 's')]));
       pillChildren.push(' · ');
     }
     var label = m.overCap ? 'Looked up: ' : 'Unique: ';
