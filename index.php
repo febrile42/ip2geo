@@ -9,7 +9,7 @@ require_once __DIR__ . '/includes/lookup.php';   // lookup_ips(), GeoDbUnavailab
 require_once __DIR__ . '/includes/summary.php';  // build_summary(), SUMMARY_CATEGORY_LABELS
 require_once __DIR__ . '/includes/version.php';  // APP_VERSION for ?v= asset URLs
 require_once __DIR__ . '/includes/client-ip.php';  // lookup_endpoint_client_ip()
-require_once __DIR__ . '/includes/rate-limit.php'; // default_lookup_rate_limiter(), 60/min/IP
+require_once __DIR__ . '/includes/rate-limit.php'; // default_lookup_rate_limiter(), cost budget per IP
 @include_once __DIR__ . '/db_version.php'; // gitignored; written by the monthly DB update script
 if (is_file(__DIR__ . '/config.php')) {
     // Optional in v5: index.php no longer talks to MySQL or Stripe (R17), so
@@ -408,9 +408,10 @@ function render_lookup_results(array $post, string $visitor_ip = '', ?string $ci
 /**
  * The no-JS POST / lookup (IPG-17): rate-limit, then render_lookup_results().
  * Same per-client-IP limit as api/lookup.php, in its own APCu bucket
- * (LOOKUP_RATE_BUCKET_NOJS; see includes/rate-limit.php for why). When
- * limited, no lookup runs and the results section is a role="alert" notice
- * sent with 429 + Retry-After.
+ * (LOOKUP_RATE_BUCKET_NOJS; see includes/rate-limit.php for why). The
+ * limiter runs before extraction, so every no-JS POST is charged as a full
+ * EXTRACT_IPS_CAP lookup (IPG-48). When limited, no lookup runs and the
+ * results section is a role="alert" notice sent with 429 + Retry-After.
  *
  * Returns status/headers/html instead of sending them so tests can drive it
  * without a real request, APCu or GeoIP database.
@@ -426,7 +427,7 @@ function render_lookup_results(array $post, string $visitor_ip = '', ?string $ci
  */
 function handle_nojs_lookup(array $post, array $server, string $visitor_ip = '', ?callable $rateLimiter = null, ?callable $render = null): array
 {
-    $rateLimiter ??= static fn(string $ip): array => default_lookup_rate_limiter($ip, LOOKUP_RATE_BUCKET_NOJS);
+    $rateLimiter ??= static fn(string $ip): array => default_lookup_rate_limiter($ip, LOOKUP_RATE_BUCKET_NOJS, lookup_rate_cost(EXTRACT_IPS_CAP));
     $render      ??= static fn(array $p, string $v): string => render_lookup_results($p, $v);
 
     $rate = $rateLimiter(lookup_endpoint_client_ip($server));

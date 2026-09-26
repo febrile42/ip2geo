@@ -44,7 +44,7 @@ require_once __DIR__ . '/../includes/lookup.php';
 require_once __DIR__ . '/../asn_classification.php';
 require_once __DIR__ . '/../report_functions.php'; // ip_in_spamhaus_drop()
 require_once __DIR__ . '/../includes/client-ip.php';  // lookup_endpoint_client_ip()
-require_once __DIR__ . '/../includes/rate-limit.php'; // default_lookup_rate_limiter(), 60/min/IP
+require_once __DIR__ . '/../includes/rate-limit.php'; // default_lookup_rate_limiter(), cost budget per IP
 
 // Cap on unique IPs per request and on raw body size.
 if (!defined('LOOKUP_MAX_UNIQUE_IPS')) {
@@ -89,15 +89,16 @@ function lookup_endpoint_json_error(int $status, string $message, array $extraHe
  * @param callable $lookup       function(string[] $ips): array<string,array> — normally
  *                                fn(array $ips) => lookup_ips($ips), injectable so tests
  *                                can simulate a missing/corrupt database
- * @param ?callable $rateLimiter function(string $clientIp): array{limited:bool,retry_after:int},
- *                                defaults to default_lookup_rate_limiter(); injectable so
- *                                tests can force the 429 path without real APCu
+ * @param ?callable $rateLimiter function(string $clientIp, int $cost): array{limited:bool,retry_after:int},
+ *                                defaults to default_lookup_rate_limiter() on the API bucket;
+ *                                $cost is lookup_rate_cost() of the unique IP count.
+ *                                Injectable so tests can force the 429 path without real APCu
  *
  * @return array{status:int, headers:array<string,string>, body:string}
  */
 function handle_lookup_request(array $server, string $body, callable $lookup, ?callable $rateLimiter = null): array
 {
-    $rateLimiter ??= 'default_lookup_rate_limiter';
+    $rateLimiter ??= static fn(string $ip, int $cost): array => default_lookup_rate_limiter($ip, LOOKUP_RATE_BUCKET_API, $cost);
 
     if (($server['REQUEST_METHOD'] ?? 'POST') !== 'POST') {
         return lookup_endpoint_json_error(405, 'This endpoint accepts POST only.');
@@ -141,7 +142,7 @@ function handle_lookup_request(array $server, string $body, callable $lookup, ?c
     }
 
     $clientIp = lookup_endpoint_client_ip($server);
-    $rate     = $rateLimiter($clientIp);
+    $rate     = $rateLimiter($clientIp, lookup_rate_cost(count($rawIps)));
     if (!empty($rate['limited'])) {
         $retryAfter = (int)($rate['retry_after'] ?? LOOKUP_RATE_LIMIT_WINDOW_SECONDS);
         return lookup_endpoint_json_error(

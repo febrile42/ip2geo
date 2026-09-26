@@ -67,10 +67,10 @@ Section 7 repeats both.
 
 | Path | Role |
 |---|---|
-| `index.php` | Page, form, no-JS `render_lookup_results()` (behind `handle_nojs_lookup()`'s rate limit: 429 over 60 POSTs/min/IP), and the workbench markup (`#workbench-root`) |
+| `index.php` | Page, form, no-JS `render_lookup_results()` (behind `handle_nojs_lookup()`'s rate limit: each POST is charged as a full 10k lookup, so 429 over ~54 POSTs/min/IP), and the workbench markup (`#workbench-root`) |
 | `includes/extract.php` / `assets/js/extract-ips.js` | IP extraction. **They must stay behaviour-identical.** Both are locked to `tests/fixtures/extract` golden files |
 | `includes/lookup.php` | `lookup_ips()`: the `.mmdb` reader, and `GEOIP_MMDB_DIR`, which defaults to `<app>/data/geoip`. It requires Composer's autoloader itself (see Gotchas) |
-| `api/lookup.php` | JSON endpoint. Returns 413 over 10k IPs or 2 MB, 429 over 60 requests/min/IP (APCu), and 503 when data is missing. Request bodies are never logged |
+| `api/lookup.php` | JSON endpoint. Returns 413 over 10k IPs or 2 MB, 429 once a client spends its 600 units/min (1 unit plus 1 per full 1,000 IPs, so ~600 small or ~54 max-size lookups; APCu, fixed windows keyed by minute), and 503 when data is missing. Request bodies are never logged |
 | `includes/client-ip.php` / `includes/rate-limit.php` | Shared by both lookup paths: the client IP (CF-Connecting-IP only from a Cloudflare edge) and the APCu limiter. Separate buckets per path (`lookup_rate:` API, `lookup_rate_nojs:` no-JS). Fails open without APCu |
 | `includes/summary.php` / `assets/js/summary.js` | Summary line. `DROP_EXPLAINER` text is duplicated in PHP and `workbench.js`, and `tests/DropExplainerTest.php` enforces parity |
 | `assets/js/workbench.js` | Client render, the filters glue, exports, share links, the unresolved toggle and the lookup timer |
