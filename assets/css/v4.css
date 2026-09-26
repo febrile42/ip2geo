@@ -2682,6 +2682,7 @@ button.button.small:hover {
   font-family: var(--font-mono);
   color: var(--text);
 }
+.wb-paste-pill > span { white-space: nowrap; }
 .wb-paste-time { margin-left: auto; }
 
 .wb-state .notice { margin: 8px 0; }

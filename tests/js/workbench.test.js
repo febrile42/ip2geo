@@ -349,7 +349,22 @@ describe('formatLookupTime (bug: always showed "0.0 s" for sub-100ms lookups)', 
   });
 });
 
-describe('renderPasteBar (IPG-38: New lookup removed, Edit paste kept)', () => {
+describe('formatIpSplit (IPG-39: pill/loading-line IPv4/IPv6 split)', () => {
+  test('mixed v4 and v6', () => {
+    expect(WB.formatIpSplit(3, 2)).toBe('3 IPv4 / 2 IPv6');
+  });
+  test('v4 only', () => {
+    expect(WB.formatIpSplit(5, 0)).toBe('5 IPv4');
+  });
+  test('v6 only', () => {
+    expect(WB.formatIpSplit(0, 4)).toBe('4 IPv6');
+  });
+  test('formats large counts with a thousands separator', () => {
+    expect(WB.formatIpSplit(1234, 0)).toBe('1,234 IPv4');
+  });
+});
+
+describe('renderPasteBar (IPG-38: New lookup removed, Edit paste kept; IPG-39: pill IPv4/IPv6 split)', () => {
   var root;
   beforeEach(() => {
     root = buildDom();
@@ -376,6 +391,63 @@ describe('renderPasteBar (IPG-38: New lookup removed, Edit paste kept)', () => {
     var labels = Array.prototype.map.call(buttons, function (b) { return b.textContent; });
     expect(labels).toEqual(['Recent ▾']);
   });
+
+  test('singular "1 line" plus the Unique: split', () => {
+    var state = WB.makeState();
+    state.pasteMeta = { lines: 1, v4: 3, v6: 2, overCap: false, lookupMs: null, rawText: '' };
+    WB.renderPasteBar(root, state, () => {}, () => {}, () => {});
+    expect(root.querySelector('.wb-paste-pill').textContent).toBe('1 line · Unique: 3 IPv4 / 2 IPv6');
+  });
+
+  test('plural line count', () => {
+    var state = WB.makeState();
+    state.pasteMeta = { lines: 4, v4: 3, v6: 2, overCap: false, lookupMs: null, rawText: '' };
+    WB.renderPasteBar(root, state, () => {}, () => {}, () => {});
+    expect(root.querySelector('.wb-paste-pill').textContent).toBe('4 lines · Unique: 3 IPv4 / 2 IPv6');
+  });
+
+  test('omits the lines span and separator when lines is null (shared-view recipient form)', () => {
+    var state = WB.makeState();
+    state.pasteMeta = { lines: null, v4: 3, v6: 2, overCap: false, lookupMs: null, rawText: '' };
+    WB.renderPasteBar(root, state, () => {}, () => {}, () => {});
+    var pill = root.querySelector('.wb-paste-pill');
+    expect(pill.textContent).toBe('Unique: 3 IPv4 / 2 IPv6');
+    expect(pill.children.length).toBe(1);
+  });
+
+  test('labels "Looked up:" instead of "Unique:" when over the cap', () => {
+    var state = WB.makeState();
+    state.pasteMeta = { lines: 2, v4: 8000, v6: 2000, overCap: true, lookupMs: null, rawText: '' };
+    WB.renderPasteBar(root, state, () => {}, () => {}, () => {});
+    expect(root.querySelector('.wb-paste-pill').textContent).toBe('2 lines · Looked up: 8,000 IPv4 / 2,000 IPv6');
+  });
+
+  test('renders exactly one .wb-overcap notice, even across two renders', () => {
+    var state = WB.makeState();
+    state.pasteMeta = {
+      lines: 2, v4: 8000, v6: 2000, overCap: true,
+      overCapNotice: 'Looked up the first 10,000 of 12,000 unique IPs. 2,000 skipped. Paste the rest separately to check them.',
+      lookupMs: null, rawText: ''
+    };
+    WB.renderPasteBar(root, state, () => {}, () => {}, () => {});
+    WB.renderPasteBar(root, state, () => {}, () => {}, () => {});
+    var notices = root.querySelectorAll('.wb-overcap');
+    expect(notices.length).toBe(1);
+    expect(notices[0].tagName).toBe('P');
+    expect(notices[0].getAttribute('role')).toBe('status');
+    expect(notices[0].previousElementSibling).toBe(root.querySelector('.wb-paste-bar'));
+  });
+
+  test('a later render without overCapNotice removes the stale notice', () => {
+    var state = WB.makeState();
+    state.pasteMeta = { lines: 2, v4: 8000, v6: 2000, overCap: true, overCapNotice: 'Looked up the first 10,000…', lookupMs: null, rawText: '' };
+    WB.renderPasteBar(root, state, () => {}, () => {}, () => {});
+    expect(root.querySelectorAll('.wb-overcap').length).toBe(1);
+
+    state.pasteMeta = { lines: 2, v4: 3, v6: 2, overCap: false, lookupMs: null, rawText: '' };
+    WB.renderPasteBar(root, state, () => {}, () => {}, () => {});
+    expect(root.querySelectorAll('.wb-overcap').length).toBe(0);
+  });
 });
 
 describe('runLookup D6 states', () => {
@@ -395,7 +467,7 @@ describe('runLookup D6 states', () => {
       headers: { get: function () { return '42'; } }
     });
     var state = WB.makeState();
-    return WB.runLookup(root, state, ['1.1.1.1'], {}, { lines: 1, unique: 1, v6: 0 }).then(function (ok) {
+    return WB.runLookup(root, state, ['1.1.1.1'], {}, { lines: 1, v4: 1, v6: 0 }).then(function (ok) {
       expect(ok).toBe(false);
       expect(root.querySelector('.wb-state').textContent).toContain('Try again in 42s');
     });
@@ -404,7 +476,7 @@ describe('runLookup D6 states', () => {
   test('503 renders the "data is updating" message', () => {
     global.fetch = jest.fn().mockResolvedValue({ status: 503, ok: false, headers: { get: function () { return null; } } });
     var state = WB.makeState();
-    return WB.runLookup(root, state, ['1.1.1.1'], {}, { lines: 1, unique: 1, v6: 0 }).then(function (ok) {
+    return WB.runLookup(root, state, ['1.1.1.1'], {}, { lines: 1, v4: 1, v6: 0 }).then(function (ok) {
       expect(ok).toBe(false);
       expect(root.querySelector('.wb-state').textContent).toContain('Lookup data is updating');
     });
@@ -413,7 +485,7 @@ describe('runLookup D6 states', () => {
   test('network failure renders a retry-able notice and keeps the paste', () => {
     global.fetch = jest.fn().mockRejectedValue(new Error('offline'));
     var state = WB.makeState();
-    return WB.runLookup(root, state, ['1.1.1.1'], {}, { lines: 1, unique: 1, v6: 0 }).then(function (ok) {
+    return WB.runLookup(root, state, ['1.1.1.1'], {}, { lines: 1, v4: 1, v6: 0 }).then(function (ok) {
       expect(ok).toBe(false);
       expect(root.querySelector('.wb-state').textContent).toContain('Your paste is still here');
       expect(root.querySelector('.wb-state button')).toBeTruthy(); // Retry
@@ -432,11 +504,61 @@ describe('runLookup D6 states', () => {
       }
     });
     var state = WB.makeState();
-    return WB.runLookup(root, state, ['1.1.1.1'], { '1.1.1.1': 3 }, { lines: 1, unique: 1, v6: 0 }).then(function (ok) {
+    return WB.runLookup(root, state, ['1.1.1.1'], { '1.1.1.1': 3 }, { lines: 1, v4: 1, v6: 0 }).then(function (ok) {
       expect(ok).toBe(true);
       expect(root.querySelector('.wb-state').hidden).toBe(true);
       expect(root.querySelector('.wb-body').hidden).toBe(false);
       expect(root.querySelector('.wb-shown-count').textContent).toBe('1 shown');
+    });
+  });
+});
+
+describe('startLookup over-cap arithmetic (IPG-39 count bug)', () => {
+  var extractIps = require('../../assets/js/extract-ips.js');
+
+  beforeEach(() => {
+    window.extractIps = extractIps;
+  });
+  afterEach(() => {
+    delete window.extractIps;
+    delete global.fetch;
+  });
+
+  test('v4 + v6 equals the looked-up count (the cap), not the pre-cap total', () => {
+    // extracted.v6Count is already post-cap; deriving v4 from the pre-cap
+    // extracted.totalUnique (the old bug) would make v4 + v6 disagree with
+    // how many IPs were actually looked up once the paste is over the cap.
+    var v4Lines = [];
+    for (var i = 0; i < 10005; i++) {
+      v4Lines.push('198.' + Math.floor(i / 256) + '.' + (i % 256) + '.5');
+    }
+    var v6Lines = [];
+    for (var j = 1; j <= 8; j++) {
+      v6Lines.push('2606:4700:4700::' + j.toString(16));
+    }
+    // v6 lines first so all 8 land inside the first 10,000 first-seen
+    // entries even though the v4 lines alone already exceed the cap.
+    var rawText = v6Lines.concat(v4Lines).join('\n');
+
+    global.fetch = jest.fn().mockResolvedValue({
+      status: 200,
+      ok: true,
+      json: function () { return Promise.resolve({ results: [], unresolved: [] }); }
+    });
+
+    var root = buildDom();
+    var form = document.createElement('form');
+    var textarea = document.createElement('textarea');
+    form.appendChild(textarea);
+    document.body.appendChild(form);
+
+    var handle = WB.mount(root, form, textarea);
+    return handle.startLookup(rawText).then(function (ok) {
+      expect(ok).toBe(true);
+      var m = handle.state.pasteMeta;
+      expect(m.overCap).toBe(true);
+      expect(m.v6).toBe(8);
+      expect(m.v4 + m.v6).toBe(10000);
     });
   });
 });
@@ -448,5 +570,31 @@ describe('mountSharedView with a rejected payload', () => {
     var p = WB.mountSharedView(document.createElement('div'), 'not-valid-base64!!!', () => { throw new Error('banner must not render'); });
     expect(p).not.toBeNull();
     await expect(p).resolves.toBe(false);
+  });
+});
+
+describe('mountSharedView (IPG-39: v4/v6 split, recipient pill has no line count)', () => {
+  var Share = require('../../assets/js/share-link.js');
+
+  afterEach(() => {
+    delete global.fetch;
+  });
+
+  test('splits decoded IPs into v4/v6 and the pill omits the lines span', () => {
+    var payload = Share.encodeShareState({
+      ips: ['1.1.1.1', '2606:4700:4700::1111', '8.8.8.8'],
+      categories: [], countries: [], search: ''
+    });
+    global.fetch = jest.fn().mockResolvedValue({
+      status: 200,
+      ok: true,
+      json: function () { return Promise.resolve({ results: [], unresolved: [] }); }
+    });
+
+    var root = buildDom();
+    return WB.mountSharedView(root, payload, () => {}).then(function (ok) {
+      expect(ok).toBe(true);
+      expect(root.querySelector('.wb-paste-pill').textContent).toBe('Unique: 2 IPv4 / 1 IPv6');
+    });
   });
 });

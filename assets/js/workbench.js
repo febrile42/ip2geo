@@ -67,6 +67,14 @@
     return (ms / 1000).toFixed(1) + ' s';
   }
 
+  // Single source of truth for the "N IPv4 / M IPv6" phrasing so the paste
+  // pill and the loading line can't drift apart (IPG-34/IPG-39).
+  function formatIpSplit(v4, v6) {
+    if (v4 && v6) return v4.toLocaleString() + ' IPv4 / ' + v6.toLocaleString() + ' IPv6';
+    if (v6) return v6.toLocaleString() + ' IPv6';
+    return v4.toLocaleString() + ' IPv4';
+  }
+
   function ipv6MiddleTruncate(ip) {
     // Mirrors index.php's ipv6_middle_truncate(): "2001:db8::7334" -> "2001:db8…:7334".
     if (ip.length <= 15) return ip;
@@ -115,7 +123,7 @@
       unresolved: [],
       filters: Filters.emptyState(),
       sort: { key: 'hits', dir: 'desc' },
-      pasteMeta: { lines: 0, unique: 0, v6: 0, lookupMs: null, rawText: '' },
+      pasteMeta: { lines: 0, v4: 0, v6: 0, overCap: false, lookupMs: null, rawText: '' },
       recipient: null // {count, categories, countries} when opened from a share link
     };
   }
@@ -570,8 +578,16 @@
     var bar = root.querySelector('.wb-paste-bar');
     bar.innerHTML = '';
     var m = state.pasteMeta;
-    var summary = m.lines.toLocaleString() + ' lines · ' + m.unique.toLocaleString() + ' unique IPs' + (m.v6 ? ' · ' + m.v6.toLocaleString() + ' IPv6' : '');
-    bar.appendChild(el('span', { class: 'wb-paste-pill' }, [summary]));
+
+    var pillChildren = [];
+    if (m.lines != null) {
+      pillChildren.push(el('span', {}, [m.lines.toLocaleString() + ' line' + (m.lines === 1 ? '' : 's')]));
+      pillChildren.push(' · ');
+    }
+    var label = m.overCap ? 'Looked up: ' : 'Unique: ';
+    pillChildren.push(el('span', {}, [label + formatIpSplit(m.v4, m.v6)]));
+    bar.appendChild(el('span', { class: 'wb-paste-pill' }, pillChildren));
+
     if (!state.recipient) {
       bar.appendChild(el('button', { type: 'button', class: 'button small', 'aria-controls': 'message', onclick: onEdit }, ['Edit paste']));
     }
@@ -579,6 +595,16 @@
     bar.lastChild.addEventListener('click', onRecent);
     if (m.lookupMs != null) {
       bar.appendChild(el('span', { class: 'wb-paste-time' }, ['looked up in ' + formatLookupTime(m.lookupMs)]));
+    }
+
+    // The over-cap notice is set on pasteMeta in startLookup but rendered
+    // here, right after the bar; drop any stale one from a previous render
+    // before deciding whether to add a fresh one (IPG-39).
+    var existingNotice = root.querySelector('.wb-overcap');
+    if (existingNotice) existingNotice.remove();
+    if (m.overCapNotice) {
+      var notice = el('p', { class: 'notice wb-overcap', role: 'status' }, [m.overCapNotice]);
+      bar.parentNode.insertBefore(notice, bar.nextSibling);
     }
   }
 
@@ -619,7 +645,7 @@
    */
   function runLookup(root, state, uniqueIps, hitCounts, meta) {
     state.pasteMeta = meta;
-    renderState(root, 'loading', 'Looking up ' + uniqueIps.length.toLocaleString() + ' unique IPs…' + (meta.v6 ? ' (' + meta.v6 + ' IPv6)' : ''));
+    renderState(root, 'loading', 'Looking up ' + formatIpSplit(meta.v4, meta.v6) + '…');
 
     var startedAt = (window.performance && performance.now) ? performance.now() : Date.now();
     return fetch('/api/lookup.php', {
@@ -717,8 +743,15 @@
         return pair[0];
       });
 
-      var meta = { lines: lines, unique: extracted.totalUnique, v6: extracted.v6Count, lookupMs: null, rawText: rawText };
-      if (extracted.totalUnique > uniqueIps.length) {
+      // extracted.v6Count is post-cap (counts only the IPs actually looked
+      // up), but extracted.totalUnique is pre-cap: deriving v4 from
+      // totalUnique here would make v4 + v6 disagree with the looked-up
+      // count whenever the cap trimmed the list (IPG-39 count bug).
+      var v6 = extracted.v6Count;
+      var v4 = uniqueIps.length - v6;
+      var overCap = extracted.totalUnique > uniqueIps.length;
+      var meta = { lines: lines, v4: v4, v6: v6, overCap: overCap, lookupMs: null, rawText: rawText };
+      if (overCap) {
         var skipped = extracted.totalUnique - uniqueIps.length;
         meta.overCapNotice = 'Looked up the first ' + uniqueIps.length.toLocaleString() + ' of ' +
           extracted.totalUnique.toLocaleString() + ' unique IPs. ' + skipped.toLocaleString() +
@@ -782,7 +815,8 @@
 
     var hitCounts = {};
     decoded.ips.forEach(function (ip) { hitCounts[ip] = 1; });
-    var meta = { lines: decoded.ips.length, unique: decoded.ips.length, v6: 0, lookupMs: null, rawText: decoded.ips.join('\n') };
+    var v6Count = decoded.ips.filter(function (ip) { return ip.indexOf(':') !== -1; }).length;
+    var meta = { lines: null, v4: decoded.ips.length - v6Count, v6: v6Count, lookupMs: null, rawText: decoded.ips.join('\n') };
 
     var state = makeState();
     state.recipient = { count: decoded.ips.length, categories: decoded.categories, countries: decoded.countries };
@@ -819,6 +853,7 @@
     renderSummary: renderSummary,
     renderUnresolved: renderUnresolved,
     formatLookupTime: formatLookupTime,
+    formatIpSplit: formatIpSplit,
     renderPasteBar: renderPasteBar,
     renderState: renderState,
     clearState: clearState,
