@@ -60,16 +60,12 @@ jobs:
           END_MARKER="// --- END AUTO-SYNC SPAMHAUS ASN-DROP ---"
 
           # Spamhaus ASN-DROP — current bad-actor AS list (NDJSON, one object per line).
-          # The first record is a `{"type":"metadata",...}` header with no .asn — filter it
-          # out so we don't materialize an "ASnull" entry into the classification array.
-          SPAMHAUS_ASNS=$(curl -sf https://www.spamhaus.org/drop/asndrop.json \
-            | jq -r 'select(.asn != null) | "AS" + (.asn | tostring)' \
-            | sort -u)
-
-          if [ -z "$SPAMHAUS_ASNS" ]; then
-            echo "Spamhaus fetch returned no ASNs — aborting to avoid emptying the auto-sync block."
-            exit 1
-          fi
+          # Each ASN is written into PHP source below, so the feed is validated by
+          # scripts/spamhaus-asns.sh: it emits only "AS<integer>" lines and fails the
+          # job (emitting nothing) on any unexpected value or an empty list, so a
+          # tampered feed can neither inject code nor empty the auto-sync block.
+          SPAMHAUS_ASNS=$(curl -sf --max-time 60 https://www.spamhaus.org/drop/asndrop.json \
+            | scripts/spamhaus-asns.sh)
 
           # Manual entries = ASNs in $known_asns ABOVE the BEGIN marker.
           # Anything below the marker is owned by this workflow and gets replaced.
@@ -168,13 +164,18 @@ jobs:
           set -euo pipefail
           git fetch origin main develop
 
-          if [ "$(git rev-parse origin/develop)" = "$(git rev-parse origin/main)" ]; then
+          # Pin the develop commit the checks below inspect, and merge only that
+          # commit (--match-head-commit). Otherwise a push to develop landing
+          # between the checks and the merge would ride the auto-promote to prod.
+          DEVELOP_SHA=$(git rev-parse origin/develop)
+
+          if [ "$DEVELOP_SHA" = "$(git rev-parse origin/main)" ]; then
             echo "develop is already at main; nothing to promote."
             echo "promoted=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          OTHER_FILES=$(git diff origin/main..origin/develop --name-only \
+          OTHER_FILES=$(git diff "origin/main..$DEVELOP_SHA" --name-only \
             | grep -v '^asn_classification.php$' || true)
           if [ -n "$OTHER_FILES" ]; then
             echo "develop has unreleased non-Spamhaus changes; not auto-promoting:"
@@ -190,7 +191,7 @@ jobs:
             awk '/BEGIN AUTO-SYNC SPAMHAUS ASN-DROP/{f=1; next} /END AUTO-SYNC SPAMHAUS ASN-DROP/{f=0; next} !f'
           }
           MAIN_STRIPPED=$(git show origin/main:asn_classification.php | strip_block)
-          DEV_STRIPPED=$(git show origin/develop:asn_classification.php | strip_block)
+          DEV_STRIPPED=$(git show "$DEVELOP_SHA:asn_classification.php" | strip_block)
           if [ "$MAIN_STRIPPED" != "$DEV_STRIPPED" ]; then
             echo "asn_classification.php has changes outside the auto-sync block; not auto-promoting."
             echo "promoted=false" >> "$GITHUB_OUTPUT"
@@ -215,7 +216,7 @@ jobs:
             echo "Reusing existing PR #${PR_NUMBER}."
           fi
 
-          if gh pr merge "$PR_NUMBER" --squash; then
+          if gh pr merge "$PR_NUMBER" --squash --match-head-commit "$DEVELOP_SHA"; then
             echo "Merged PR #${PR_NUMBER}."
             echo "promoted=true" >> "$GITHUB_OUTPUT"
           else
