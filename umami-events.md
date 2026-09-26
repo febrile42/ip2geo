@@ -127,3 +127,30 @@ Someone clicked Clear on the list.
 
 ### `recent_lookups_undo`
 Someone clicked Undo on the toast after turning it off or clearing it.
+
+---
+
+## Checking events on staging
+
+Staging never loads the tracker, and that is deliberate: keeping staging
+traffic out of the production Umami site. Two things stop it:
+
+- `index.php` and `includes/page-chrome.php` only render the tracker tag when
+  `HTTP_HOST` is exactly `ip2geo.org`.
+- The `/u/` proxy to Umami exists only on the production vhost, so
+  `https://staging.ip2geo.org/u/script.js` returns 404.
+
+So `window.umami` is undefined on staging and no `/u/` request appears in
+DevTools. Don't file that as a bug. To check which events fire and with what
+fields, stub the tracker in the console after the page loads and before you
+interact. Every call site is `window.umami && umami.track(...)`, so the stub
+catches all of them:
+
+```js
+window.umami = { track: (name, data) => console.log('umami', name, data ?? '') };
+```
+
+Reload clears the stub. The privacy guarantee (no log text or `#v=`
+fragment in any `/u/` request) is covered by `tests/e2e/privacy.spec.js`,
+which runs in CI against a stubbed `/u/` with `IP2GEO_E2E_FORCE_UMAMI=1`.
+Only production shows real sends.
