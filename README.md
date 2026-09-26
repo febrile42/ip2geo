@@ -14,7 +14,7 @@ Live at [ip2geo.org](https://ip2geo.org) since 2017. **Picking this up cold? Rea
 
 - **PHP 8.4**: all server-side logic. No framework.
 - **MaxMind GeoLite2-City + GeoLite2-ASN `.mmdb` files**: the lookup reads them with `maxmind-db/reader` (`includes/lookup.php`). Production also has the `php-maxminddb` C extension, which the reader uses automatically. It makes a 10k-IP lookup take ~0.2–0.5 s instead of ~3.5 s.
-- **MySQL / MariaDB**: Community Block List tables, plus the legacy GeoIP integer-range tables (`geoip2_*_current_int`). v5 lookups no longer read those tables, but `community-consent.php` still does. They are dropped once v5 has run cleanly for a while.
+- **MySQL / MariaDB**: Community Block List tables, plus the legacy GeoIP integer-range tables (`geoip2_*_current_int`). Nothing in v5 reads the GeoIP tables any more. They are dropped once v5 has run cleanly for a while.
 - **Vanilla JS, no build step**: the v5 workbench (`assets/js/*.js`) extracts IPs in the browser, POSTs only the IPs to `/api/lookup.php`, and renders, filters and exports on the client. Without JS, `index.php` falls back to a server-rendered results table.
 - **Cloudflare** in front of the origin. Rocket Loader is on for the zone, so every `<script>` tag carries `data-cfasync="false"` (enforced by `tests/RocketLoaderOptOutTest.php`), and every asset URL carries `?v=<APP_VERSION>` so a release is never paired with day-old cached JS.
 - **APCu**: `/intel.php` page cache (15-min TTL) and the `/api/lookup.php` rate limit.
@@ -100,7 +100,7 @@ The Spamhaus DROP check lives on in `report_functions.php` and in the lookup's D
 
 ## How Community Block List Works
 
-1. ⚠️ **Currently orphaned.** Consent used to be collected on the Threat Report page, which posted the report's IP list to `community-consent.php`. That page is gone as of v5.0.0, so `community-consent.php` has no caller. The tables and the `/intel.php` feed are untouched. Open Question 4 is still unresolved: keep the list, fold it into DROP intel, or retire it. New opt-ins can't happen until that is settled.
+1. ⚠️ **Currently orphaned.** Consent used to be collected on the Threat Report page, which posted the report's IP list to `community-consent.php`. That page is gone as of v5.0.0, and `community-consent.php` now returns 410 (its ingestion code is in git history). The tables and the `/intel.php` feed are untouched. Open Question 4 is still unresolved: keep the list, fold it into DROP intel, or retire it. New opt-ins can't happen until that is settled.
 2. The consent endpoint ingests IPs, computes CIDR ranges via `geoip2_asn_current_int`, and writes daily rows to `community_cidr_stats` and `community_ip_stats`, deduplicated per user per day.
 3. `/intel.php` queries the rolling 7-day window. A range is listed only if it has:
    - reports from **3 or more** independent users
@@ -142,7 +142,7 @@ npx playwright test                              # browser specs; starts php -S 
 | `IndexResultsTest.php`, `SummaryTest.php`, `DropExplainerTest.php` | No-JS results page, summary line, and the DROP explainer text staying identical in PHP and JS |
 | `SampleLogTest.php` | "Try a sample log" never labels a real person's IP |
 | `SpamhausDropTest.php`, `AsnClassificationTest.php` | DROP lookup and generator; ASN classification |
-| `CommunityConsentTest.php`, `IntelCacheTest.php` | Community Block List ingestion and `/intel.php` cache |
+| `CommunityConsentRetiredTest.php`, `IntelCacheTest.php` | Retired consent endpoint (410) and `/intel.php` cache |
 | `ReportRetiredTest.php`, `IpValidationTest.php` | `report.php` 410; IP validation |
 | `RocketLoaderOptOutTest.php` | Every script tag carries `data-cfasync="false"` |
 | `tests/js/*.test.js` | Filters, exports, share links, summary, workbench rendering, DROP popover, Recent lookups |
