@@ -1,10 +1,8 @@
 # ip2geo.org
 
-Two tools in one place.
-
 **Bulk lookup:** paste in a wall of text, log output, or a raw list of IPs. It extracts the IPv4 and IPv6 addresses and returns country, region, city, ASN, a category (scanning, VPN/proxy, cloud, residential…) and a Spamhaus DROP flag for each one. Up to 10,000 unique IPs per lookup. Results can be filtered, exported (TSV, CSV, KQL, SPL, iptables, ufw, nginx) and shared as a link whose IPs live only in the URL fragment. Threat Reports (the paid one-time report and its free precursor) were retired in v5.0.0; see "Threat Reports (retired in v5.0.0)" below.
 
-**Community Block List:** a rolling 7-day feed of CIDR ranges reported by opted-in ip2geo users, on [`/intel.php`](https://ip2geo.org/intel.php). Its future is an open question (see below).
+The **Community Block List** (`/intel.php`) was retired in v5.0.0 too; see "Community Block List (retired in v5.0.0)" below.
 
 Live at [ip2geo.org](https://ip2geo.org) since 2017. **Picking this up cold? Read [`HANDOFF.md`](HANDOFF.md) first.**
 
@@ -14,10 +12,10 @@ Live at [ip2geo.org](https://ip2geo.org) since 2017. **Picking this up cold? Rea
 
 - **PHP 8.4**: all server-side logic. No framework.
 - **MaxMind GeoLite2-City + GeoLite2-ASN `.mmdb` files**: the lookup reads them with `maxmind-db/reader` (`includes/lookup.php`). Production also has the `php-maxminddb` C extension, which the reader uses automatically. It makes a 10k-IP lookup take ~0.2–0.5 s instead of ~3.5 s.
-- **MySQL / MariaDB**: Community Block List tables, plus the legacy GeoIP integer-range tables (`geoip2_*_current_int`). Nothing in v5 reads the GeoIP tables any more. They are dropped once v5 has run cleanly for a while.
+- **MySQL / MariaDB**: the retired Community Block List tables (kept, nothing reads them), plus the legacy GeoIP integer-range tables (`geoip2_*_current_int`). Nothing in v5 reads the GeoIP tables any more. They are dropped once v5 has run cleanly for a while.
 - **Vanilla JS, no build step**: the v5 workbench (`assets/js/*.js`) extracts IPs in the browser, POSTs only the IPs to `/api/lookup.php`, and renders, filters and exports on the client. Without JS, `index.php` falls back to a server-rendered results table.
 - **Cloudflare** in front of the origin. Rocket Loader is on for the zone, so every `<script>` tag carries `data-cfasync="false"` (enforced by `tests/RocketLoaderOptOutTest.php`), and every asset URL carries `?v=<APP_VERSION>` so a release is never paired with day-old cached JS.
-- **APCu**: `/intel.php` page cache (15-min TTL) and the lookup rate limit (`/api/lookup.php` and the no-JS `POST /`).
+- **APCu**: the lookup rate limit (`/api/lookup.php` and the no-JS `POST /`).
 - **GitHub Actions**: CI/CD (tests → staging → production), monthly GeoLite2 refresh, and Spamhaus DROP / ASN-DROP syncs.
 - **Tests**: PHPUnit, plus Jest and Playwright (dev-only; nothing Node-based is deployed).
 
@@ -58,7 +56,7 @@ cp tests/fixtures/mmdb/GeoLite2-ASN-Test.mmdb data/geoip/GeoLite2-ASN.mmdb
 
 ### Database
 
-Run `scripts/migrate-community.sql` once to create the Community Block List tables:
+v5 needs no database. The tables below belong to the retired Community Block List and are kept for now; `scripts/migrate-community.sql` created them:
 
 | Table | Contents |
 |-------|----------|
@@ -98,18 +96,16 @@ The Spamhaus DROP check lives on in `report_functions.php` and in the lookup's D
 
 ---
 
-## How Community Block List Works
+## Community Block List (retired in v5.0.0)
 
-1. ⚠️ **Currently orphaned.** Consent used to be collected on the Threat Report page, which posted the report's IP list to `community-consent.php`. That page is gone as of v5.0.0, and `community-consent.php` now returns 410 (its ingestion code is in git history). The tables and the `/intel.php` feed are untouched. Open Question 4 is still unresolved: keep the list, fold it into DROP intel, or retire it. New opt-ins can't happen until that is settled.
-2. The consent endpoint ingests IPs, computes CIDR ranges via `geoip2_asn_current_int`, and writes daily rows to `community_cidr_stats` and `community_ip_stats`, deduplicated per user per day.
-3. `/intel.php` queries the rolling 7-day window. A range is listed only if it has:
-   - reports from **3 or more** independent users
-   - a prefix of **/16 or more specific**
-   - hit density of at least **0.1%**
-4. The page is APCu-cached for 15 minutes. Downloads (iptables, ufw, nginx, plain CIDR) bypass the cache.
-5. Nothing is shown until there are at least 5 opted-in reports in the past 7 days.
+The list was fed by opt-ins on the Threat Report page, so it had no source left once reports were retired, and production's list was already empty. The owner retired it in v5.0.0 (IPG-7 option 2A, IPG-23):
 
-Residential IPs are never collected. Data is retained for 52 weeks.
+- `/intel.php` returns a static 410 page for every request, including the old `?format=` download URLs. It never touches the database.
+- `community-consent.php` (the opt-in endpoint) is deleted, so it 404s. The deploy workflow checks that it stays unreachable.
+- The `community_*` tables are **kept** for now. The old page, the consent ingestion code and the CIDR thresholds are in git history (before IPG-23).
+- A DROP-based block list is on the post-release roadmap.
+
+When the legacy tables are cleaned up: the old ingestion code computed CIDR ranges from `geoip2_asn_current_int`, so a revived community list built the old way would need that table.
 
 ---
 
@@ -142,7 +138,7 @@ npx playwright test                              # browser specs; starts php -S 
 | `IndexResultsTest.php`, `SummaryTest.php`, `DropExplainerTest.php` | No-JS results page, summary line, and the DROP explainer text staying identical in PHP and JS |
 | `SampleLogTest.php` | "Try a sample log" never labels a real person's IP |
 | `SpamhausDropTest.php`, `AsnClassificationTest.php` | DROP lookup and generator; ASN classification |
-| `CommunityConsentRetiredTest.php`, `IntelCacheTest.php` | Retired consent endpoint (410) and `/intel.php` cache |
+| `IntelRetiredTest.php` | `/intel.php` 410 (Community Block List retired) |
 | `ReportRetiredTest.php`, `IpValidationTest.php` | `report.php` 410; IP validation |
 | `RocketLoaderOptOutTest.php` | Every script tag carries `data-cfasync="false"` |
 | `tests/js/*.test.js` | Filters, exports, share links, summary, workbench rendering, DROP popover, Recent lookups |

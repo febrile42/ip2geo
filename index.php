@@ -14,8 +14,7 @@ require_once __DIR__ . '/includes/rate-limit.php'; // default_lookup_rate_limite
 if (is_file(__DIR__ . '/config.php')) {
     // Optional in v5: index.php no longer talks to MySQL or Stripe (R17), so
     // the only thing it might still read from here is a GEOIP_MMDB_DIR
-    // override. Other pages (e.g. intel.php) still
-    // require it directly for their own needs.
+    // override.
     require_once __DIR__ . '/config.php';
 }
 
@@ -327,8 +326,6 @@ function render_lookup_results(array $post, string $visitor_ip = '', ?string $ci
     $html .= '<div id="rules-iptables" class="rules-block" style="display:none" aria-label="iptables block rules"><button class="button small copy-rules" data-target="rules-iptables-pre">Copy</button><pre id="rules-iptables-pre"></pre></div>';
     $html .= '<div id="rules-ufw"      class="rules-block" style="display:none" aria-label="ufw deny rules"><button class="button small copy-rules" data-target="rules-ufw-pre">Copy</button><pre id="rules-ufw-pre"></pre></div>';
     $html .= '<div id="rules-nginx"    class="rules-block" style="display:none" aria-label="nginx geo block"><button class="button small copy-rules" data-target="rules-nginx-pre">Copy</button><pre id="rules-nginx-pre"></pre></div>';
-
-    $html .= '<p class="cbl-callout">Block known scanners reported by the ip2geo community. <a href="/intel.php" target="_blank" rel="noopener noreferrer" class="cbl-link">View the Community Block List <span aria-hidden="true">&rarr;</span></a></p>';
 
     $html .= '</div>'; // end #filter-left
 
@@ -707,7 +704,6 @@ if (isset($_POST['ip_list'])) {
 
 					<h3>What It's Grown Into</h3>
 					<p>The free lookup is still here, and it's the whole tool. Paste a log, get a summary line up front &mdash; how much of it is cloud infrastructure, scanning traffic, VPN/proxy exits, or plain residential, plus which ASNs show up the most and how many IPs sit in Spamhaus's DROP list of known-hijacked netblocks.</p>
-					<p>There's also a <a href="/intel.php">Community Block List</a> &mdash; a rolling feed of CIDR ranges reported by opted-in ip2geo users. If you contribute, your data joins the aggregate anonymously. If you just want the list, download it and apply it directly to your firewall.</p>
 
 					<h3>How It Works</h3>
 					<p>Paste any block of text. ip2geo.org scans it for IPv4 and IPv6 addresses, checks them against a geolocation database, and returns results you can filter by country or infrastructure category &mdash; scanning ranges, cloud exit nodes, VPN and proxy infrastructure, or residential traffic. Want to only see scanning infrastructure hits from outside the US? Done. Focus only on what matters.</p>

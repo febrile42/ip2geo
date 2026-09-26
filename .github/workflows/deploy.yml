@@ -128,7 +128,7 @@ jobs:
           FAIL=0
           for P in /scripts/rand_ips.php /scripts/cleanup_report_events.php /scripts/migrate.sql \
                    /migrations/retire_reports_v5.sql /composer.json /vendor/composer/installed.json \
-                   /includes/extract.php /tests/ApiLookupTest.php; do
+                   /includes/extract.php /tests/ApiLookupTest.php /community-consent.php; do
             CODE=$(curl -s -o /dev/null -w "%{http_code}" \
               -H "Host: staging.ip2geo.org" \
               "http://${{ secrets.DEPLOY_HOST }}$P")
@@ -248,7 +248,7 @@ jobs:
           FAIL=0
           for P in /scripts/rand_ips.php /scripts/cleanup_report_events.php /scripts/migrate.sql \
                    /migrations/retire_reports_v5.sql /composer.json /vendor/composer/installed.json \
-                   /includes/extract.php /tests/ApiLookupTest.php; do
+                   /includes/extract.php /tests/ApiLookupTest.php /community-consent.php; do
             CODE=$(curl -s -o /dev/null -w "%{http_code}" \
               -H "Host: ip2geo.org" \
               "http://${{ secrets.DEPLOY_HOST }}$P")
