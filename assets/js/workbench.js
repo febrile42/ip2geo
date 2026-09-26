@@ -76,8 +76,10 @@
   }
 
   function formatLookupTime(ms) {
-    if (ms < 100) return '<0.1 s';
-    return (ms / 1000).toFixed(1) + ' s';
+    var r = Math.round(ms);
+    if (r < 1) return '<1 ms';
+    if (r < 1000) return r + ' ms';
+    return (ms / 1000).toFixed(2) + ' s';
   }
 
   // Single source of truth for the "N IPv4 / M IPv6" phrasing so the paste
@@ -614,7 +616,7 @@
     if (!state.recipient) {
       bar.appendChild(el('button', { type: 'button', class: 'button small', 'aria-controls': 'message', onclick: onEdit }, ['Edit paste']));
     }
-    if (m.lookupMs != null) {
+    if (m.lookupMs != null && isFinite(m.lookupMs) && m.lookupMs >= 0) {
       bar.appendChild(el('span', { class: 'wb-paste-time' }, ['looked up in ' + formatLookupTime(m.lookupMs)]));
     }
 

@@ -602,13 +602,19 @@ describe('renderUnresolved (bug: "Show N unresolved" never appeared)', () => {
   });
 });
 
-describe('formatLookupTime (bug: always showed "0.0 s" for sub-100ms lookups)', () => {
-  test('shows "<0.1 s" under 100ms', () => {
-    expect(WB.formatLookupTime(42)).toBe('<0.1 s');
-  });
-  test('shows one decimal place at and above 100ms', () => {
-    expect(WB.formatLookupTime(342)).toBe('0.3 s');
-    expect(WB.formatLookupTime(1000)).toBe('1.0 s');
+describe('formatLookupTime (IPG-91: ms precision under 1s, NBSP unit separator)', () => {
+  test.each([
+    [0, '<1 ms'],
+    [0.4, '<1 ms'],
+    [0.5, '1 ms'],
+    [43.4, '43 ms'],
+    [480, '480 ms'],
+    [999.4, '999 ms'],
+    [999.5, '1.00 s'],
+    [1240, '1.24 s'],
+    [12300, '12.30 s']
+  ])('formats %p as %p', (ms, expected) => {
+    expect(WB.formatLookupTime(ms)).toBe(expected);
   });
 });
 
@@ -717,6 +723,13 @@ describe('renderPasteBar (IPG-38: New lookup removed, Edit paste kept; IPG-39: p
     state.pasteMeta = { lines: 2, v4: 3, v6: 2, overCap: false, lookupMs: null, rawText: '' };
     WB.renderPasteBar(root, state, () => {});
     expect(root.querySelectorAll('.wb-overcap').length).toBe(0);
+  });
+
+  test.each([NaN, -5, Infinity])('omits .wb-paste-time when lookupMs is %p', (lookupMs) => {
+    var state = WB.makeState();
+    state.pasteMeta = { lines: 1, v4: 1, v6: 0, overCap: false, lookupMs: lookupMs, rawText: '' };
+    WB.renderPasteBar(root, state, () => {});
+    expect(root.querySelector('.wb-paste-time')).toBeNull();
   });
 });
 
