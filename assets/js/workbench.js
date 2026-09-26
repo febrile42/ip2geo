@@ -696,8 +696,12 @@
       return resp.json().then(function (data) {
         state.rows = buildRows(data.results || [], hitCounts);
         state.unresolved = data.unresolved || [];
-        var finishedAt = (window.performance && performance.now) ? performance.now() : Date.now();
-        meta.lookupMs = finishedAt - startedAt;
+        // A share-link recipient doesn't see the timer (IPG-96): their
+        // re-lookup time says nothing about the sender's paste.
+        if (!state.recipient) {
+          var finishedAt = (window.performance && performance.now) ? performance.now() : Date.now();
+          meta.lookupMs = finishedAt - startedAt;
+        }
         state.pasteMeta = meta;
         clearState(root);
         renderPasteBar(root, state, root._wbOnEdit);
