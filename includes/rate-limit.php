@@ -4,10 +4,14 @@
  * index.php's no-JS POST path (IPG-17).
  *
  * Buckets: each entry point has its own APCu key prefix, so the limit is
- * 60 requests/minute per client IP *per path*:
+ * 60 requests/minute per client *per path*:
  *
- *   api/lookup.php      'lookup_rate:<ip>'       (LOOKUP_RATE_BUCKET_API)
- *   index.php POST /    'lookup_rate_nojs:<ip>'  (LOOKUP_RATE_BUCKET_NOJS)
+ *   api/lookup.php      'lookup_rate:<key>'       (LOOKUP_RATE_BUCKET_API)
+ *   index.php POST /    'lookup_rate_nojs:<key>'  (LOOKUP_RATE_BUCKET_NOJS)
+ *
+ * <key> is rate_limit_key($clientIp): the IPv4 address as is, or the /64
+ * prefix for IPv6 (IPG-21), since one IPv6 client usually holds a whole /64
+ * and could otherwise take a fresh bucket per request.
  *
  * Separate buckets because a real visitor only ever uses one of the two (JS
  * on or off), and it keeps the CI functional + perf POSTs to / (two per
@@ -34,9 +38,32 @@ const LOOKUP_RATE_BUCKET_API  = 'lookup_rate';
 const LOOKUP_RATE_BUCKET_NOJS = 'lookup_rate_nojs';
 
 /**
+ * The client identity a rate-limit bucket is keyed on (IPG-21). IPv4 comes
+ * back unchanged; IPv4-mapped IPv6 (::ffff:a.b.c.d) is treated as that IPv4;
+ * any other IPv6 address becomes its /64, e.g. '2001:db8:1:2::/64'.
+ * Anything that isn't an IP (shouldn't happen for REMOTE_ADDR) is returned
+ * as is, so it still gets its own bucket.
+ *
+ * Residual (accepted): a client holding many /64s, e.g. a /48, still gets
+ * one bucket per /64.
+ */
+function rate_limit_key(string $ip): string
+{
+    $packed = @inet_pton($ip);
+    if ($packed === false || strlen($packed) !== 16) {
+        return $ip;
+    }
+    if (strncmp($packed, str_repeat("\0", 10) . "\xff\xff", 12) === 0) {
+        return (string) inet_ntop(substr($packed, 12));
+    }
+    return inet_ntop(substr($packed, 0, 8) . str_repeat("\0", 8)) . '/64';
+}
+
+/**
  * Default rate limiter: the APCu increment-then-add-fallback pattern from
  * get-report.php:41-54, keyed per client IP instead of per free-report
- * token. Gracefully returns "not limited" if APCu isn't loaded (matches
+ * token (via rate_limit_key(), so an IPv6 /64 shares one bucket).
+ * Gracefully returns "not limited" if APCu isn't loaded (matches
  * get-report.php's function_exists guard).
  *
  * @return array{limited: bool, retry_after: int}
@@ -47,7 +74,7 @@ function default_lookup_rate_limiter(string $clientIp, string $bucket = LOOKUP_R
         return ['limited' => false, 'retry_after' => 0];
     }
 
-    $key     = $bucket . ':' . $clientIp;
+    $key     = $bucket . ':' . rate_limit_key($clientIp);
     $success = false;
     $count   = apcu_inc($key, 1, $success);
     if (!$success) {
