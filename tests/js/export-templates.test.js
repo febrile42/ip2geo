@@ -121,3 +121,29 @@ describe('toast text', () => {
     expect(Exp.toastText('spl', makeRows(3))).toBe('Copied 3 rows as SPL');
   });
 });
+
+// IPG-10 S1 (CWE-1236): city/ASN org are third-party data, so a cell that a
+// spreadsheet would read as a formula is prefixed with ' in CSV and TSV.
+describe('CSV/TSV formula injection', () => {
+  test.each(['=HYPERLINK("http://x","y")', '+1', '-2+3', '@SUM(A1)', '\tx', '\rx', '\nx'])('neutralizes %j', (v) => {
+    expect(Exp.csvEscape(v).replace(/^"/, '').startsWith("'")).toBe(true);
+    expect(Exp.tsvEscape(v).startsWith("'")).toBe(true);
+  });
+
+  test('=HYPERLINK(...) comes out as \'=HYPERLINK(...)', () => {
+    expect(Exp.csvEscape('=HYPERLINK("http://x","y")')).toBe('"\'=HYPERLINK(""http://x"",""y"")"');
+    expect(Exp.tsvEscape('=HYPERLINK(1)')).toBe("'=HYPERLINK(1)");
+  });
+
+  test('ordinary values, IPv6 and numbers pass through unchanged', () => {
+    ['Fremont', '2001:db8::1', 'AS14061', 3, '', null].forEach((v) => {
+      expect(Exp.csvEscape(v)).toBe(v == null ? '' : String(v));
+    });
+  });
+
+  test('buildExport csv and tsv neutralize a hostile ASN org', () => {
+    var rows = [{ ip: '1.1.1.1', country: 'US', region: 'CA', city: '@evil', asn: 'AS1', asnOrg: '=cmd|x', category: 'cloud', hits: 1, drop: false }];
+    expect(Exp.buildExport('csv', rows).split('\r\n')[1]).toBe("1.1.1.1,US,CA,'@evil,AS1,'=cmd|x,cloud,1,");
+    expect(Exp.buildExport('tsv', rows).split('\r\n')[1]).toBe("1.1.1.1\tUS\tCA\t'@evil\tAS1\t'=cmd|x\tcloud\t1\t");
+  });
+});
