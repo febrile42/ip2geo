@@ -418,57 +418,189 @@ describe('relativeTime', () => {
 
 function buildDOM() {
     document.body.innerHTML = `
-        <div id="recent-lookups" hidden>
-            <div id="recent-lookups-header">
-                <h3>Recent lookups</h3>
-                <button type="button" id="recent-lookups-clear" class="button small">Clear</button>
+        <div id="workbench-root"></div>
+        <form id="iplookup">
+            <textarea id="message"></textarea>
+            <div class="actions-row">
+                <input type="submit" class="button submit" value="Look Up IP Addresses" />
+                <button type="button" id="rl-recent-btn" class="button alt rl-recent-btn"
+                        aria-haspopup="menu" aria-expanded="false" aria-controls="rl-menu" hidden>
+                    Recent <span aria-hidden="true">▾</span>
+                </button>
+                <div id="rl-menu" class="wb-menu rl-menu" role="menu" aria-labelledby="rl-recent-btn" hidden></div>
             </div>
-            <ul id="recent-lookups-list"></ul>
-        </div>
-        <textarea id="message"></textarea>
-        <label id="rl-optin-row" class="opt-in-toggle" hidden>
-            <input type="checkbox" id="rl-optin">
-        </label>
+            <div id="rl-optin-row" class="opt-in-toggle" hidden>
+                <label class="opt-in">
+                    <input type="checkbox" id="rl-optin">
+                </label>
+            </div>
+        </form>
         <div id="rl-toast" role="status" aria-live="polite" hidden>
             <span id="rl-toast-msg"></span>
             <button type="button" id="rl-toast-undo">Undo</button>
         </div>
     `;
+    // jsdom doesn't implement real form submission; workbench.js's own submit
+    // listener always calls preventDefault(), so mirror that here to avoid
+    // its "not implemented: HTMLFormElement.prototype.submit" console noise.
+    document.getElementById('iplookup').addEventListener('submit', (e) => e.preventDefault());
 }
 
-// Mirror of the production renderList() + handlers, attached to the test DOM
+// Mirror of the production RL module in assets/js/ip2geo-app.js (menu render,
+// open/close/keyboard, select/clear handlers, toast). Kept in lockstep with
+// the real implementation; storage helpers above are the shared source.
 function attachHandlers() {
     let toastTimer = null;
     let pendingUndo = null;
+    let pendingUndoTracked = true;
+    let btn = null;
+    let menu = null;
 
-    function renderList() {
-        const widget = document.getElementById('recent-lookups');
-        const listEl = document.getElementById('recent-lookups-list');
-        if (!widget || !listEl) return;
-        const optIn = loadOptInState();
+    function lastRawText() {
+        const root = document.getElementById('workbench-root');
+        return (root && typeof root._wbLastRawText === 'function') ? root._wbLastRawText() : '';
+    }
+
+    function menuItems() {
+        return menu ? Array.from(menu.querySelectorAll('.wb-menu-item')) : [];
+    }
+
+    function renderMenu() {
+        menu.innerHTML = '';
+        const listWrap = document.createElement('div');
+        listWrap.className = 'rl-menu-list';
+        listWrap.setAttribute('role', 'group');
+        listWrap.setAttribute('aria-label', 'Saved lookups');
+        menu.appendChild(listWrap);
+
         const items = loadList();
-        if (!optIn || !items.length) {
-            widget.hidden = true;
-            listEl.innerHTML = '';
+
+        if (!items.length) {
+            const empty = document.createElement('button');
+            empty.type = 'button';
+            empty.className = 'wb-menu-item';
+            empty.setAttribute('role', 'menuitem');
+            empty.setAttribute('tabindex', '-1');
+            empty.setAttribute('aria-disabled', 'true');
+            const head = document.createElement('span');
+            head.textContent = 'No saved lookups yet';
+            const note = document.createElement('span');
+            note.className = 'wb-menu-note';
+            note.textContent = 'Lookups you run are saved here, in this browser only.';
+            empty.appendChild(head);
+            empty.appendChild(note);
+            listWrap.appendChild(empty);
             return;
         }
-        widget.hidden = false;
-        listEl.innerHTML = '';
+
         const now = Date.now();
         items.slice().reverse().forEach((entry, revIdx) => {
             const origIdx = items.length - 1 - revIdx;
-            const li = document.createElement('li');
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'recent-lookup-item';
-            btn.dataset.idx = String(origIdx);
-            btn.textContent = `${entry.count} IPs`;
-            li.appendChild(btn);
-            listEl.appendChild(li);
+            const itemBtn = document.createElement('button');
+            itemBtn.type = 'button';
+            itemBtn.className = 'wb-menu-item';
+            itemBtn.setAttribute('role', 'menuitem');
+            itemBtn.setAttribute('tabindex', '-1');
+            itemBtn.dataset.idx = String(origIdx);
+
+            const head = document.createElement('span');
+            head.className = 'rl-item-head';
+            const countEl = document.createElement('span');
+            countEl.className = 'recent-lookup-count';
+            countEl.textContent = `${entry.count.toLocaleString()} IP${entry.count !== 1 ? 's' : ''}`;
+            const timeEl = document.createElement('span');
+            timeEl.className = 'recent-lookup-time';
+            timeEl.textContent = relativeTime(entry.ts, now);
+            head.appendChild(countEl);
+            head.appendChild(timeEl);
+
+            let preview = entry.ips.slice(0, 3).join(', ');
+            if (entry.count > 3) preview += `, +${(entry.count - 3).toLocaleString()} more`;
+            const previewEl = document.createElement('span');
+            previewEl.className = 'wb-menu-note rl-item-preview';
+            previewEl.textContent = preview;
+
+            itemBtn.appendChild(head);
+            itemBtn.appendChild(previewEl);
+            listWrap.appendChild(itemBtn);
         });
+
+        const sep = document.createElement('div');
+        sep.className = 'rl-menu-sep';
+        sep.setAttribute('role', 'separator');
+        menu.appendChild(sep);
+
+        const clearBtn = document.createElement('button');
+        clearBtn.type = 'button';
+        clearBtn.className = 'wb-menu-item rl-menu-clear';
+        clearBtn.setAttribute('role', 'menuitem');
+        clearBtn.setAttribute('tabindex', '-1');
+        clearBtn.textContent = 'Clear saved lookups';
+        menu.appendChild(clearBtn);
     }
 
-    function showToast(message, undoFn) {
+    function syncButtonVisibility() {
+        if (btn) btn.hidden = !loadOptInState();
+    }
+
+    function openMenu() {
+        renderMenu();
+        menu.hidden = false;
+        btn.setAttribute('aria-expanded', 'true');
+        const first = menuItems()[0];
+        if (first) first.focus();
+        document.addEventListener('click', onDocClick, true);
+    }
+
+    function closeMenu(returnFocus) {
+        menu.hidden = true;
+        btn.setAttribute('aria-expanded', 'false');
+        document.removeEventListener('click', onDocClick, true);
+        if (returnFocus) btn.focus();
+    }
+
+    function onDocClick(event) {
+        if (!btn.contains(event.target) && !menu.contains(event.target)) closeMenu();
+    }
+
+    function onMenuKeydown(event) {
+        const list = menuItems();
+        const idx = list.indexOf(document.activeElement);
+        if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            list[(idx + 1) % list.length].focus();
+        } else if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            list[(idx - 1 + list.length) % list.length].focus();
+        } else if (event.key === 'Home') {
+            event.preventDefault();
+            list[0].focus();
+        } else if (event.key === 'End') {
+            event.preventDefault();
+            list[list.length - 1].focus();
+        } else if (event.key === 'Escape') {
+            event.preventDefault();
+            closeMenu(true);
+        } else if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            document.activeElement.click();
+        } else if (event.key === 'Tab') {
+            closeMenu();
+        }
+    }
+
+    function onMenuClick(event) {
+        const itemBtn = event.target.closest && event.target.closest('.wb-menu-item');
+        if (!itemBtn || itemBtn.getAttribute('aria-disabled') === 'true') return;
+        if (itemBtn.classList.contains('rl-menu-clear')) {
+            handleClear();
+            return;
+        }
+        const idx = parseInt(itemBtn.dataset.idx, 10);
+        if (!isNaN(idx)) handleSelect(idx);
+    }
+
+    function showToast(message, undoFn, trackUndo) {
         const toast = document.getElementById('rl-toast');
         const msgEl = document.getElementById('rl-toast-msg');
         if (!toast || !msgEl) return;
@@ -479,6 +611,7 @@ function attachHandlers() {
         }
         msgEl.textContent = message;
         pendingUndo = undoFn;
+        pendingUndoTracked = trackUndo !== false;
         toast.hidden = false;
         toast.classList.add('rl-toast-visible');
         toastTimer = setTimeout(() => hideToast(false), TOAST_TIMEOUT_MS);
@@ -489,8 +622,12 @@ function attachHandlers() {
         if (!toast) return;
         if (viaUndo && typeof pendingUndo === 'function') {
             try { pendingUndo(); } catch (_) {}
+            if (pendingUndoTracked) {
+                try { window.umami && window.umami.track('recent_lookups_undo'); } catch (_) {}
+            }
         }
         pendingUndo = null;
+        pendingUndoTracked = true;
         if (toastTimer) {
             clearTimeout(toastTimer);
             toastTimer = null;
@@ -503,78 +640,112 @@ function attachHandlers() {
         const checked = event.target.checked;
         if (checked) {
             saveOptInState(true);
-            renderList();
+            try { window.umami && window.umami.track('recent_lookups_optin'); } catch (_) {}
+            syncButtonVisibility();
             return;
         }
         const listSnapshot = loadList();
         if (!listSnapshot.length) {
             saveOptInState(false);
-            renderList();
+            try { window.umami && window.umami.track('recent_lookups_optout'); } catch (_) {}
+            syncButtonVisibility();
             return;
         }
         saveOptInState(false);
         clearList();
-        renderList();
-        showToast(`Cleared ${listSnapshot.length} lookups.`, () => {
+        syncButtonVisibility();
+        closeMenu();
+        showToast(`Saving turned off. Cleared ${listSnapshot.length} saved lookup${listSnapshot.length !== 1 ? 's' : ''}.`, () => {
             saveOptInState(true);
             saveList(listSnapshot);
-            renderList();
+            syncButtonVisibility();
             const optInEl = document.getElementById('rl-optin');
             if (optInEl) optInEl.checked = true;
         });
+        setTimeout(() => {
+            if (!loadOptInState()) {
+                try { window.umami && window.umami.track('recent_lookups_optout'); } catch (_) {}
+            }
+        }, TOAST_TIMEOUT_MS + 50);
     }
 
-    function handleClearClick() {
+    function handleClear() {
         const listSnapshot = loadList();
+        closeMenu(true);
         if (!listSnapshot.length) return;
         clearList();
-        renderList();
-        showToast(`Cleared ${listSnapshot.length} lookups.`, () => {
+        showToast(`Cleared ${listSnapshot.length} saved lookup${listSnapshot.length !== 1 ? 's' : ''}.`, () => {
             saveList(listSnapshot);
-            renderList();
         });
+        setTimeout(() => {
+            if (!loadList().length) {
+                try { window.umami && window.umami.track('recent_lookups_clear'); } catch (_) {}
+            }
+        }, TOAST_TIMEOUT_MS + 50);
     }
 
-    function handleListClick(event) {
-        const btn = event.target.closest && event.target.closest('.recent-lookup-item');
-        if (!btn) return;
-        const idx = parseInt(btn.dataset.idx, 10);
-        if (isNaN(idx)) return;
+    function handleSelect(idx) {
         const items = loadList();
         const entry = items[idx];
         if (!entry) return;
         const textarea = document.getElementById('message');
-        if (!textarea) return;
-        textarea.value = entry.ips.join('\n');
+        const form = document.getElementById('iplookup');
+        if (!textarea || !form) return;
+
         try { window.umami && window.umami.track('recent_lookups_use'); } catch (_) {}
+        closeMenu(true);
+
+        const priorText = textarea.value;
+        const isUnsent = priorText !== '' && priorText !== lastRawText();
+
+        textarea.value = entry.ips.join('\n');
+        form.requestSubmit();
+
+        if (isUnsent) {
+            showToast('Replaced your unsent paste.', () => {
+                textarea.value = priorText;
+            }, false);
+        }
     }
 
     function handleLookupSubmit(event) {
         const detail = event.detail || {};
         appendLookup(detail.ips, detail.count);
-        renderList();
     }
 
-    const row = document.getElementById('rl-optin-row');
-    const optInEl = document.getElementById('rl-optin');
-    if (row && optInEl) {
-        if (isStorageAvailable()) row.hidden = false;
-        optInEl.checked = loadOptInState();
-        optInEl.addEventListener('change', handleToggleChange);
+    // Mirrors production's early `if (!isStorageAvailable()) return;`: the
+    // toggle row and Recent button are never touched when storage is blocked.
+    if (isStorageAvailable()) {
+        const row = document.getElementById('rl-optin-row');
+        const optInEl = document.getElementById('rl-optin');
+        btn = document.getElementById('rl-recent-btn');
+        menu = document.getElementById('rl-menu');
+        if (row && optInEl && btn && menu) {
+            row.hidden = false;
+            optInEl.checked = loadOptInState();
+            syncButtonVisibility();
+            optInEl.addEventListener('change', handleToggleChange);
+            btn.addEventListener('click', () => {
+                if (menu.hidden) openMenu(); else closeMenu();
+            });
+            btn.addEventListener('keydown', (event) => {
+                if (event.key === 'ArrowDown' || event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    openMenu();
+                }
+            });
+            menu.addEventListener('keydown', onMenuKeydown);
+            menu.addEventListener('click', onMenuClick);
+        }
     }
-    const clearBtn = document.getElementById('recent-lookups-clear');
-    if (clearBtn) clearBtn.addEventListener('click', handleClearClick);
-    const listEl = document.getElementById('recent-lookups-list');
-    if (listEl) listEl.addEventListener('click', handleListClick);
     const undoBtn = document.getElementById('rl-toast-undo');
     if (undoBtn) undoBtn.addEventListener('click', () => hideToast(true));
     document.addEventListener('ip2geo:lookup_submit', handleLookupSubmit);
 
-    renderList();
     return {
-        renderList,
-        showToast,
-        hideToast,
+        openMenu,
+        closeMenu,
+        handleSelect,
         detach: () => {
             document.removeEventListener('ip2geo:lookup_submit', handleLookupSubmit);
         }
@@ -595,30 +766,73 @@ describe('handleToggleChange', () => {
         jest.useRealTimers();
     });
 
-    test('checking the toggle saves opt-in and reveals widget when nonempty', () => {
+    test('checking the toggle saves opt-in and shows the Recent button', () => {
         const cb = document.getElementById('rl-optin');
         cb.checked = true;
         cb.dispatchEvent(new Event('change'));
         expect(loadOptInState()).toBe(true);
+        expect(document.getElementById('rl-recent-btn').hidden).toBe(false);
     });
 
-    test('unchecking with empty list: silent off, no toast', () => {
+    test('unchecking with empty list: silent off, no toast, Recent hidden', () => {
         saveOptInState(true);
         const cb = document.getElementById('rl-optin');
         cb.checked = false;
         cb.dispatchEvent(new Event('change'));
         expect(loadOptInState()).toBe(false);
         expect(document.getElementById('rl-toast').hidden).toBe(true);
+        expect(document.getElementById('rl-recent-btn').hidden).toBe(true);
     });
 
-    test('unchecking with nonempty list: clears + shows toast', () => {
+    test('unchecking with nonempty list: clears, hides Recent, shows toast with new copy', () => {
         saveOptInState(true);
         saveList([{ ips: ['1.1.1.1'], count: 1, ts: 100 }]);
         const cb = document.getElementById('rl-optin');
         cb.checked = false;
         cb.dispatchEvent(new Event('change'));
         expect(loadList()).toEqual([]);
+        expect(document.getElementById('rl-recent-btn').hidden).toBe(true);
         expect(document.getElementById('rl-toast').hidden).toBe(false);
+        expect(document.getElementById('rl-toast-msg').textContent).toBe('Saving turned off. Cleared 1 saved lookup.');
+    });
+
+    test('unchecking with a plural list uses plural copy', () => {
+        saveOptInState(true);
+        saveList([{ ips: ['1.1.1.1'], count: 1, ts: 100 }, { ips: ['2.2.2.2'], count: 1, ts: 200 }]);
+        const cb = document.getElementById('rl-optin');
+        cb.checked = false;
+        cb.dispatchEvent(new Event('change'));
+        expect(document.getElementById('rl-toast-msg').textContent).toBe('Saving turned off. Cleared 2 saved lookups.');
+    });
+
+    test('Undo after opt-out restores the list, the toggle, and the Recent button (acceptance 10)', () => {
+        saveOptInState(true);
+        saveList([{ ips: ['1.1.1.1'], count: 1, ts: 100 }]);
+        const cb = document.getElementById('rl-optin');
+        cb.checked = false;
+        cb.dispatchEvent(new Event('change'));
+        document.getElementById('rl-toast-undo').click();
+        expect(loadList()).toHaveLength(1);
+        expect(loadOptInState()).toBe(true);
+        expect(cb.checked).toBe(true);
+        expect(document.getElementById('rl-recent-btn').hidden).toBe(false);
+    });
+
+    test('re-ticking after an opt-out clear shows Recent with the empty state (acceptance 10/11)', () => {
+        saveOptInState(true);
+        saveList([{ ips: ['1.1.1.1'], count: 1, ts: 100 }]);
+        const cb = document.getElementById('rl-optin');
+        cb.checked = false;
+        cb.dispatchEvent(new Event('change'));
+        jest.advanceTimersByTime(TOAST_TIMEOUT_MS + 100); // commit, no undo
+        cb.checked = true;
+        cb.dispatchEvent(new Event('change'));
+        expect(document.getElementById('rl-recent-btn').hidden).toBe(false);
+        __handlers.openMenu();
+        const items = document.querySelectorAll('#rl-menu .wb-menu-item');
+        expect(items.length).toBe(1);
+        expect(items[0].getAttribute('aria-disabled')).toBe('true');
+        expect(items[0].textContent).toContain('No saved lookups yet');
     });
 });
 
@@ -648,19 +862,6 @@ describe('toast with undo', () => {
         expect(document.getElementById('rl-toast-msg').textContent).toMatch(/Cleared 1/);
     });
 
-    test('clicking Undo restores list and re-checks toggle', () => {
-        saveOptInState(true);
-        saveList([{ ips: ['1.1.1.1'], count: 1, ts: 100 }]);
-        const cb = document.getElementById('rl-optin');
-        cb.checked = false;
-        cb.dispatchEvent(new Event('change'));
-        document.getElementById('rl-toast-undo').click();
-        expect(loadList()).toHaveLength(1);
-        expect(loadOptInState()).toBe(true);
-        expect(cb.checked).toBe(true);
-        expect(document.getElementById('rl-toast').hidden).toBe(true);
-    });
-
     test('timeout commits the action (toast hides, list stays cleared)', () => {
         saveOptInState(true);
         saveList([{ ips: ['1.1.1.1'], count: 1, ts: 100 }]);
@@ -679,12 +880,176 @@ describe('toast with undo', () => {
     });
 });
 
-// ── Clear button ─────────────────────────────────────────────────────────────
+// ── Menu open/close and keyboard (acceptance criteria 3, 4) ──────────────────
 
-describe('clear button flow', () => {
+describe('menu open/close and keyboard', () => {
     let __handlers;
     beforeEach(() => {
         buildDOM();
+        saveOptInState(true);
+        saveList([
+            { ips: ['1.1.1.1'], count: 1, ts: 100 },
+            { ips: ['2.2.2.2'], count: 1, ts: 200 },
+        ]);
+        __handlers = attachHandlers();
+    });
+    afterEach(() => {
+        if (__handlers && __handlers.detach) __handlers.detach();
+    });
+
+    test('clicking Recent opens the menu, sets aria-expanded, and focuses the first item', () => {
+        const btn = document.getElementById('rl-recent-btn');
+        btn.click();
+        expect(document.getElementById('rl-menu').hidden).toBe(false);
+        expect(btn.getAttribute('aria-expanded')).toBe('true');
+        expect(document.activeElement.classList.contains('wb-menu-item')).toBe(true);
+    });
+
+    test('a second click closes the menu and resets aria-expanded', () => {
+        const btn = document.getElementById('rl-recent-btn');
+        btn.click();
+        btn.click();
+        expect(document.getElementById('rl-menu').hidden).toBe(true);
+        expect(btn.getAttribute('aria-expanded')).toBe('false');
+    });
+
+    test('Escape closes the menu and returns focus to Recent', () => {
+        const btn = document.getElementById('rl-recent-btn');
+        btn.click();
+        document.getElementById('rl-menu').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        expect(document.getElementById('rl-menu').hidden).toBe(true);
+        expect(document.activeElement).toBe(btn);
+    });
+
+    test('Tab closes the menu without forcing focus back to Recent', () => {
+        const btn = document.getElementById('rl-recent-btn');
+        btn.click();
+        document.getElementById('rl-menu').dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+        expect(document.getElementById('rl-menu').hidden).toBe(true);
+    });
+
+    test('a click outside the menu closes it', () => {
+        document.getElementById('rl-recent-btn').click();
+        document.body.click();
+        expect(document.getElementById('rl-menu').hidden).toBe(true);
+    });
+
+    test('ArrowDown/ArrowUp wrap, with Clear as the last stop', () => {
+        document.getElementById('rl-recent-btn').click();
+        const menu = document.getElementById('rl-menu');
+        const items = () => Array.from(menu.querySelectorAll('.wb-menu-item'));
+        expect(items().length).toBe(3); // 2 entries + Clear
+        expect(document.activeElement).toBe(items()[0]);
+
+        menu.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+        expect(document.activeElement).toBe(items()[items().length - 1]);
+        expect(document.activeElement.classList.contains('rl-menu-clear')).toBe(true);
+
+        menu.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+        expect(document.activeElement).toBe(items()[0]);
+    });
+
+    test('Home/End jump to the first and last item', () => {
+        document.getElementById('rl-recent-btn').click();
+        const menu = document.getElementById('rl-menu');
+        const items = Array.from(menu.querySelectorAll('.wb-menu-item'));
+        menu.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
+        expect(document.activeElement).toBe(items[items.length - 1]);
+        menu.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
+        expect(document.activeElement).toBe(items[0]);
+    });
+
+    test('Enter/Space/ArrowDown on Recent opens the menu with focus on the first item', () => {
+        const btn = document.getElementById('rl-recent-btn');
+        btn.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }));
+        expect(document.getElementById('rl-menu').hidden).toBe(false);
+        expect(document.activeElement).toBe(document.querySelectorAll('#rl-menu .wb-menu-item')[0]);
+    });
+});
+
+// ── Empty state (acceptance criteria 11) ──────────────────────────────────────
+
+describe('empty state', () => {
+    let __handlers;
+    beforeEach(() => {
+        buildDOM();
+        saveOptInState(true);
+        __handlers = attachHandlers();
+    });
+    afterEach(() => {
+        if (__handlers && __handlers.detach) __handlers.detach();
+    });
+
+    test('shows one disabled item, no separator and no Clear item', () => {
+        document.getElementById('rl-recent-btn').click();
+        const menu = document.getElementById('rl-menu');
+        const items = menu.querySelectorAll('.wb-menu-item');
+        expect(items.length).toBe(1);
+        expect(items[0].getAttribute('aria-disabled')).toBe('true');
+        expect(items[0].textContent).toContain('No saved lookups yet');
+        expect(items[0].textContent).toContain('Lookups you run are saved here, in this browser only.');
+        expect(menu.querySelectorAll('.rl-menu-sep').length).toBe(0);
+        expect(menu.querySelectorAll('.rl-menu-clear').length).toBe(0);
+    });
+
+    test('the disabled item is focusable, and Enter/Space on it does nothing', () => {
+        window.umami = { track: jest.fn() };
+        document.getElementById('rl-recent-btn').click();
+        expect(document.activeElement.getAttribute('aria-disabled')).toBe('true');
+        document.getElementById('rl-menu').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+        expect(window.umami.track).not.toHaveBeenCalled();
+        expect(document.getElementById('rl-menu').hidden).toBe(false); // still open, nothing happened
+        delete window.umami;
+    });
+});
+
+// ── Menu contents (acceptance criteria 6) ─────────────────────────────────────
+
+describe('menu entry contents', () => {
+    let __handlers;
+    beforeEach(() => {
+        buildDOM();
+        saveOptInState(true);
+    });
+    afterEach(() => {
+        if (__handlers && __handlers.detach) __handlers.detach();
+    });
+
+    test('shows count, age and a 3-IP preview; no "+N more" at exactly 3 IPs', () => {
+        saveList([{ ips: ['192.0.2.10', '198.51.100.7', '203.0.113.44'], count: 3, ts: Date.now() - 2 * 3600 * 1000 }]);
+        __handlers = attachHandlers();
+        document.getElementById('rl-recent-btn').click();
+        const item = document.querySelector('#rl-menu .wb-menu-item');
+        expect(item.querySelector('.recent-lookup-count').textContent).toBe('3 IPs');
+        expect(item.querySelector('.recent-lookup-time').textContent).toBe('2 hr ago');
+        expect(item.querySelector('.rl-item-preview').textContent).toBe('192.0.2.10, 198.51.100.7, 203.0.113.44');
+    });
+
+    test('appends "+N more" (localised) beyond the first 3 IPs', () => {
+        saveList([{ ips: ['192.0.2.10', '198.51.100.7', '203.0.113.44', '9.9.9.9'], count: 10000, ts: Date.now() }]);
+        __handlers = attachHandlers();
+        document.getElementById('rl-recent-btn').click();
+        const item = document.querySelector('#rl-menu .wb-menu-item');
+        expect(item.querySelector('.recent-lookup-count').textContent).toBe('10,000 IPs');
+        expect(item.querySelector('.rl-item-preview').textContent).toBe('192.0.2.10, 198.51.100.7, 203.0.113.44, +9,997 more');
+    });
+
+    test('singular "1 IP" for a single-address entry', () => {
+        saveList([{ ips: ['8.8.8.8'], count: 1, ts: Date.now() }]);
+        __handlers = attachHandlers();
+        document.getElementById('rl-recent-btn').click();
+        expect(document.querySelector('.recent-lookup-count').textContent).toBe('1 IP');
+    });
+});
+
+// ── Selecting a menu entry (acceptance criteria 7, 8) ─────────────────────────
+
+describe('selecting a menu entry', () => {
+    let __handlers;
+    beforeEach(() => {
+        buildDOM();
+        saveOptInState(true);
+        saveList([{ ips: ['1.1.1.1', '2.2.2.2'], count: 2, ts: 100 }]);
         __handlers = attachHandlers();
         jest.useFakeTimers();
     });
@@ -693,80 +1058,113 @@ describe('clear button flow', () => {
         jest.useRealTimers();
     });
 
-    test('clears list and shows toast when list nonempty', () => {
-        saveOptInState(true);
-        saveList([{ ips: ['1.1.1.1'], count: 1, ts: 100 }]);
-        document.getElementById('recent-lookups-clear').click();
-        expect(loadList()).toEqual([]);
-        expect(document.getElementById('rl-toast').hidden).toBe(false);
+    test('fills the textarea, runs the lookup via form.requestSubmit(), fires recent_lookups_use once, and closes the menu', () => {
+        window.umami = { track: jest.fn() };
+        const form = document.getElementById('iplookup');
+        const submitSpy = jest.fn((e) => e.preventDefault());
+        form.addEventListener('submit', submitSpy);
+
+        document.getElementById('rl-recent-btn').click();
+        document.querySelector('#rl-menu .wb-menu-item[data-idx="0"]').click();
+
+        const textarea = document.getElementById('message');
+        expect(textarea.value).toBe('1.1.1.1\n2.2.2.2');
+        expect(submitSpy).toHaveBeenCalledTimes(1);
+        expect(window.umami.track).toHaveBeenCalledTimes(1);
+        expect(window.umami.track).toHaveBeenCalledWith('recent_lookups_use');
+        expect(document.getElementById('rl-menu').hidden).toBe(true);
+        expect(document.activeElement).toBe(document.getElementById('rl-recent-btn'));
+        delete window.umami;
     });
 
-    test('Undo restores list, opt-in stays on', () => {
+    test('moving an entry to the top: re-running via ip2geo:lookup_submit dedupes onto one entry', () => {
+        document.getElementById('rl-recent-btn').click();
+        document.querySelector('#rl-menu .wb-menu-item[data-idx="0"]').click();
+        // The workbench fires this event once the (mocked) lookup succeeds.
+        document.dispatchEvent(new CustomEvent('ip2geo:lookup_submit', {
+            detail: { ips: ['1.1.1.1', '2.2.2.2'], count: 2 }
+        }));
+        expect(loadList()).toHaveLength(1);
+    });
+
+    test('no toast when the textarea was empty before selecting', () => {
+        document.getElementById('rl-recent-btn').click();
+        document.querySelector('#rl-menu .wb-menu-item[data-idx="0"]').click();
+        expect(document.getElementById('rl-toast').hidden).toBe(true);
+    });
+
+    test('no toast when the textarea already held the last looked-up text', () => {
+        const root = document.getElementById('workbench-root');
+        root._wbLastRawText = () => '9.9.9.9';
+        document.getElementById('message').value = '9.9.9.9';
+
+        document.getElementById('rl-recent-btn').click();
+        document.querySelector('#rl-menu .wb-menu-item[data-idx="0"]').click();
+        expect(document.getElementById('rl-toast').hidden).toBe(true);
+    });
+
+    test('forgiveness toast when the textarea held different unsent text; Undo restores it exactly and fires no recent_lookups_undo (acceptance 8)', () => {
+        window.umami = { track: jest.fn() };
+        const root = document.getElementById('workbench-root');
+        root._wbLastRawText = () => '9.9.9.9'; // last successful lookup
+        document.getElementById('message').value = 'unsent draft text';
+
+        document.getElementById('rl-recent-btn').click();
+        document.querySelector('#rl-menu .wb-menu-item[data-idx="0"]').click();
+
+        const toast = document.getElementById('rl-toast');
+        expect(toast.hidden).toBe(false);
+        expect(document.getElementById('rl-toast-msg').textContent).toBe('Replaced your unsent paste.');
+        expect(document.getElementById('message').value).toBe('1.1.1.1\n2.2.2.2'); // lookup already ran
+
+        window.umami.track.mockClear();
+        document.getElementById('rl-toast-undo').click();
+
+        expect(document.getElementById('message').value).toBe('unsent draft text');
+        expect(window.umami.track).not.toHaveBeenCalledWith('recent_lookups_undo');
+    });
+});
+
+// ── Clear saved lookups menu item (acceptance criteria 9) ─────────────────────
+
+describe('Clear saved lookups (menu item)', () => {
+    let __handlers;
+    beforeEach(() => {
+        buildDOM();
         saveOptInState(true);
         saveList([{ ips: ['1.1.1.1'], count: 1, ts: 100 }]);
-        document.getElementById('recent-lookups-clear').click();
+        __handlers = attachHandlers();
+        jest.useFakeTimers();
+    });
+    afterEach(() => {
+        if (__handlers && __handlers.detach) __handlers.detach();
+        jest.useRealTimers();
+    });
+
+    test('clears the list, closes the menu, and shows a toast with the new copy', () => {
+        document.getElementById('rl-recent-btn').click();
+        document.querySelector('#rl-menu .rl-menu-clear').click();
+        expect(loadList()).toEqual([]);
+        expect(document.getElementById('rl-menu').hidden).toBe(true);
+        expect(document.getElementById('rl-toast').hidden).toBe(false);
+        expect(document.getElementById('rl-toast-msg').textContent).toBe('Cleared 1 saved lookup.');
+    });
+
+    test('Undo restores the list; opt-in stays on', () => {
+        document.getElementById('rl-recent-btn').click();
+        document.querySelector('#rl-menu .rl-menu-clear').click();
         document.getElementById('rl-toast-undo').click();
         expect(loadList()).toHaveLength(1);
         expect(loadOptInState()).toBe(true);
     });
 
-    test('does nothing when list is empty', () => {
-        saveOptInState(true);
-        document.getElementById('recent-lookups-clear').click();
-        expect(document.getElementById('rl-toast').hidden).toBe(true);
-    });
-});
-
-// ── List item click → fill textarea ─────────────────────────────────────────
-
-describe('list item click', () => {
-    let __handlers;
-    beforeEach(() => {
-        buildDOM();
-        __handlers = attachHandlers();
-    });
-    afterEach(() => {
-        if (__handlers && __handlers.detach) __handlers.detach();
-    });
-
-    test('clicking an entry fills the textarea with stored IPs', () => {
-        saveOptInState(true);
-        saveList([{ ips: ['1.1.1.1', '2.2.2.2'], count: 2, ts: 100 }]);
-        // Re-render after seeding
-        document.dispatchEvent(new CustomEvent('ip2geo:lookup_submit', {
-            detail: { ips: [], count: 0 }
-        }));
-        // Now there are 2 items in the list (the seeded one + the empty submit)
-        // Click the first rendered item (which is the newest = the empty submit)
-        const items = document.querySelectorAll('.recent-lookup-item');
-        expect(items.length).toBeGreaterThan(0);
-        // Click the entry with idx=0 (the seeded one)
-        const seededBtn = Array.from(items).find(b => b.dataset.idx === '0');
-        seededBtn.click();
-        const textarea = document.getElementById('message');
-        expect(textarea.value).toContain('1.1.1.1');
-        expect(textarea.value).toContain('2.2.2.2');
-    });
-
-    test('restoring an entry fires recent_lookups_use with no properties', () => {
+    test('recent_lookups_clear fires only after the 6s commit window, not on click', () => {
         window.umami = { track: jest.fn() };
-        saveOptInState(true);
-        saveList([{ ips: ['1.1.1.1'], count: 1, ts: 100 }]);
-        document.dispatchEvent(new CustomEvent('ip2geo:lookup_submit', {
-            detail: { ips: [], count: 0 }
-        }));
-        const seededBtn = Array.from(document.querySelectorAll('.recent-lookup-item'))
-            .find(b => b.dataset.idx === '0');
-        seededBtn.click();
-        expect(window.umami.track).toHaveBeenCalledTimes(1);
-        expect(window.umami.track).toHaveBeenCalledWith('recent_lookups_use');
-        delete window.umami;
-    });
-
-    test('clicking outside an entry fires nothing', () => {
-        window.umami = { track: jest.fn() };
-        document.getElementById('recent-lookups-list').click();
-        expect(window.umami.track).not.toHaveBeenCalled();
+        document.getElementById('rl-recent-btn').click();
+        document.querySelector('#rl-menu .rl-menu-clear').click();
+        expect(window.umami.track).not.toHaveBeenCalledWith('recent_lookups_clear');
+        jest.advanceTimersByTime(TOAST_TIMEOUT_MS + 100);
+        expect(window.umami.track).toHaveBeenCalledWith('recent_lookups_clear');
         delete window.umami;
     });
 });
@@ -802,7 +1200,7 @@ describe('ip2geo:lookup_submit integration', () => {
     });
 });
 
-// ── localStorage unavailable ─────────────────────────────────────────────────
+// ── localStorage unavailable (acceptance criteria 13) ─────────────────────────
 
 describe('localStorage unavailable', () => {
     let __handlers;
@@ -821,9 +1219,9 @@ describe('localStorage unavailable', () => {
         if (__spy) __spy.mockRestore();
     });
 
-    test('toggle row stays hidden', () => {
-        const row = document.getElementById('rl-optin-row');
-        expect(row.hidden).toBe(true);
+    test('toggle row and Recent button stay hidden', () => {
+        expect(document.getElementById('rl-optin-row').hidden).toBe(true);
+        expect(document.getElementById('rl-recent-btn').hidden).toBe(true);
     });
 
     test('lookup_submit dispatch does not throw', () => {

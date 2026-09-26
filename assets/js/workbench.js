@@ -584,10 +584,14 @@
 
   // ── paste bar ────────────────────────────────────────────────────────
 
-  function renderPasteBar(root, state, onEdit, onRecent) {
+  function renderPasteBar(root, state, onEdit) {
     var bar = root.querySelector('.wb-paste-bar');
     bar.innerHTML = '';
     var m = state.pasteMeta;
+    // Read-only getter for the Recent-lookups module (ip2geo-app.js), so it
+    // can tell whether the textarea holds unsent text without reaching into
+    // workbench state directly.
+    root._wbLastRawText = function () { return m.rawText; };
 
     var pillChildren = [];
     if (m.lines != null) {
@@ -601,8 +605,6 @@
     if (!state.recipient) {
       bar.appendChild(el('button', { type: 'button', class: 'button small', 'aria-controls': 'message', onclick: onEdit }, ['Edit paste']));
     }
-    bar.appendChild(el('button', { type: 'button', class: 'button small', 'aria-haspopup': 'true' }, ['Recent ▾']));
-    bar.lastChild.addEventListener('click', onRecent);
     if (m.lookupMs != null) {
       bar.appendChild(el('span', { class: 'wb-paste-time' }, ['looked up in ' + formatLookupTime(m.lookupMs)]));
     }
@@ -687,7 +689,7 @@
         meta.lookupMs = finishedAt - startedAt;
         state.pasteMeta = meta;
         clearState(root);
-        renderPasteBar(root, state, root._wbOnEdit, root._wbOnRecent);
+        renderPasteBar(root, state, root._wbOnEdit);
         renderSummary(root, state);
         renderUnresolved(root, state);
         renderAll(root, state);
@@ -728,7 +730,6 @@
       textarea.scrollTop = textarea.scrollHeight; // show the end of a long paste inside the box
       textarea.scrollIntoView({ block: 'center', behavior: reduce ? 'auto' : 'smooth' });
     };
-    root._wbOnRecent = function () { /* wired by the Recent-lookups module, if present */ };
 
     function startLookup(rawText, opts) {
       opts = opts || {};

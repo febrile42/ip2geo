@@ -469,6 +469,19 @@ main {
   cursor: pointer;
 }
 
+/* Recent lookups menu (IPG-30): reuses .wb-menu; these are layout-only.
+   align-items: stretch matters — without it the .alt button's 1px border
+   makes it 2px taller than the primary submit button. */
+.actions-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; position: relative; width: 100%; }
+.wb-menu.rl-menu { left: 0; right: 0; width: auto; max-width: none; }
+.rl-menu-list { max-height: 320px; overflow-y: auto; overscroll-behavior: contain; }
+.rl-menu-sep { height: 1px; background: var(--border); margin: 6px 0; }
+.rl-menu .rl-item-head { display: inline-flex; gap: .5em; align-items: baseline; }
+.rl-menu .rl-item-preview { font-family: var(--font-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.rl-menu .wb-menu-item[aria-disabled="true"] { cursor: default; }
+.rl-menu .wb-menu-item[aria-disabled="true"]:hover { background: none; }
+@media (max-width: 767px) { .rl-menu-list { max-height: min(320px, 50vh); } }
+
 /* ============================================================
    10. GENERIC SECTIONS
    Hairline divider + asymmetric padding (72/42).
@@ -1433,83 +1446,10 @@ button.button.small:hover {
     }
 }
 
-/* ---------- 16i. Recent lookups widget (opt-in localStorage) ----------
-   Pill-chip aesthetic. Each lookup is a compact rounded chip with count +
-   relative time; the IP preview moves to a title-attribute tooltip so chips
-   stay scannable. The widget only renders inside .hero, so no scoping is
-   needed in the selectors here. */
-#recent-lookups {
-    margin: 1.25em 0 0;
-    padding: 0;
-    border: none;
-    background: transparent;
-}
-#recent-lookups-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75em;
-    margin-bottom: 12px;
-}
-#recent-lookups-header h3 {
-    font-family: var(--font-mono);
-    font-size: 11px;
-    font-weight: 500;
-    line-height: 1.3;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--text-muted);
-    margin: 0;
-}
-#recent-lookups-header h3 small {
-    font-family: var(--font-sans);
-    font-size: 11px;
-    font-weight: 400;
-    letter-spacing: 0;
-    text-transform: none;
-    margin-left: 8px;
-    color: var(--text-muted);
-    opacity: 0.7;
-}
-#recent-lookups-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-}
-#recent-lookups-list li {
-    margin: 0;
-    padding: 0;
-}
-#recent-lookups-list .recent-lookup-item {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5em;
-    height: auto;
-    line-height: 1.4;
-    padding: 6px 14px;
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    color: var(--text);
-    font: inherit;
-    font-family: var(--font-sans);
-    font-size: 13px;
-    font-weight: 500;
-    text-transform: none;
-    letter-spacing: 0;
-    cursor: pointer;
-    transition: border-color 0.12s, background 0.12s;
-}
-#recent-lookups-list .recent-lookup-item:hover,
-#recent-lookups-list .recent-lookup-item:focus {
-    background: var(--surface-2);
-    border-color: var(--accent-purple);
-    color: var(--text);
-    outline: none;
-}
+/* ---------- 16i. Recent lookups menu (IPG-30) ----------
+   The pill widget is gone; entries are rendered inside #rl-menu (a .wb-menu,
+   see §21/.actions-row rules above). These classes are reused by the menu's
+   entry rows. */
 .recent-lookup-count {
     font-family: var(--font-mono);
     font-feature-settings: "tnum" 1;
@@ -1544,6 +1484,7 @@ button.button.small:hover {
     z-index: 2147483646;
     transition: transform 0.22s ease;
     max-width: calc(100vw - 2em);
+    width: max-content;
 }
 #rl-toast.rl-toast-visible {
     transform: translate(-50%, 0);
