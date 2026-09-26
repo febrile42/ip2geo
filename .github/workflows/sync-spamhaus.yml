@@ -217,19 +217,26 @@ jobs:
 
           # Validate the exact develop commit that would be merged, with the
           # validator from main: exactly one BEGIN/END marker pair (whole lines),
-          # only generator-shaped lines inside the block, and the rest of the file
-          # byte-identical to main. See scripts/validate-spamhaus-promote.sh.
+          # only generator-shaped lines inside the block, the block where main has
+          # it, and the rest of the file byte-identical to main. See scripts/validate-spamhaus-promote.sh.
           git show origin/main:asn_classification.php > "$RUNNER_TEMP/asn_main.php"
           git show "$DEVELOP_SHA:asn_classification.php" > "$RUNNER_TEMP/asn_develop.php"
           RC=0
           bash .trusted/scripts/validate-spamhaus-promote.sh asn \
             "$RUNNER_TEMP/asn_main.php" "$RUNNER_TEMP/asn_develop.php" || RC=$?
           if [ "$RC" -eq 2 ]; then
-            echo "asn_classification.php has changes outside the auto-sync block; not auto-promoting."
+            echo "asn_classification.php has changes outside the auto-sync block (or the block moved); not auto-promoting."
             echo "promoted=false" >> "$GITHUB_OUTPUT"
             exit 0
           elif [ "$RC" -ne 0 ]; then
             echo "::error::develop ${DEVELOP_SHA}: the ASN-DROP auto-sync block in asn_classification.php is not what sync-spamhaus.yml writes. NOT promoting to main. Inspect develop before any release."
+            echo "promoted=false" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+          # Defense in depth: the checks above exist to rule out a file that fails
+          # to parse in production, so check that directly too (parse only, no run).
+          if ! php -l "$RUNNER_TEMP/asn_develop.php"; then
+            echo "::error::develop ${DEVELOP_SHA}: asn_classification.php does not parse. NOT promoting to main. Inspect develop before any release."
             echo "promoted=false" >> "$GITHUB_OUTPUT"
             exit 1
           fi

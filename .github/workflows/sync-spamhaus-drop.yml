@@ -190,6 +190,13 @@ jobs:
             echo "promoted=false" >> "$GITHUB_OUTPUT"
             exit 1
           fi
+          # Defense in depth: the shape check exists to rule out a file that fails
+          # to parse in production, so check that directly too (parse only, no run).
+          if ! php -l "$RUNNER_TEMP/drop_develop.php"; then
+            echo "::error::develop ${DEVELOP_SHA}: spamhaus_drop_data.php does not parse. NOT promoting to main. Inspect develop before any release."
+            echo "promoted=false" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
 
           echo "Pure DROP-data delta detected. Opening PR develop -> main."
           DATE=$(date -u +%Y-%m-%d)
