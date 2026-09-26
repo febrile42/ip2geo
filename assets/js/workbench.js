@@ -158,7 +158,7 @@
     if (!hasFacts) return;
 
     if (summary.drop_count > 0) {
-      var n = el('span', { class: 'lookup-summary-n' }, [summary.drop_count.toLocaleString()]);
+      var n = el('span', { class: 'lookup-summary-n' }, [summary.drop_count.toLocaleString('en-US')]);
       var dropAbbr = el('abbr', { title: DROP_EXPLAINER }, ['Spamhaus DROP']);
       var dropChildren = summary.drop_count === 1
         ? [n, ' IP in a ', dropAbbr, ' netblock']
@@ -172,7 +172,7 @@
         'Top ASN: ',
         el('span', { class: 'lookup-summary-asn' }, [asnText]),
         ' (',
-        el('span', { class: 'lookup-summary-n' }, [summary.top_asn.count.toLocaleString()]),
+        el('span', { class: 'lookup-summary-n' }, [summary.top_asn.count.toLocaleString('en-US')]),
         ' IPs)'
       ]));
     }
