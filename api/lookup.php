@@ -43,6 +43,8 @@ declare(strict_types=1);
 require_once __DIR__ . '/../includes/lookup.php';
 require_once __DIR__ . '/../asn_classification.php';
 require_once __DIR__ . '/../report_functions.php'; // ip_in_spamhaus_drop()
+require_once __DIR__ . '/../includes/client-ip.php';  // lookup_endpoint_client_ip()
+require_once __DIR__ . '/../includes/rate-limit.php'; // default_lookup_rate_limiter(), 60/min/IP
 
 // Cap on unique IPs per request and on raw body size.
 if (!defined('LOOKUP_MAX_UNIQUE_IPS')) {
@@ -50,17 +52,6 @@ if (!defined('LOOKUP_MAX_UNIQUE_IPS')) {
 }
 if (!defined('LOOKUP_MAX_BODY_BYTES')) {
     define('LOOKUP_MAX_BODY_BYTES', 2 * 1024 * 1024); // 2 MB
-}
-
-// Per-client-IP rate limit (APCu). Not specified by the design doc beyond
-// "rate limit per client IP using the APCu pattern from get-report.php";
-// 60 requests/minute is this lane's assumption — cheap to retune later
-// since it's isolated to these two constants.
-if (!defined('LOOKUP_RATE_LIMIT_MAX')) {
-    define('LOOKUP_RATE_LIMIT_MAX', 60);
-}
-if (!defined('LOOKUP_RATE_LIMIT_WINDOW_SECONDS')) {
-    define('LOOKUP_RATE_LIMIT_WINDOW_SECONDS', 60);
 }
 
 /**
@@ -77,107 +68,6 @@ function lookup_endpoint_ip4_to_uint(string $ip): ?int
         return null;
     }
     return (int)sprintf('%u', $long);
-}
-
-/**
- * Default rate limiter: the APCu increment-then-add-fallback pattern from
- * get-report.php:41-54, keyed per client IP instead of per free-report
- * token. Gracefully returns "not limited" if APCu isn't loaded (matches
- * get-report.php's function_exists guard) so a box without APCu never
- * blocks lookups outright.
- *
- * @return array{limited: bool, retry_after: int}
- */
-function default_lookup_rate_limiter(string $clientIp): array
-{
-    if (!function_exists('apcu_inc') || $clientIp === '') {
-        return ['limited' => false, 'retry_after' => 0];
-    }
-
-    $key     = 'lookup_rate:' . $clientIp;
-    $success = false;
-    $count   = apcu_inc($key, 1, $success);
-    if (!$success) {
-        if (!apcu_add($key, 1, LOOKUP_RATE_LIMIT_WINDOW_SECONDS)) {
-            $count = apcu_inc($key) ?: 1;
-        } else {
-            $count = 1;
-        }
-    }
-
-    if ($count > LOOKUP_RATE_LIMIT_MAX) {
-        return ['limited' => true, 'retry_after' => LOOKUP_RATE_LIMIT_WINDOW_SECONDS];
-    }
-
-    return ['limited' => false, 'retry_after' => 0];
-}
-
-// Cloudflare's published edge ranges (https://www.cloudflare.com/ips/,
-// fetched 2026-09-26). CF-Connecting-IP is only trusted when the request
-// actually came from one of these; anything else hit the origin directly and
-// could put any value in that header. Cloudflare changes this list rarely;
-// re-check it when touching this file.
-if (!defined('CLOUDFLARE_IP_RANGES')) {
-    define('CLOUDFLARE_IP_RANGES', [
-        '173.245.48.0/20', '103.21.244.0/22', '103.22.200.0/22', '103.31.4.0/22',
-        '141.101.64.0/18', '108.162.192.0/18', '190.93.240.0/20', '188.114.96.0/20',
-        '197.234.240.0/22', '198.41.128.0/17', '162.158.0.0/15', '104.16.0.0/13',
-        '104.24.0.0/14', '172.64.0.0/13', '131.0.72.0/22',
-        '2400:cb00::/32', '2606:4700::/32', '2803:f800::/32', '2405:b500::/32',
-        '2405:8100::/32', '2a06:98c0::/29', '2c0f:f248::/32',
-    ]);
-}
-
-/** True if $ip (v4 or v6) is inside $cidr. Mismatched families never match. */
-function lookup_endpoint_ip_in_cidr(string $ip, string $cidr): bool
-{
-    [$net, $bits] = array_pad(explode('/', $cidr, 2), 2, null);
-    $ipBin  = @inet_pton($ip);
-    $netBin = @inet_pton((string)$net);
-    if ($ipBin === false || $netBin === false || strlen($ipBin) !== strlen($netBin)) {
-        return false;
-    }
-    $maxBits = strlen($ipBin) * 8;
-    $bits    = $bits === null ? $maxBits : (int)$bits;
-    if ($bits < 0 || $bits > $maxBits) {
-        return false;
-    }
-    $bytes = intdiv($bits, 8);
-    if (substr($ipBin, 0, $bytes) !== substr($netBin, 0, $bytes)) {
-        return false;
-    }
-    $rem = $bits % 8;
-    if ($rem === 0) {
-        return true;
-    }
-    $mask = (0xFF << (8 - $rem)) & 0xFF;
-    return (ord($ipBin[$bytes]) & $mask) === (ord($netBin[$bytes]) & $mask);
-}
-
-function lookup_endpoint_is_cloudflare(string $ip): bool
-{
-    foreach (CLOUDFLARE_IP_RANGES as $cidr) {
-        if (lookup_endpoint_ip_in_cidr($ip, $cidr)) {
-            return true;
-        }
-    }
-    return false;
-}
-
-/**
- * Client IP for rate limiting. CF-Connecting-IP only when REMOTE_ADDR is a
- * Cloudflare edge and the header holds a valid IP; otherwise REMOTE_ADDR,
- * so a direct-to-origin caller can't mint a fresh rate-limit bucket per
- * request by varying the header.
- */
-function lookup_endpoint_client_ip(array $server): string
-{
-    $remote = trim((string)($server['REMOTE_ADDR'] ?? ''));
-    $cf     = trim((string)($server['HTTP_CF_CONNECTING_IP'] ?? ''));
-    if ($cf !== '' && lookup_endpoint_is_cloudflare($remote) && filter_var($cf, FILTER_VALIDATE_IP) !== false) {
-        return $cf;
-    }
-    return $remote;
 }
 
 function lookup_endpoint_json_error(int $status, string $message, array $extraHeaders = []): array

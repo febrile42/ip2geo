@@ -8,6 +8,8 @@ require_once __DIR__ . '/includes/extract.php';  // extract_ips(), EXTRACT_IPS_C
 require_once __DIR__ . '/includes/lookup.php';   // lookup_ips(), GeoDbUnavailableException
 require_once __DIR__ . '/includes/summary.php';  // build_summary(), SUMMARY_CATEGORY_LABELS
 require_once __DIR__ . '/includes/version.php';  // APP_VERSION for ?v= asset URLs
+require_once __DIR__ . '/includes/client-ip.php';  // lookup_endpoint_client_ip()
+require_once __DIR__ . '/includes/rate-limit.php'; // default_lookup_rate_limiter(), 60/min/IP
 @include_once __DIR__ . '/db_version.php'; // gitignored; written by the monthly DB update script
 if (is_file(__DIR__ . '/config.php')) {
     // Optional in v5: index.php no longer talks to MySQL or Stripe (R17), so
@@ -406,6 +408,45 @@ function render_lookup_results(array $post, string $visitor_ip = '', ?string $ci
     return $html;
 }
 
+/**
+ * The no-JS POST / lookup (IPG-17): rate-limit, then render_lookup_results().
+ * Same per-client-IP limit as api/lookup.php, in its own APCu bucket
+ * (LOOKUP_RATE_BUCKET_NOJS; see includes/rate-limit.php for why). When
+ * limited, no lookup runs and the results section is a role="alert" notice
+ * sent with 429 + Retry-After.
+ *
+ * Returns status/headers/html instead of sending them so tests can drive it
+ * without a real request, APCu or GeoIP database.
+ *
+ * @param array     $post         like $_POST
+ * @param array     $server       like $_SERVER (client IP for the limiter)
+ * @param string    $visitor_ip   passed through to render_lookup_results() (R16)
+ * @param ?callable $rateLimiter  function(string $clientIp): array{limited:bool,retry_after:int}
+ * @param ?callable $render       function(array $post, string $visitor_ip): string,
+ *                                defaults to render_lookup_results()
+ *
+ * @return array{status:int, headers:array<string,string>, html:string}
+ */
+function handle_nojs_lookup(array $post, array $server, string $visitor_ip = '', ?callable $rateLimiter = null, ?callable $render = null): array
+{
+    $rateLimiter ??= static fn(string $ip): array => default_lookup_rate_limiter($ip, LOOKUP_RATE_BUCKET_NOJS);
+    $render      ??= static fn(array $p, string $v): string => render_lookup_results($p, $v);
+
+    $rate = $rateLimiter(lookup_endpoint_client_ip($server));
+    if (!empty($rate['limited'])) {
+        $retryAfter = (int)($rate['retry_after'] ?? LOOKUP_RATE_LIMIT_WINDOW_SECONDS);
+        return [
+            'status'  => 429,
+            'headers' => ['Retry-After' => (string)$retryAfter],
+            'html'    => '<section id="results" class="block"><div class="section-head"><h2 id="result">Lookup Results</h2><span class="section-tag">01 / Results</span></div>'
+                . '<p class="notice" role="alert">Too many lookups from your network. Try again in ' . $retryAfter . 's.</p>'
+                . '</section>',
+        ];
+    }
+
+    return ['status' => 200, 'headers' => [], 'html' => $render($post, $visitor_ip)];
+}
+
 // ─────────────────────────────────────────────────────────────────────────
 // Page render. Skipped when IP2GEO_SKIP_PAGE_RENDER is defined before this
 // file is required, so tests can pull in the functions above (in particular
@@ -418,6 +459,17 @@ header('Cache-Control: ' . ip2geo_index_cache_control());
 
 $visitor_ip_raw = getRealIPAddr();
 $visitor_ip     = filter_var($visitor_ip_raw, FILTER_VALIDATE_IP) !== false ? $visitor_ip_raw : '';
+
+// Run the no-JS lookup before any output so a 429 can set its status and
+// Retry-After header; the HTML is echoed in place below the form.
+$nojs_lookup = null;
+if ($_POST) {
+    $nojs_lookup = handle_nojs_lookup($_POST, $_SERVER, $visitor_ip);
+    http_response_code($nojs_lookup['status']);
+    foreach ($nojs_lookup['headers'] as $name => $value) {
+        header($name . ': ' . $value);
+    }
+}
 
 ?><!DOCTYPE HTML>
 <html lang="en" data-theme="dark">
@@ -550,8 +602,8 @@ if (isset($_POST['ip_list'])) {
 				</div>
 			</section>
 
-<?php if ($_POST): ?>
-<?php echo render_lookup_results($_POST, $visitor_ip); ?>
+<?php if ($nojs_lookup !== null): ?>
+<?php echo $nojs_lookup['html']; ?>
 <?php endif; ?>
 
 			<!-- Phase 2 workbench mount point (design doc: "Progressive enhancement").

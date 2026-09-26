@@ -208,4 +208,79 @@ class IndexResultsTest extends TestCase
         // instead (same header() call site the page uses).
         $this->assertSame('private, no-store', ip2geo_index_cache_control());
     }
+
+    // ── No-JS POST rate limit (IPG-17) ──────────────────────────────────────
+
+    public function testRateLimitedNoJsLookupReturns429WithoutLookingUp(): void
+    {
+        $rendered = 0;
+        $result   = handle_nojs_lookup(
+            ['ip_list' => '81.2.69.142'],
+            ['REMOTE_ADDR' => '198.51.100.1'],
+            '',
+            static fn(string $ip): array => ['limited' => true, 'retry_after' => 42],
+            function () use (&$rendered): string {
+                $rendered++;
+                return '';
+            }
+        );
+
+        $this->assertSame(0, $rendered, 'no lookup may run when rate-limited');
+        $this->assertSame(429, $result['status']);
+        $this->assertSame('42', $result['headers']['Retry-After']);
+        $this->assertStringContainsString('role="alert"', $result['html']);
+        $this->assertStringContainsString('Try again in 42s', $result['html']);
+        $this->assertStringContainsString('id="results"', $result['html']);
+    }
+
+    public function testNotLimitedNoJsLookupRendersResults(): void
+    {
+        $result = handle_nojs_lookup(
+            ['ip_list' => '81.2.69.142'],
+            ['REMOTE_ADDR' => '198.51.100.1'],
+            '',
+            static fn(string $ip): array => ['limited' => false, 'retry_after' => 0],
+            fn(array $post, string $v): string => render_lookup_results($post, $v, self::CITY_DB, self::ASN_DB)
+        );
+
+        $this->assertSame(200, $result['status']);
+        $this->assertSame([], $result['headers']);
+        $this->assertStringContainsString('81.2.69.142', $result['html']);
+    }
+
+    /** Runs one no-JS request and returns the key the rate limiter was called with. */
+    private function noJsRateLimitKeyFor(array $server): string
+    {
+        $seen = [];
+        handle_nojs_lookup(
+            ['ip_list' => '81.2.69.142'],
+            $server,
+            '',
+            function (string $ip) use (&$seen): array {
+                $seen[] = $ip;
+                return ['limited' => false, 'retry_after' => 0];
+            },
+            static fn(): string => ''
+        );
+
+        $this->assertCount(1, $seen);
+        return $seen[0];
+    }
+
+    // IPG-10 F2 applies here too: a direct-to-origin caller must not pick its own bucket.
+    public function testNoJsSpoofedCfHeaderFromNonCloudflareIsKeyedOnRemoteAddr(): void
+    {
+        $this->assertSame('203.0.113.5', $this->noJsRateLimitKeyFor([
+            'REMOTE_ADDR'           => '203.0.113.5',
+            'HTTP_CF_CONNECTING_IP' => '198.51.100.9',
+        ]));
+    }
+
+    public function testNoJsCfHeaderFromCloudflareIsKeyedOnCfIp(): void
+    {
+        $this->assertSame('198.51.100.9', $this->noJsRateLimitKeyFor([
+            'REMOTE_ADDR'           => '162.158.1.1',
+            'HTTP_CF_CONNECTING_IP' => '198.51.100.9',
+        ]));
+    }
 }
