@@ -2620,7 +2620,7 @@ button.button.small:hover {
    like .wb-summary. Longhands, so the ≤767px full-bleed side margins on
    .notice survive (IPG-75). */
 .wb-overcap { margin-top: 0; margin-bottom: 12px; }
-.wb-paste-time { margin-left: auto; }
+.wb-paste-time { margin-left: auto; font-variant-numeric: tabular-nums; }
 
 .wb-state .notice { margin: 8px 0; }
 
