@@ -177,14 +177,14 @@ curl -s https://staging.ip2geo.org/ | grep -o 'v[0-9.]*' | head -1
 ## 7. Open decisions (the owner's call) and later work
 
 - **A past paid customer's report was lost** to a cleanup-script bug in May 2026. Whether to contact or refund them is still open. Details are in the private design doc (R17).
-- **Community Block List** (Open Question 4): keep it, fold it into DROP intel, or retire it. `community-consent.php` has had no caller since v5 removed the report page, so there can be no new opt-ins. The "Block list" nav link waits on this decision.
+- **Community Block List** (Open Question 4): keep it, fold it into DROP intel, or retire it. `community-consent.php` returns 410 since v5 removed the report page (ingestion code is in git history), so there can be no new opt-ins. The "Block list" nav link waits on this decision.
 - **Search Console check:** did the April 2026 reskin lose impressions or clicks?
 - **The Recent lookups decision** is due around **2026-10-23**, after 30 days of `recent_lookups_use` data (shipped in 4.3.3). Keep the feature or remove it.
 - **Retirement notices:**
   - The "Firewall rules moved here" hint is built. It's counted per visitor: 30 days from their first view, in localStorage.
   - The plan's 90-day "old form endpoint" POST response was **not built**. The form POST still works in v5 as the no-JS fallback, so it's probably moot. Confirm with the owner.
 - **Later:**
-  - drop the legacy MySQL GeoIP tables once v5 has run cleanly (`community-consent.php` still reads `geoip2_asn_current_int`, so settle the block-list question first)
+  - drop the legacy MySQL GeoIP tables once v5 has run cleanly (if the block list is revived, its ingestion code read `geoip2_asn_current_int`, so settle that question first)
   - the Cloudflare performance spike (parked: "we're doing well with what we have today")
 
 ## 8. Known gaps and unverified items
