@@ -68,6 +68,11 @@ test.describe('D16: accessibility scan', () => {
   // IPG-41/IPG-30 spec §11 item 14: the Recent menu must pass with the menu
   // open and closed, in both themes.
   test('the Recent menu has no serious/critical axe violations, open and closed, in light and dark', async ({ page }) => {
+    // body has a 200ms background-color/color transition on theme switch
+    // (disabled under prefers-reduced-motion). Without this, the immediate
+    // axe scan after setAttribute('data-theme', ...) below can sample a color
+    // mid-transition and report a false contrast violation.
+    await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/index.php');
     await page.evaluate(() => {
       localStorage.setItem('rl_optin', '1');
@@ -87,7 +92,13 @@ test.describe('D16: accessibility scan', () => {
       const closedResults = await new AxeBuilder({ page }).include('.actions-row').analyze();
       expect(seriousOrCritical(closedResults), `${theme}, closed: ` + JSON.stringify(seriousOrCritical(closedResults), null, 2)).toEqual([]);
 
-      await page.locator('#rl-recent-btn').click();
+      // Keyboard-open (not .click()): opening via a pointer click leaves the
+      // first item's programmatic focus() without :focus-visible in Chromium,
+      // which hid the IPG-92 contrast bug from a mouse-driven scan. Real
+      // keyboard users (the D16 menu-button pattern this menu implements)
+      // always get :focus-visible here, so the scan must match that path.
+      await page.locator('#rl-recent-btn').focus();
+      await page.keyboard.press('Enter');
       await expect(page.locator('#rl-menu')).toBeVisible();
 
       const openResults = await new AxeBuilder({ page }).include('.actions-row').analyze();

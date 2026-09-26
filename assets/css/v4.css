@@ -2753,8 +2753,14 @@ button.button.small:hover {
   cursor: pointer;
   font-size: 13px;
 }
+/* IPG-92: the translucent accent-purple overlay this used to paint lightened
+   --surface-2 enough that --text-muted note/timestamp text (e.g. the Recent
+   menu's .recent-lookup-time and .rl-item-preview) dropped to a 4.39:1
+   contrast ratio, below the WCAG AA 4.5:1 floor, whenever an item held
+   real keyboard focus. var(--surface) is already the hover highlight used
+   by .button.alt and keeps --text-muted at 6.23:1 (dark) / 7.22:1 (light). */
 .wb-menu-item:hover, .wb-menu-item:focus-visible {
-  background: rgba(167,139,250,0.14);
+  background: var(--surface);
   outline: none;
 }
 .wb-menu-note { color: var(--text-muted); font-size: 11px; }
