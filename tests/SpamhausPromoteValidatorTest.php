@@ -199,7 +199,53 @@ class SpamhausPromoteValidatorTest extends TestCase
                 fn(string $s) => self::insertBefore($s, self::BEGIN, "    'AS64512' => 'hosting',"),
                 2,
             ],
+            // Security review F1: with the block cut out the file still equals
+            // main, so only the block's position gives these away.
+            'block moved to top level (parse fatal)' => [
+                fn(string $s) => self::moveBlockBefore($s, '$known_asns = ['),
+                2,
+            ],
+            'block moved into the header docblock' => [
+                fn(string $s) => self::moveBlockBefore($s, ' */'),
+                2,
+            ],
+            'block moved up one line' => [
+                fn(string $s) => self::moveBlockBefore($s, null),
+                2,
+            ],
         ];
+    }
+
+    /**
+     * Cut the whole BEGIN..END block (cut down to one entry) out of the file and
+     * reinsert it before the first line equal to $anchor, or (null) one line
+     * earlier than where it was.
+     */
+    private static function moveBlockBefore(string $src, ?string $anchor): string
+    {
+        $lines = explode("\n", $src);
+        $b = array_search(self::BEGIN, $lines, true);
+        $e = array_search(self::END, $lines, true);
+        self::assertIsInt($b);
+        self::assertIsInt($e);
+        $block = [$lines[$b], "    'AS15169' => 'scanning',", $lines[$e]];
+        array_splice($lines, $b, $e - $b + 1);
+        if ($anchor === null) {
+            // Put the line that preceded BEGIN after the block instead.
+            $prev = $lines[$b - 1];
+            array_splice($lines, $b - 1, 1, [...$block, $prev]);
+            return implode("\n", $lines);
+        }
+        return self::insertBefore(implode("\n", $lines), $anchor, ...$block);
+    }
+
+    public function testRelocatedBlockFixtureIsAParseFatal(): void
+    {
+        // Pins the F1 fixture to what it guards against: the unattended
+        // promote would have shipped a file that does not parse.
+        $path = $this->tmp(self::moveBlockBefore((string) file_get_contents(self::ASN_FILE), '$known_asns = ['));
+        exec('php -l ' . escapeshellarg($path) . ' 2>&1', $out, $rc);
+        $this->assertNotSame(0, $rc, implode("\n", $out));
     }
 
     // --- spamhaus_drop_data.php -------------------------------------------------
