@@ -245,6 +245,91 @@ describe('renderAll smoke test', () => {
   });
 });
 
+describe('filter_<dim> analytics (D9)', () => {
+  var root;
+
+  function rows() {
+    return [
+      { ip: '1.1.1.1', country: 'US', region: 'CA', city: 'Fremont', asn: 'AS14061', asnOrg: 'DigitalOcean, LLC', category: 'cloud', drop: false, hits: 5 },
+      { ip: '2.2.2.2', country: 'CN', region: '', city: '', asn: 'AS4134', asnOrg: 'Chinanet', category: 'scanning', drop: true, hits: 12 },
+    ];
+  }
+
+  beforeEach(() => {
+    root = buildDom();
+    window.umami = { track: jest.fn() };
+  });
+
+  afterEach(() => {
+    delete window.umami;
+    jest.useRealTimers();
+  });
+
+  test('clicking a category chip fires filter_category with no properties', () => {
+    var state = WB.makeState();
+    state.rows = rows();
+    WB.renderAll(root, state);
+
+    var scanningChip = Array.from(root.querySelectorAll('.wb-chips-category .wb-chip'))
+      .find(function (l) { return l.textContent.indexOf('Scanning') !== -1; });
+    scanningChip.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+
+    expect(window.umami.track).toHaveBeenCalledWith('filter_category');
+    expect(window.umami.track).not.toHaveBeenCalledWith('filter_category', expect.anything());
+  });
+
+  test('clicking a country chip fires filter_country with no properties', () => {
+    var state = WB.makeState();
+    state.rows = rows();
+    WB.renderAll(root, state);
+
+    var usChip = Array.from(root.querySelectorAll('.wb-chips-country .wb-chip'))
+      .find(function (l) { return l.textContent.indexOf('US') !== -1; });
+    usChip.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+
+    expect(window.umami.track).toHaveBeenCalledWith('filter_country');
+    expect(window.umami.track).not.toHaveBeenCalledWith('filter_country', expect.anything());
+  });
+
+  test('typing in the search box fires filter_search once, only after the debounce settles', () => {
+    jest.useFakeTimers();
+    var state = WB.makeState();
+    state.rows = rows();
+    WB.renderAll(root, state);
+
+    var search = root.querySelector('.wb-search');
+    'digi'.split('').forEach(function (ch) {
+      search.value += ch;
+      search.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+
+    // No event yet -- still within the debounce window, and no value ever sent.
+    expect(window.umami.track).not.toHaveBeenCalled();
+
+    jest.advanceTimersByTime(600);
+
+    expect(window.umami.track).toHaveBeenCalledTimes(1);
+    expect(window.umami.track).toHaveBeenCalledWith('filter_search');
+    expect(window.umami.track).not.toHaveBeenCalledWith('filter_search', expect.anything());
+  });
+
+  test('search input never appears in any tracked event payload', () => {
+    jest.useFakeTimers();
+    var state = WB.makeState();
+    state.rows = rows();
+    WB.renderAll(root, state);
+
+    var search = root.querySelector('.wb-search');
+    search.value = '203.0.113.5'; // looks like an IP typed into the free-text filter
+    search.dispatchEvent(new Event('input', { bubbles: true }));
+    jest.advanceTimersByTime(600);
+
+    window.umami.track.mock.calls.forEach(function (call) {
+      expect(JSON.stringify(call)).not.toMatch(/203\.0\.113\.5/);
+    });
+  });
+});
+
 describe('renderSummary (bug: the summary bar rendered empty because nothing ever called buildSummary)', () => {
   var root;
   beforeEach(() => {
