@@ -61,7 +61,8 @@ used to fire nothing, so filter usage went unmeasured once a browser-side
 lookup swapped the server-rendered `#results` table for `#workbench-root`.
 See `filter_category` / `filter_country` below for the older, still-present
 handlers on the server-rendered table — those fire only for visitors who
-never get a workbench (no-JS, or JS load failure), and their `filter_category`
+get the server-rendered table because the workbench never took over (with JS
+fully off, neither set fires), and their `filter_category`
 carries different fields, so don't merge the two in a dashboard without
 checking which section the row came from.
 
@@ -85,8 +86,8 @@ This is the stronger signal — they actually grabbed the rules to use somewhere
 These two handlers bind to the server-rendered results table
 (`#filter-countries`, `.filter-category`) inside `#results`. A visitor only
 sees that table — and these events only fire — when the workbench never took
-over: no JS, or the browser-side lookup in `assets/js/workbench.js` never
-ran. Once a lookup succeeds client-side, `#results` stays hidden and
+over, i.e. the browser-side lookup in `assets/js/workbench.js` never ran but
+`ip2geo-app.js` did. With JS fully disabled nothing fires at all. Once a lookup succeeds client-side, `#results` stays hidden and
 `#workbench-root` takes its place, so the same filter action instead fires
 the `filter_category` / `filter_country` / `filter_search` events documented
 above under workbench — note `filter_category` here still carries the
