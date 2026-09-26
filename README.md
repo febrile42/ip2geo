@@ -17,7 +17,7 @@ Live at [ip2geo.org](https://ip2geo.org) since 2017. **Picking this up cold? Rea
 - **MySQL / MariaDB**: Community Block List tables, plus the legacy GeoIP integer-range tables (`geoip2_*_current_int`). Nothing in v5 reads the GeoIP tables any more. They are dropped once v5 has run cleanly for a while.
 - **Vanilla JS, no build step**: the v5 workbench (`assets/js/*.js`) extracts IPs in the browser, POSTs only the IPs to `/api/lookup.php`, and renders, filters and exports on the client. Without JS, `index.php` falls back to a server-rendered results table.
 - **Cloudflare** in front of the origin. Rocket Loader is on for the zone, so every `<script>` tag carries `data-cfasync="false"` (enforced by `tests/RocketLoaderOptOutTest.php`), and every asset URL carries `?v=<APP_VERSION>` so a release is never paired with day-old cached JS.
-- **APCu**: `/intel.php` page cache (15-min TTL) and the `/api/lookup.php` rate limit.
+- **APCu**: `/intel.php` page cache (15-min TTL) and the lookup rate limit (`/api/lookup.php` and the no-JS `POST /`).
 - **GitHub Actions**: CI/CD (tests → staging → production), monthly GeoLite2 refresh, and Spamhaus DROP / ASN-DROP syncs.
 - **Tests**: PHPUnit, plus Jest and Playwright (dev-only; nothing Node-based is deployed).
 
