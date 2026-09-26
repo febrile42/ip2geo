@@ -40,6 +40,8 @@
 
   var CATEGORY_LABELS = Summary.SUMMARY_CATEGORY_LABELS;
   var RECENT_CHIP_COUNT = 6; // D3.5: top 6 countries + "+N more"
+  var NO_COUNTRY_LABEL = 'No country'; // IPG-81: display text for country ''; the filter/share value stays ''
+  function countryLabel(code) { return code || NO_COUNTRY_LABEL; }
   var SEARCH_TRACK_DEBOUNCE_MS = 600; // D9: don't fire filter_search per keystroke
   var searchTrackTimer = null;
 
@@ -369,7 +371,7 @@
     shown.forEach(function (value) {
       var selected = state.filters[dim].has(value);
       var count = counts[value] || 0;
-      var text = dim === 'categories' ? (CATEGORY_LABELS[value] || value) : value;
+      var text = dim === 'categories' ? (CATEGORY_LABELS[value] || value) : countryLabel(value);
       var chipLabel = el('label', { class: 'wb-chip' + (selected ? ' wb-chip--sel' : '') }, [
         el('input', {
           type: 'checkbox',
@@ -836,7 +838,8 @@
     if (onRestoreBanner) {
       onRestoreBanner('Shared view · ' + decoded.ips.length.toLocaleString('en-US') + ' IPs' +
         (decoded.categories.length || decoded.countries.length
-          ? ' · filters: ' + decoded.categories.concat(decoded.countries).join(', ')
+          ? ' · filters: ' + decoded.categories.map(function (c) { return CATEGORY_LABELS[c] || c; })
+              .concat(decoded.countries.map(countryLabel)).join(', ')
           : ''));
     }
 
