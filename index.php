@@ -619,7 +619,6 @@ if (isset($_POST['ip_list'])) {
 				<div class="wb-state" hidden></div>
 				<div class="wb-body" hidden>
 					<div class="wb-summary lookup-summary" role="status"></div>
-					<div class="wb-export-hint" hidden></div>
 					<div class="wb-filters">
 						<div class="wb-chips-row"><div class="wb-chips-category"></div></div>
 						<div class="wb-chips-row"><div class="wb-chips-country"></div></div>

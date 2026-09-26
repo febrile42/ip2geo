@@ -47,4 +47,21 @@ test.describe('D16: accessibility scan', () => {
     await expect(btn).toHaveAttribute('aria-expanded', 'false');
     await expect(btn).toBeFocused();
   });
+
+  test('arrow-key navigation skips the group labels and reaches iptables (IPG-32 menu groups)', async ({ page }) => {
+    await page.route('**/u/**', (route) => route.fulfill({ status: 200, contentType: 'application/javascript', body: '/* stub */' }));
+    await page.goto('/index.php');
+    await page.fill('#message', '203.0.113.9');
+    await page.click('.lookup-form .submit');
+    await page.waitForSelector('#workbench-root:not([hidden])', { timeout: 10000 });
+
+    const btn = page.locator('.wb-export-btn');
+    await btn.focus();
+    await page.keyboard.press('Enter');
+    for (let i = 0; i < 4; i++) {
+      await page.keyboard.press('ArrowDown');
+    }
+    const focused = page.locator('.wb-menu-item:focus');
+    await expect(focused).toContainText('iptables');
+  });
 });
