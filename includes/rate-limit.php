@@ -3,21 +3,35 @@
  * Per-client-IP lookup rate limit (APCu), shared by api/lookup.php and
  * index.php's no-JS POST path (IPG-17).
  *
- * Buckets: each entry point has its own APCu key prefix, so the limit is
- * 60 requests/minute per client *per path*:
+ * Budget, not request count (IPG-48): each client gets
+ * LOOKUP_RATE_LIMIT_MAX cost units per fixed LOOKUP_RATE_LIMIT_WINDOW_SECONDS
+ * window *per path*, and a request costs lookup_rate_cost($ipCount) units
+ * (1, plus 1 per full 1,000 IPs: 1 for anything under 1,000, 11 for a full
+ * 10k lookup). That lets many small lookups from one address through (a SOC
+ * behind one NAT egress all opening the same #v= share link, ≤ ~1,500 IPs
+ * each) while a client sending max-size lookups is held to about the same
+ * work per minute as the old flat 60 requests/minute.
  *
- *   api/lookup.php      'lookup_rate:<key>'       (LOOKUP_RATE_BUCKET_API)
- *   index.php POST /    'lookup_rate_nojs:<key>'  (LOOKUP_RATE_BUCKET_NOJS)
+ *   api/lookup.php      'lookup_rate:<key>:<window>'       (LOOKUP_RATE_BUCKET_API)
+ *   index.php POST /    'lookup_rate_nojs:<key>:<window>'  (LOOKUP_RATE_BUCKET_NOJS)
  *
  * <key> is rate_limit_key($clientIp): the IPv4 address as is, or the /64
  * prefix for IPv6 (IPG-21), since one IPv6 client usually holds a whole /64
- * and could otherwise take a fresh bucket per request.
+ * and could otherwise take a fresh bucket per request. <window> is
+ * intdiv(now, window seconds), so a new window is a new key and the reset
+ * never depends on APCu expiring anything. The TTL on the entry is only
+ * there to free memory.
+ *
+ * Why not the old apcu_inc-then-apcu_add pattern (from get-report.php):
+ * apcu_inc() inserts a missing key itself, with its $ttl argument (default
+ * 0 = never expires), and reports success, so the apcu_add(…, 60) fallback
+ * never ran. Every counter lived until APCu restarted and "60/minute" was
+ * really "60 ever" per client, locking out whole offices behind one IP.
  *
  * Separate buckets because a real visitor only ever uses one of the two (JS
  * on or off), and it keeps the CI functional + perf POSTs to / (two per
  * deploy, from one runner IP straight to the origin) from ever competing
- * with anything else. Each request on either path is capped at 10k IPs, so
- * the worst case per IP is the same on both.
+ * with anything else.
  *
  * Fails open without APCu (documented decision): a box without it never
  * blocks lookups outright.
@@ -25,17 +39,28 @@
 
 declare(strict_types=1);
 
-// 60 requests/minute is this lane's assumption, not a design-doc number —
-// cheap to retune later since it's isolated to these two constants.
+// Cost units per client per window. Measured on staging (IPG-48): a 10k
+// no-JS lookup is ~0.3s server time, a 1-IP lookup well under 0.06s.
 if (!defined('LOOKUP_RATE_LIMIT_MAX')) {
-    define('LOOKUP_RATE_LIMIT_MAX', 60);
+    define('LOOKUP_RATE_LIMIT_MAX', 600);
 }
 if (!defined('LOOKUP_RATE_LIMIT_WINDOW_SECONDS')) {
     define('LOOKUP_RATE_LIMIT_WINDOW_SECONDS', 60);
 }
+// IPs per cost unit above the first.
+const LOOKUP_RATE_IPS_PER_UNIT = 1000;
 
 const LOOKUP_RATE_BUCKET_API  = 'lookup_rate';
 const LOOKUP_RATE_BUCKET_NOJS = 'lookup_rate_nojs';
+
+/**
+ * Cost units for one lookup of $ipCount unique IPs: 1 for 0–999, 2 for
+ * 1,000–1,999, … 11 for 10,000.
+ */
+function lookup_rate_cost(int $ipCount): int
+{
+    return 1 + intdiv(max(0, $ipCount), LOOKUP_RATE_IPS_PER_UNIT);
+}
 
 /**
  * The client identity a rate-limit bucket is keyed on (IPG-21). IPv4 comes
@@ -60,33 +85,43 @@ function rate_limit_key(string $ip): string
 }
 
 /**
- * Default rate limiter: the APCu increment-then-add-fallback pattern from
- * get-report.php:41-54, keyed per client IP instead of per free-report
- * token (via rate_limit_key(), so an IPv6 /64 shares one bucket).
- * Gracefully returns "not limited" if APCu isn't loaded (matches
- * get-report.php's function_exists guard).
+ * Default rate limiter: charges $cost units to this client's bucket for the
+ * current window and reports whether the window's budget is now exceeded.
+ * Gracefully returns "not limited" if APCu isn't loaded.
+ *
+ * @param ?callable $increment function(string $key, int $step, int $ttl): int|false,
+ *                             defaults to apcu_inc(); injectable so tests can
+ *                             model APCu without the extension
+ * @param ?int      $now       unix time, defaults to time()
  *
  * @return array{limited: bool, retry_after: int}
  */
-function default_lookup_rate_limiter(string $clientIp, string $bucket = LOOKUP_RATE_BUCKET_API): array
-{
-    if (!function_exists('apcu_inc') || $clientIp === '') {
+function default_lookup_rate_limiter(
+    string $clientIp,
+    string $bucket = LOOKUP_RATE_BUCKET_API,
+    int $cost = 1,
+    ?callable $increment = null,
+    ?int $now = null
+): array {
+    if ($increment === null) {
+        if (!function_exists('apcu_inc')) {
+            return ['limited' => false, 'retry_after' => 0];
+        }
+        $increment = static function (string $key, int $step, int $ttl) {
+            return apcu_inc($key, $step, $success, $ttl);
+        };
+    }
+    if ($clientIp === '') {
         return ['limited' => false, 'retry_after' => 0];
     }
 
-    $key     = $bucket . ':' . rate_limit_key($clientIp);
-    $success = false;
-    $count   = apcu_inc($key, 1, $success);
-    if (!$success) {
-        if (!apcu_add($key, 1, LOOKUP_RATE_LIMIT_WINDOW_SECONDS)) {
-            $count = apcu_inc($key) ?: 1;
-        } else {
-            $count = 1;
-        }
-    }
+    $now    = $now ?? time();
+    $window = LOOKUP_RATE_LIMIT_WINDOW_SECONDS;
+    $key    = $bucket . ':' . rate_limit_key($clientIp) . ':' . intdiv($now, $window);
+    $count  = $increment($key, max(1, $cost), $window);
 
-    if ($count > LOOKUP_RATE_LIMIT_MAX) {
-        return ['limited' => true, 'retry_after' => LOOKUP_RATE_LIMIT_WINDOW_SECONDS];
+    if ($count !== false && $count > LOOKUP_RATE_LIMIT_MAX) {
+        return ['limited' => true, 'retry_after' => $window - ($now % $window)];
     }
 
     return ['limited' => false, 'retry_after' => 0];

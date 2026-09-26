@@ -160,7 +160,7 @@ jobs:
           # Single random IP list avoids cross-environment MariaDB cache skew.
           # Absolute ceiling (6s) is the right check — staging and production share
           # the same physical server so relative comparison is not meaningful.
-          # POST / is rate-limited (IPG-17: 60/min per client IP, own APCu bucket).
+          # POST / is rate-limited (IPG-17/IPG-48: ~54 POSTs/min per client IP, own APCu bucket).
           # This job sends only this request and the functional test's from one
           # runner IP, so it stays far under the limit; no bypass header exists.
           python3 -c "
