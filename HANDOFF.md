@@ -39,6 +39,7 @@ Decisions that are settled, so don't reopen them without the owner:
 - **Privacy is honest but not the headline differentiator.** Speed and usability are.
 - **Cloudflare Pages/Workers are parked** as an investigation spike.
 - **The simple text logo stays.**
+- **The Community Block List is retired in v5.0.0** (IPG-7 option 2A). Its tables are kept for now; a DROP-based block list is post-release roadmap work.
 
 ## 2. Where everything is
 
@@ -79,7 +80,7 @@ Section 7 repeats both.
 | `includes/version.php` | `APP_VERSION` (5.0.0). Keep it equal to `VERSION`. Every asset URL uses `?v=<?= APP_VERSION ?>` |
 | `asn_classification.php` | ASN → category map. The ASN-DROP auto-sync block is regenerated monthly |
 | `spamhaus_drop_data.php` | Spamhaus DROP netblocks, regenerated weekly. It's a local list, with **no API and no quota** |
-| `report.php` | Static 410 "retired" page |
+| `report.php`, `intel.php` | Static 410 "retired" pages (Threat Reports; Community Block List) |
 | `migrations/retire_reports_v5.sql` | Manual, backup-first report-table retirement. **Not run yet** |
 | `scripts/fetch-mmdb.sh` | Deploy-time `.mmdb` fetch: netrc auth, SHA256 check, 8.8.8.8 spot check, atomic swap, skipped if the files are less than 35 days old |
 | `scripts/update-geoip.sh` | Monthly refresh (`.mmdb` plus legacy MySQL tables), run from `~/bin` on the server |
@@ -178,14 +179,14 @@ curl -s https://staging.ip2geo.org/ | grep -o 'v[0-9.]*' | head -1
 ## 7. Open decisions (the owner's call) and later work
 
 - **A past paid customer's report was lost** to a cleanup-script bug in May 2026. Whether to contact or refund them is still open. Details are in the private design doc (R17).
-- **Community Block List** (Open Question 4): keep it, fold it into DROP intel, or retire it. `community-consent.php` returns 410 since v5 removed the report page (ingestion code is in git history), so there can be no new opt-ins. The "Block list" nav link waits on this decision.
 - **Search Console check:** did the April 2026 reskin lose impressions or clicks?
 - **The Recent lookups decision** is due around **2026-10-23**, after 30 days of `recent_lookups_use` data (shipped in 4.3.3). Keep the feature or remove it.
 - **Retirement notices:**
   - The "Firewall rules moved here" hint is built. It's counted per visitor: 30 days from their first view, in localStorage.
   - The plan's 90-day "old form endpoint" POST response was **not built**. The form POST still works in v5 as the no-JS fallback, so it's probably moot. Confirm with the owner.
 - **Later:**
-  - drop the legacy MySQL GeoIP tables once v5 has run cleanly (if the block list is revived, its ingestion code read `geoip2_asn_current_int`, so settle that question first)
+  - drop the legacy MySQL GeoIP tables once v5 has run cleanly. The retired Community Block List's ingestion code (git history, before IPG-23) read `geoip2_asn_current_int`; nothing in v5 does. Decide the `community_*` tables at the same time.
+  - a DROP-based block list (replaces the Community Block List, retired in v5.0.0 by IPG-23)
   - the Cloudflare performance spike (parked: "we're doing well with what we have today")
 
 ## 8. Known gaps and unverified items

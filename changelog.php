@@ -12,7 +12,7 @@ render_page_open('Changelog — ip2geo.org', 'Release notes for ip2geo.org.');
         <div class="prose">
             <h3>5.0.0 — DRAFT (release date TBD)</h3>
             <p>A rebuild around the part people actually use: paste a pile of log text, get the IPs sorted out fast. IPv6 is looked up now, not skipped. A 10,000-IP paste comes back in well under a second instead of four or five. Filter by category, country or a search, see how often each IP showed up, and export straight to Excel, KQL, SPL or firewall rules. You can share a filtered view as a link, and there's a sample log to try it on.</p>
-            <p>Threat Reports and the $9 upgrade are gone. Almost nobody wanted them, and the tool is better without an upsell in the middle of your results. It's free, no signup, and in a normal browser the log text you paste stays on your machine: only the IP addresses are sent to look up, and they aren't stored.</p>
+            <p>Threat Reports and the $9 upgrade are gone. Almost nobody wanted them, and the tool is better without an upsell in the middle of your results. The Community Block List went with them: it was fed by Threat Reports, so it had nothing left to list. It's free, no signup, and in a normal browser the log text you paste stays on your machine: only the IP addresses are sent to look up, and they aren't stored.</p>
 
             <h3>4.3.3 — 2026-09-23</h3>
             <p>Recent lookups now counts, anonymously, when someone actually reopens a saved lookup. Nothing from the lookup goes with it, just "this got used". Before, I could only see who switched it off. It's a feature your browser keeps for you, and I'd like to know whether it's earning its spot.</p>
@@ -73,7 +73,7 @@ render_page_open('Changelog — ip2geo.org', 'Release notes for ip2geo.org.');
             <p>A few small tweaks and bugfixes. That last polish with your sleeve before guests come over.</p>
 
             <h3>3.1.0 — 2026-04-03</h3>
-            <p>A rolling 7-day <a href="/intel.php">Community Block List</a> built from opted-in Threat Reports. CIDR ranges corroborated by three or more independent users &mdash; filtered by prefix size and hit density so coarse ISP blocks don't slip through &mdash; appear on the public list, downloadable as iptables, ufw, nginx, or plain CIDR format.</p>
+            <p>A rolling 7-day Community Block List built from opted-in Threat Reports. CIDR ranges corroborated by three or more independent users &mdash; filtered by prefix size and hit density so coarse ISP blocks don't slip through &mdash; appear on the public list, downloadable as iptables, ufw, nginx, or plain CIDR format. (Retired in 5.0.0.)</p>
 
             <h3>3.0.0 — 2026-04-02</h3>
             <p>Threat Reports: paste a batch of IPs from your server logs, pay once, and get back a verdict (clean, watchlist, or threat), AbuseIPDB scores for the worst offenders, and ASN CIDR ranges so you can block whole subnets instead of individual addresses. Ready-to-run block scripts for iptables, ufw, and nginx download directly from the report. Reports are token-tied and expire after 30 days.</p>
