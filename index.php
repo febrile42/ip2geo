@@ -764,8 +764,7 @@ if (isset($_POST['ip_list'])) {
 					// — .ip-full (the untruncated address) is what should survive.
 					var clone = td.cloneNode(true);
 					clone.querySelectorAll('.you-tag, .drop-tag, .ip-truncated').forEach(function(el) { el.remove(); });
-					var val = clone.textContent.trim().replace(/"/g, '""');
-					row.push(/[,"\n]/.test(val) ? '"' + val + '"' : val);
+					row.push(window.ip2geoExport.csvEscape(clone.textContent.trim()));
 				});
 				rows.push(row);
 			});

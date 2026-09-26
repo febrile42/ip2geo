@@ -44,13 +44,21 @@
     nginx:    { label: 'nginx' }
   };
 
-  function csvEscape(val) {
+  // CSV/TSV formula injection (CWE-1236, IPG-10 S1): city and ASN org are
+  // third-party data, so a cell starting with = + - @ tab or CR/LF gets a
+  // leading ' and a spreadsheet shows it as text instead of running it.
+  function neutralizeFormula(val) {
     var s = String(val == null ? '' : val);
-    return /[,"\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    return /^[=+\-@\t\r\n]/.test(s) ? "'" + s : s;
+  }
+
+  function csvEscape(val) {
+    var s = neutralizeFormula(val);
+    return /[,"\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
   }
 
   function tsvEscape(val) {
-    return String(val == null ? '' : val).replace(/\t/g, ' ').replace(/\n/g, ' ');
+    return neutralizeFormula(val).replace(/[\t\r\n]/g, ' ');
   }
 
   var COLUMNS = ['ip', 'country', 'region', 'city', 'asn', 'asnOrg', 'category', 'hits', 'drop'];
@@ -171,6 +179,8 @@
     buildExport: buildExport,
     exportLabel: exportLabel,
     toastText: toastText,
-    approxKB: approxKB
+    approxKB: approxKB,
+    csvEscape: csvEscape,
+    tsvEscape: tsvEscape
   };
 });
