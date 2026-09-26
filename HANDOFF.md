@@ -182,12 +182,13 @@ curl -s https://staging.ip2geo.org/ | grep -o 'v[0-9.]*' | head -1
 - **Search Console check:** did the April 2026 reskin lose impressions or clicks?
 - **The Recent lookups decision** is due around **2026-10-23**, after 30 days of `recent_lookups_use` data (shipped in 4.3.3). Keep the feature or remove it.
 - **Retirement notices:**
-  - The "Firewall rules moved here" hint is built. It's counted per visitor: 30 days from their first view, in localStorage.
+  - Removed in IPG-32 (the owner reversed D12). Firewall/block rules are signposted by the Export / Rules button label and a "Block rules" menu group. The one-off `wb_export_hint_seen_at` cleanup can be deleted after 2026-12-31.
   - The plan's 90-day "old form endpoint" POST response was **not built**. The form POST still works in v5 as the no-JS fallback, so it's probably moot. Confirm with the owner.
 - **Later:**
   - drop the legacy MySQL GeoIP tables once v5 has run cleanly. The retired Community Block List's ingestion code (git history, before IPG-23) read `geoip2_asn_current_int`; nothing in v5 does. Decide the `community_*` tables at the same time.
   - a DROP-based block list (replaces the Community Block List, retired in v5.0.0 by IPG-23)
   - the Cloudflare performance spike (parked: "we're doing well with what we have today")
+  - delete the `wb_export_hint_seen_at` `localStorage.removeItem()` cleanup line in `mount()` (`assets/js/workbench.js`) after 2026-12-31.
 
 ## 8. Known gaps and unverified items
 

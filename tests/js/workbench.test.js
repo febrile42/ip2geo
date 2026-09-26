@@ -1,9 +1,8 @@
 /**
  * Tests for assets/js/workbench.js: the DOM-facing orchestration layer on
  * top of filters.js / export-templates.js / summary.js / share-link.js.
- * Covers buildRows(), ipv6MiddleTruncate(), the 30-day export hint, a
- * renderAll() smoke test against a DOM fixture, and runLookup()'s D6 state
- * handling against a mocked fetch.
+ * Covers buildRows(), ipv6MiddleTruncate(), a renderAll() smoke test against
+ * a DOM fixture, and runLookup()'s D6 state handling against a mocked fetch.
  */
 
 'use strict';
@@ -18,7 +17,6 @@ function buildDom() {
       <div class="wb-state" hidden></div>
       <div class="wb-body">
         <div class="wb-summary lookup-summary" role="status"></div>
-        <div class="wb-export-hint" hidden></div>
         <div class="wb-chips-category"></div>
         <div class="wb-chips-country"></div>
         <div class="wb-export"></div>
@@ -72,27 +70,63 @@ describe('ipv6MiddleTruncate', () => {
   });
 });
 
-describe('maybeShowExportHint (D12 30-day hint)', () => {
+describe('Export / Rules button and menu groups (IPG-32)', () => {
+  var root;
   beforeEach(() => {
-    buildDom();
-    window.localStorage.clear();
+    root = buildDom();
   });
 
-  test('shows the hint the first time (seeds the timestamp)', () => {
-    var root = document.getElementById('workbench-root');
-    WB.maybeShowExportHint(root);
-    var hint = root.querySelector('.wb-export-hint');
-    expect(hint.hidden).toBe(false);
-    expect(hint.textContent).toContain('Firewall rules moved here');
-    expect(window.localStorage.getItem(WB.EXPORT_HINT_KEY)).not.toBeNull();
+  function rows() {
+    return [
+      { ip: '1.1.1.1', country: 'US', region: 'CA', city: 'Fremont', asn: 'AS14061', asnOrg: 'DigitalOcean, LLC', category: 'cloud', drop: false, hits: 5 },
+    ];
+  }
+
+  test('the Export button label starts with "Export / Rules" and wraps the caret in an aria-hidden span', () => {
+    var state = WB.makeState();
+    state.rows = rows();
+    WB.renderAll(root, state);
+
+    var btn = root.querySelector('.wb-export-btn');
+    expect(btn.textContent.indexOf('Export / Rules')).toBe(0);
+    var caret = btn.querySelector('span[aria-hidden="true"]');
+    expect(caret).toBeTruthy();
+    expect(caret.textContent).toBe('▾');
   });
 
-  test('hides itself once the hint is older than 30 days', () => {
-    var root = document.getElementById('workbench-root');
-    var old = Date.now() - (WB.EXPORT_HINT_DAYS + 1) * 86400000;
-    window.localStorage.setItem(WB.EXPORT_HINT_KEY, String(old));
-    WB.maybeShowExportHint(root);
-    expect(root.querySelector('.wb-export-hint').hidden).toBe(true);
+  test('the menu has two role=group sections labelled "Data & queries" (4 items) and "Block rules" (3 items)', () => {
+    var state = WB.makeState();
+    state.rows = rows();
+    WB.renderAll(root, state);
+
+    var groups = root.querySelectorAll('.wb-menu [role="group"]');
+    expect(groups.length).toBe(2);
+
+    var dataGroup = groups[0];
+    var dataLabelId = dataGroup.getAttribute('aria-labelledby');
+    expect(document.getElementById(dataLabelId).textContent).toBe('Data & queries');
+    expect(dataGroup.querySelectorAll('.wb-menu-item').length).toBe(4);
+
+    var rulesGroup = groups[1];
+    var rulesLabelId = rulesGroup.getAttribute('aria-labelledby');
+    expect(document.getElementById(rulesLabelId).textContent).toBe('Block rules');
+    var rulesItems = rulesGroup.querySelectorAll('.wb-menu-item');
+    expect(rulesItems.length).toBe(3);
+    expect(rulesItems[0].textContent).toContain('iptables');
+    expect(rulesItems[1].textContent).toContain('ufw');
+    expect(rulesItems[2].textContent).toContain('nginx');
+  });
+
+  test('mount() removes wb_export_hint_seen_at from localStorage when present', () => {
+    window.localStorage.setItem('wb_export_hint_seen_at', String(Date.now()));
+    var form = document.createElement('form');
+    var textarea = document.createElement('textarea');
+    WB.mount(root, form, textarea);
+    expect(window.localStorage.getItem('wb_export_hint_seen_at')).toBeNull();
+  });
+
+  test('the D12 hint element is gone from the DOM', () => {
+    expect(document.querySelector('.wb-export-hint')).toBeNull();
   });
 });
 

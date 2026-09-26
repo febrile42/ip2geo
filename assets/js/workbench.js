@@ -40,8 +40,6 @@
 
   var CATEGORY_LABELS = Summary.SUMMARY_CATEGORY_LABELS;
   var RECENT_CHIP_COUNT = 6; // D3.5: top 6 countries + "+N more"
-  var EXPORT_HINT_KEY = 'wb_export_hint_seen_at';
-  var EXPORT_HINT_DAYS = 30; // D12: "Firewall rules moved here" for 30 days
 
   // ── small DOM helpers ───────────────────────────────────────────────────
 
@@ -218,7 +216,10 @@
 
   // ── Export ▾ menu (D9 + D16 WAI-ARIA menu button pattern) ───────────────
 
-  var EXPORT_FORMATS = ['tsv', 'csv', 'kql', 'spl', 'iptables', 'ufw', 'nginx'];
+  var EXPORT_GROUPS = [
+    { id: 'wb-menu-g-data', label: 'Data & queries', formats: ['tsv', 'csv', 'kql', 'spl'] },
+    { id: 'wb-menu-g-rules', label: 'Block rules', formats: ['iptables', 'ufw', 'nginx'] }
+  ];
 
   function renderExportMenu(root, state, visibleRows) {
     var wrap = root.querySelector('.wb-export');
@@ -231,26 +232,36 @@
       'aria-haspopup': 'true',
       'aria-expanded': 'false',
       id: 'wb-export-btn'
-    }, ['Export ▾ ', el('span', { class: 'wb-export-count' }, [count.toLocaleString() + ' IPs'])]);
+    }, [
+      'Export / Rules ',
+      el('span', { 'aria-hidden': 'true' }, ['▾']),
+      el('span', { class: 'wb-export-count' }, [count.toLocaleString() + ' IPs'])
+    ]);
 
     var menu = el('div', { class: 'wb-menu', role: 'menu', 'aria-labelledby': 'wb-export-btn', hidden: 'hidden' });
 
-    EXPORT_FORMATS.forEach(function (format) {
-      var info = Exp.exportLabel(format, visibleRows);
-      var item = el('button', {
-        class: 'wb-menu-item',
-        type: 'button',
-        role: 'menuitem',
-        tabindex: '-1'
-      }, [
-        el('span', {}, [info.label]),
-        info.over64kNote ? el('span', { class: 'wb-menu-note' }, ['over the 64 KB alert-rule limit']) : null
+    EXPORT_GROUPS.forEach(function (group) {
+      var groupEl = el('div', { class: 'wb-menu-group', role: 'group', 'aria-labelledby': group.id }, [
+        el('div', { class: 'wb-menu-group-label', id: group.id, role: 'presentation' }, [group.label])
       ]);
-      item.addEventListener('click', function () {
-        copyExport(root, format, visibleRows);
-        closeMenu();
+      group.formats.forEach(function (format) {
+        var info = Exp.exportLabel(format, visibleRows);
+        var item = el('button', {
+          class: 'wb-menu-item',
+          type: 'button',
+          role: 'menuitem',
+          tabindex: '-1'
+        }, [
+          el('span', {}, [info.label]),
+          info.over64kNote ? el('span', { class: 'wb-menu-note' }, ['over the 64 KB alert-rule limit']) : null
+        ]);
+        item.addEventListener('click', function () {
+          copyExport(root, format, visibleRows);
+          closeMenu();
+        });
+        groupEl.appendChild(item);
       });
-      menu.appendChild(item);
+      menu.appendChild(groupEl);
     });
 
     wrap.appendChild(btn);
@@ -549,28 +560,6 @@
     }
   }
 
-  // ── the 30-day "Firewall rules moved here" hint (D12) ──────────────────
-
-  function maybeShowExportHint(root) {
-    var seenAt = window.localStorage ? window.localStorage.getItem(EXPORT_HINT_KEY) : null;
-    var now = Date.now();
-    if (seenAt === null) {
-      if (window.localStorage) window.localStorage.setItem(EXPORT_HINT_KEY, String(now));
-      seenAt = String(now);
-    }
-    var ageDays = (now - Number(seenAt)) / 86400000;
-    var hint = root.querySelector('.wb-export-hint');
-    if (ageDays > EXPORT_HINT_DAYS) {
-      hint.hidden = true;
-      return;
-    }
-    hint.hidden = false;
-    hint.textContent = 'Firewall rules moved here';
-    var dismiss = el('button', { type: 'button', class: 'wb-hint-dismiss', 'aria-label': 'Dismiss' }, ['×']);
-    dismiss.addEventListener('click', function () { hint.hidden = true; });
-    hint.appendChild(dismiss);
-  }
-
   // ── D6 lookup states, rendered into the results slot, never alert() ────
 
   function renderState(root, kind, message, opts) {
@@ -644,7 +633,6 @@
         renderSummary(root, state);
         renderUnresolved(root, state);
         renderAll(root, state);
-        maybeShowExportHint(root);
         return true;
       });
     }).catch(function () {
@@ -665,6 +653,9 @@
    * the caller decides whether to call preventDefault() at all.
    */
   function mount(root, form, textarea) {
+    // IPG-32: the D12 "Firewall rules moved here" hint is gone; drop its leftover timestamp.
+    try { window.localStorage && window.localStorage.removeItem('wb_export_hint_seen_at'); } catch (e) { /* storage blocked */ }
+
     var state = makeState();
 
     if (typeof window.extractIps !== 'function') {
@@ -811,11 +802,8 @@
     renderState: renderState,
     clearState: clearState,
     ipv6MiddleTruncate: ipv6MiddleTruncate,
-    maybeShowExportHint: maybeShowExportHint,
     runLookup: runLookup,
     mount: mount,
-    mountSharedView: mountSharedView,
-    EXPORT_HINT_KEY: EXPORT_HINT_KEY,
-    EXPORT_HINT_DAYS: EXPORT_HINT_DAYS
+    mountSharedView: mountSharedView
   };
 });

@@ -2694,28 +2694,6 @@ button.button.small:hover {
    ip2geoSummary) always look identical. */
 .wb-summary { margin-bottom: 14px; }
 
-.wb-export-hint {
-  background: var(--surface-2);
-  color: var(--text-muted);
-  border-radius: var(--r-md);
-  padding: 6px 10px;
-  margin-bottom: 10px;
-  font-size: 12.5px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.wb-hint-dismiss {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: 14px;
-  line-height: 1;
-  margin-left: auto;
-}
-.wb-hint-dismiss:focus-visible { outline: 2px solid var(--accent-purple); outline-offset: 2px; }
-
 .wb-filters { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
 .wb-chips-row {
   display: flex;
@@ -2830,6 +2808,20 @@ button.button.small:hover {
   outline: none;
 }
 .wb-menu-note { color: var(--text-muted); font-size: 11px; }
+.wb-menu-group-label {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  padding: 6px 8px 4px;
+}
+.wb-menu-group + .wb-menu-group {
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+  padding-top: 4px;
+}
 
 .wb-table th { cursor: default; }
 .wb-cat {
@@ -2872,6 +2864,7 @@ button.button.small:hover {
     min-width: 0;
   }
   .wb-export-btn { width: 100%; justify-content: space-between; }
+  .wb-export-count { display: none; }
   .wb-toolbar .wb-share-download,
   .wb-toolbar .wb-toggle-unresolved {
     flex: 1 1 100%;
