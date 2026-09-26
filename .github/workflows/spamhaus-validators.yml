@@ -1,0 +1,61 @@
+name: Spamhaus validators
+
+# Runs the tests for the scripts that guard the Spamhaus auto-promote to
+# production (scripts/spamhaus-asns.sh, scripts/validate-spamhaus-promote.sh)
+# whenever they, the generator, the data files or the sync workflows change.
+# The committed data files are the passing fixtures, so a hand edit to them that
+# the validator would reject fails here too, before it reaches develop.
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/spamhaus-asns.sh'
+      - 'scripts/validate-spamhaus-promote.sh'
+      - 'scripts/gen-spamhaus-drop.php'
+      - 'asn_classification.php'
+      - 'spamhaus_drop_data.php'
+      - 'tests/SpamhausAsnsScriptTest.php'
+      - 'tests/SpamhausPromoteValidatorTest.php'
+      - '.github/workflows/sync-spamhaus.yml'
+      - '.github/workflows/sync-spamhaus-drop.yml'
+      - '.github/workflows/spamhaus-validators.yml'
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'scripts/spamhaus-asns.sh'
+      - 'scripts/validate-spamhaus-promote.sh'
+      - 'scripts/gen-spamhaus-drop.php'
+      - 'asn_classification.php'
+      - 'spamhaus_drop_data.php'
+      - 'tests/SpamhausAsnsScriptTest.php'
+      - 'tests/SpamhausPromoteValidatorTest.php'
+      - '.github/workflows/sync-spamhaus.yml'
+      - '.github/workflows/sync-spamhaus-drop.yml'
+      - '.github/workflows/spamhaus-validators.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  test:
+    name: Spamhaus validator tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          persist-credentials: false
+
+      # ubuntu-latest ships PHP, Composer and jq preinstalled.
+      - name: Install dev dependencies
+        run: composer install --no-interaction --no-progress
+
+      - name: Run tests
+        run: |
+          vendor/bin/phpunit tests/SpamhausAsnsScriptTest.php
+          vendor/bin/phpunit tests/SpamhausPromoteValidatorTest.php

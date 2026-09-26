@@ -46,12 +46,33 @@ jobs:
           fi
           echo "Branch 'develop' found."
 
+      # develop is only data here: nothing from this checkout is executed, and
+      # no credentials are left in its .git/config. Anyone who can push to
+      # develop can change its scripts, so the scripts this job runs (the
+      # generator and the promote validator) come from the main checkout below.
+      # Only the "Push to develop" step gets a token.
       - name: Checkout develop
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
         with:
           ref: develop
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: false
+
+      # develop must not ship its own .trusted (e.g. a symlink) for the main
+      # checkout to land in or through.
+      - name: Refuse a develop tree that contains .trusted
+        run: |
+          if [ -e .trusted ] || [ -L .trusted ]; then
+            echo "::error::develop contains a .trusted path; refusing to run. Remove it from develop."
+            exit 1
+          fi
+
+      - name: Checkout main (trusted scripts)
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          ref: main
+          path: .trusted
+          persist-credentials: false
 
       # ubuntu-latest ships PHP preinstalled (same as sync-spamhaus.yml, which
       # calls `php -l` with no setup step), so no setup-php action is needed.
@@ -74,8 +95,9 @@ jobs:
             exit 1
           fi
 
-          # Generator exits non-zero (without writing) on empty/garbage input.
-          php scripts/gen-spamhaus-drop.php < "$TMP_FEED" > "$DATA_FILE.new"
+          # Generator exits non-zero (without writing) on empty/garbage input. It runs
+          # from the trusted main checkout, never from develop.
+          php .trusted/scripts/gen-spamhaus-drop.php < "$TMP_FEED" > "$DATA_FILE.new"
           php -l "$DATA_FILE.new"
           rm -f "$TMP_FEED"
 
@@ -98,8 +120,17 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add "$DATA_FILE"
           git commit -m "chore: sync Spamhaus DROP — +${ADDED} / -${REMOVED} ranges ($(date -u +%Y-%m-%d))"
-          git push origin develop
           echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      # The only step with a token that can write to the repo via git. The develop
+      # checkout keeps no credentials, so pass it for this one push.
+      - name: Push to develop
+        if: steps.regen.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:develop
 
       # GITHUB_TOKEN pushes don't trigger the CI/CD workflow (GitHub loop-
       # prevention), so mirror deploy.yml's staging deploy here.
@@ -147,6 +178,17 @@ jobs:
             echo "$OTHER_FILES"
             echo "promoted=false" >> "$GITHUB_OUTPUT"
             exit 0
+          fi
+
+          # "Only the data file changed" is not enough: validate the exact develop
+          # commit that would be merged, with the validator from main. Every line
+          # must be one the generator writes (no free-form // comments, where a
+          # "?>" would end the PHP block). See scripts/validate-spamhaus-promote.sh.
+          git show "$DEVELOP_SHA:spamhaus_drop_data.php" > "$RUNNER_TEMP/drop_develop.php"
+          if ! bash .trusted/scripts/validate-spamhaus-promote.sh drop "$RUNNER_TEMP/drop_develop.php"; then
+            echo "::error::develop ${DEVELOP_SHA}: spamhaus_drop_data.php is not what scripts/gen-spamhaus-drop.php writes. NOT promoting to main. Inspect develop before any release."
+            echo "promoted=false" >> "$GITHUB_OUTPUT"
+            exit 1
           fi
 
           echo "Pure DROP-data delta detected. Opening PR develop -> main."
