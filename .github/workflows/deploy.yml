@@ -76,6 +76,9 @@ jobs:
           port: ${{ secrets.DEPLOY_PORT }}
           script: |
             cd ${{ secrets.STAGING_PATH }}
+            # The repo now tracks a root .htaccess (IPG-10 F1). Keep a copy of any
+            # untracked server-side one before git reset replaces it.
+            if [ -f .htaccess ] && ! git ls-files --error-unmatch .htaccess >/dev/null 2>&1; then cp -n .htaccess .htaccess.pre-v5.bak; fi
             git fetch origin && git reset --hard origin/${{ github.ref_name }}
             ~/bin/composer install --no-dev --no-interaction --quiet
             printf "User-agent: *\nDisallow: /\n" > robots.txt
@@ -115,6 +118,23 @@ jobs:
             exit 1
           fi
           echo "data/geoip blocked: HTTP $CODE"
+
+      - name: Non-public paths are not web-reachable (IPG-10 F1)
+        run: |
+          FAIL=0
+          for P in /scripts/rand_ips.php /scripts/cleanup_report_events.php /scripts/migrate.sql \
+                   /migrations/retire_reports_v5.sql /composer.json /vendor/composer/installed.json; do
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+              -H "Host: staging.ip2geo.org" \
+              "http://${{ secrets.DEPLOY_HOST }}$P")
+            if [ "$CODE" != "403" ] && [ "$CODE" != "404" ]; then
+              echo "$P is web-reachable: HTTP $CODE"
+              FAIL=1
+            else
+              echo "$P blocked: HTTP $CODE"
+            fi
+          done
+          exit $FAIL
 
       - name: Functional test — known IP lookup returns expected country
         run: |
@@ -183,6 +203,9 @@ jobs:
           port: ${{ secrets.DEPLOY_PORT }}
           script: |
             cd ${{ secrets.DEPLOY_PATH }}
+            # The repo now tracks a root .htaccess (IPG-10 F1). Keep a copy of any
+            # untracked server-side one before git reset replaces it.
+            if [ -f .htaccess ] && ! git ls-files --error-unmatch .htaccess >/dev/null 2>&1; then cp -n .htaccess .htaccess.pre-v5.bak; fi
             git fetch origin && git reset --hard origin/main
             ~/bin/composer install --no-dev --no-interaction --quiet
             # .mmdb lookup data (v5): only downloads when missing or >35 days old
@@ -211,3 +234,20 @@ jobs:
             exit 1
           fi
           echo "data/geoip blocked: HTTP $CODE"
+
+      - name: Production non-public paths are not web-reachable (IPG-10 F1)
+        run: |
+          FAIL=0
+          for P in /scripts/rand_ips.php /scripts/cleanup_report_events.php /scripts/migrate.sql \
+                   /migrations/retire_reports_v5.sql /composer.json /vendor/composer/installed.json; do
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+              -H "Host: ip2geo.org" \
+              "http://${{ secrets.DEPLOY_HOST }}$P")
+            if [ "$CODE" != "403" ] && [ "$CODE" != "404" ]; then
+              echo "$P is web-reachable: HTTP $CODE"
+              FAIL=1
+            else
+              echo "$P blocked: HTTP $CODE"
+            fi
+          done
+          exit $FAIL
