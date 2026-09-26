@@ -883,6 +883,25 @@ describe('mountSharedView (IPG-39: v4/v6 split, recipient pill has no line count
       expect(root.querySelector('.wb-paste-pill').textContent).toBe('Unique: 2 IPv4 / 1 IPv6');
     });
   });
+
+  test('recipient view has no lookup timer (IPG-96)', () => {
+    var payload = Share.encodeShareState({
+      ips: ['192.0.2.10', '8.8.8.8'],
+      categories: [], countries: [], search: ''
+    });
+    global.fetch = jest.fn().mockResolvedValue({
+      status: 200,
+      ok: true,
+      json: function () { return Promise.resolve({ results: [], unresolved: [] }); }
+    });
+
+    var root = buildDom();
+    return WB.mountSharedView(root, payload, () => {}).then(function (ok) {
+      expect(ok).toBe(true);
+      expect(root.querySelector('.wb-paste-pill')).not.toBeNull();
+      expect(root.querySelector('.wb-paste-time')).toBeNull();
+    });
+  });
 });
 
 describe('no-country chip label (IPG-81/IPG-82)', () => {
