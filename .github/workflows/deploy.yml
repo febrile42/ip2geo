@@ -14,6 +14,10 @@ on:
       - main
       - develop
 
+# No job needs to write to the repo (IPG-10 S3).
+permissions:
+  contents: read
+
 jobs:
 
   # ── Runs on both branches ──────────────────────────────────────────────────
