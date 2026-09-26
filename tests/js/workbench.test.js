@@ -303,6 +303,35 @@ describe('formatLookupTime (bug: always showed "0.0 s" for sub-100ms lookups)', 
   });
 });
 
+describe('renderPasteBar (IPG-38: New lookup removed, Edit paste kept)', () => {
+  var root;
+  beforeEach(() => {
+    root = buildDom();
+  });
+
+  test('renders exactly two buttons, Edit paste and Recent ▾, with no New lookup', () => {
+    var state = WB.makeState();
+    WB.renderPasteBar(root, state, function () {}, function () {});
+
+    var buttons = root.querySelectorAll('.wb-paste-bar button');
+    var labels = Array.prototype.map.call(buttons, function (b) { return b.textContent; });
+    expect(labels).toEqual(['Edit paste', 'Recent ▾']);
+
+    var editBtn = root.querySelector('.wb-paste-bar button');
+    expect(editBtn.getAttribute('aria-controls')).toBe('message');
+  });
+
+  test('hides Edit paste when state.recipient is set (shared-view link)', () => {
+    var state = WB.makeState();
+    state.recipient = { count: 3, categories: [], countries: [] };
+    WB.renderPasteBar(root, state, function () {}, function () {});
+
+    var buttons = root.querySelectorAll('.wb-paste-bar button');
+    var labels = Array.prototype.map.call(buttons, function (b) { return b.textContent; });
+    expect(labels).toEqual(['Recent ▾']);
+  });
+});
+
 describe('runLookup D6 states', () => {
   var root;
   beforeEach(() => {

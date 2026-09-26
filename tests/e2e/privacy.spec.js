@@ -89,7 +89,7 @@ test.describe('R3: no log text or fragment content leaks to any request', () => 
     });
 
     // Second, independent paste: a fresh page load keeps this deterministic
-    // regardless of how "New lookup" resets workbench state.
+    // without depending on any in-page reset of workbench state.
     await page.goto('/index.php');
     await page.fill('#message', PASTE_B);
     await page.click('.lookup-form .submit');
