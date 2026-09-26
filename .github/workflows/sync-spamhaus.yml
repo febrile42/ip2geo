@@ -43,12 +43,33 @@ jobs:
           fi
           echo "Branch 'develop' found."
 
+      # develop is only data here: nothing from this checkout is executed, and
+      # no credentials are left in its .git/config. Anyone who can push to
+      # develop can change its scripts, so the scripts this job runs (the
+      # generator and the promote validator) come from the main checkout below.
+      # Only the "Push to develop" step gets a token.
       - name: Checkout develop
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
         with:
           ref: develop
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: false
+
+      # develop must not ship its own .trusted (e.g. a symlink) for the main
+      # checkout to land in or through.
+      - name: Refuse a develop tree that contains .trusted
+        run: |
+          if [ -e .trusted ] || [ -L .trusted ]; then
+            echo "::error::develop contains a .trusted path; refusing to run. Remove it from develop."
+            exit 1
+          fi
+
+      - name: Checkout main (trusted scripts)
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          ref: main
+          path: .trusted
+          persist-credentials: false
 
       - name: Regenerate Spamhaus auto-sync block
         id: regen
@@ -61,11 +82,12 @@ jobs:
 
           # Spamhaus ASN-DROP — current bad-actor AS list (NDJSON, one object per line).
           # Each ASN is written into PHP source below, so the feed is validated by
-          # scripts/spamhaus-asns.sh: it emits only "AS<integer>" lines and fails the
-          # job (emitting nothing) on any unexpected value or an empty list, so a
-          # tampered feed can neither inject code nor empty the auto-sync block.
+          # scripts/spamhaus-asns.sh (from the trusted main checkout): it emits only
+          # "AS<integer>" lines and fails the job (emitting nothing) on any unexpected
+          # value or an empty list, so a tampered feed can neither inject code nor
+          # empty the auto-sync block.
           SPAMHAUS_ASNS=$(curl -sf --max-time 60 https://www.spamhaus.org/drop/asndrop.json \
-            | scripts/spamhaus-asns.sh)
+            | bash .trusted/scripts/spamhaus-asns.sh)
 
           # Manual entries = ASNs in $known_asns ABOVE the BEGIN marker.
           # Anything below the marker is owned by this workflow and gets replaced.
@@ -129,8 +151,17 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add "$CLASSIFICATION_FILE"
           git commit -m "chore: sync Spamhaus ASN-DROP — +${ADDED} / -${REMOVED} ($(date -u +%Y-%m-%d))"
-          git push origin develop
           echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      # The only step with a token that can write to the repo via git. The develop
+      # checkout keeps no credentials, so pass it for this one push.
+      - name: Push to develop
+        if: steps.regen.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:develop
 
       # GITHUB_TOKEN-driven pushes don't trigger the CI/CD workflow (GitHub
       # loop-prevention), so the monthly sync would land on develop but staging
@@ -184,18 +215,23 @@ jobs:
             exit 0
           fi
 
-          # Strip the entire auto-sync block (including the Last-sync date comment)
-          # from both versions; if the rest of the file is identical, the delta is
-          # pure Spamhaus and safe to auto-promote.
-          strip_block() {
-            awk '/BEGIN AUTO-SYNC SPAMHAUS ASN-DROP/{f=1; next} /END AUTO-SYNC SPAMHAUS ASN-DROP/{f=0; next} !f'
-          }
-          MAIN_STRIPPED=$(git show origin/main:asn_classification.php | strip_block)
-          DEV_STRIPPED=$(git show "$DEVELOP_SHA:asn_classification.php" | strip_block)
-          if [ "$MAIN_STRIPPED" != "$DEV_STRIPPED" ]; then
+          # Validate the exact develop commit that would be merged, with the
+          # validator from main: exactly one BEGIN/END marker pair (whole lines),
+          # only generator-shaped lines inside the block, and the rest of the file
+          # byte-identical to main. See scripts/validate-spamhaus-promote.sh.
+          git show origin/main:asn_classification.php > "$RUNNER_TEMP/asn_main.php"
+          git show "$DEVELOP_SHA:asn_classification.php" > "$RUNNER_TEMP/asn_develop.php"
+          RC=0
+          bash .trusted/scripts/validate-spamhaus-promote.sh asn \
+            "$RUNNER_TEMP/asn_main.php" "$RUNNER_TEMP/asn_develop.php" || RC=$?
+          if [ "$RC" -eq 2 ]; then
             echo "asn_classification.php has changes outside the auto-sync block; not auto-promoting."
             echo "promoted=false" >> "$GITHUB_OUTPUT"
             exit 0
+          elif [ "$RC" -ne 0 ]; then
+            echo "::error::develop ${DEVELOP_SHA}: the ASN-DROP auto-sync block in asn_classification.php is not what sync-spamhaus.yml writes. NOT promoting to main. Inspect develop before any release."
+            echo "promoted=false" >> "$GITHUB_OUTPUT"
+            exit 1
           fi
 
           echo "Pure-Spamhaus delta detected. Opening PR develop -> main."
