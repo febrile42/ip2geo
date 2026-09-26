@@ -205,7 +205,8 @@ class ApiLookupTest extends TestCase
 
     // ── client IP selection ──────────────────────────────────────────────────
 
-    public function testClientIpPrefersCfConnectingIpOverRemoteAddr(): void
+    /** Runs one request and returns the key the rate limiter was called with. */
+    private function rateLimitKeyFor(array $server): string
     {
         $seen = [];
         $spy  = function (string $ip) use (&$seen): array {
@@ -214,17 +215,59 @@ class ApiLookupTest extends TestCase
         };
 
         handle_lookup_request(
-            [
-                'REQUEST_METHOD'       => 'POST',
-                'HTTP_CF_CONNECTING_IP' => '203.0.113.7',
-                'REMOTE_ADDR'          => '10.0.0.1',
-            ],
+            ['REQUEST_METHOD' => 'POST'] + $server,
             json_encode(['ips' => ['1.2.3.4']]),
             $this->realLookup(),
             $spy
         );
 
-        $this->assertSame(['203.0.113.7'], $seen);
+        $this->assertCount(1, $seen);
+        return $seen[0];
+    }
+
+    // IPG-10 F2: a direct-to-origin caller must not pick its own bucket.
+    public function testCfHeaderIgnoredWhenRemoteAddrIsNotCloudflare(): void
+    {
+        $this->assertSame('203.0.113.5', $this->rateLimitKeyFor([
+            'REMOTE_ADDR'           => '203.0.113.5',
+            'HTTP_CF_CONNECTING_IP' => '198.51.100.9',
+        ]));
+    }
+
+    public function testCfHeaderUsedWhenRemoteAddrIsCloudflareV4(): void
+    {
+        $this->assertSame('198.51.100.9', $this->rateLimitKeyFor([
+            'REMOTE_ADDR'           => '162.158.1.1',
+            'HTTP_CF_CONNECTING_IP' => '198.51.100.9',
+        ]));
+    }
+
+    public function testCfHeaderUsedWhenRemoteAddrIsCloudflareV6(): void
+    {
+        $this->assertSame('2001:db8::1', $this->rateLimitKeyFor([
+            'REMOTE_ADDR'           => '2a06:98c7:1::5',
+            'HTTP_CF_CONNECTING_IP' => '2001:db8::1',
+        ]));
+    }
+
+    public function testGarbageCfHeaderFromCloudflareFallsBackToRemoteAddr(): void
+    {
+        $this->assertSame('162.158.1.1', $this->rateLimitKeyFor([
+            'REMOTE_ADDR'           => '162.158.1.1',
+            'HTTP_CF_CONNECTING_IP' => 'not-an-ip; x',
+        ]));
+    }
+
+    public function testIpInCidrBoundaries(): void
+    {
+        $this->assertTrue(lookup_endpoint_ip_in_cidr('104.16.0.0', '104.16.0.0/13'));
+        $this->assertTrue(lookup_endpoint_ip_in_cidr('104.23.255.255', '104.16.0.0/13'));
+        $this->assertFalse(lookup_endpoint_ip_in_cidr('104.24.0.0', '104.16.0.0/13'));
+        $this->assertFalse(lookup_endpoint_ip_in_cidr('104.15.255.255', '104.16.0.0/13'));
+        $this->assertTrue(lookup_endpoint_ip_in_cidr('2a06:98c7:ffff::1', '2a06:98c0::/29'));
+        $this->assertFalse(lookup_endpoint_ip_in_cidr('2a06:98c8::1', '2a06:98c0::/29'));
+        $this->assertFalse(lookup_endpoint_ip_in_cidr('162.158.1.1', '2400:cb00::/32'));
+        $this->assertFalse(lookup_endpoint_ip_in_cidr('', '104.16.0.0/13'));
     }
 
     public function testClientIpFallsBackToRemoteAddr(): void
