@@ -22,6 +22,7 @@ function buildDom() {
         <div class="wb-export"></div>
         <button type="button" class="wb-share-btn"></button>
         <button type="button" class="wb-share-download" hidden></button>
+        <p class="wb-share-notice"></p>
         <button type="button" class="wb-toggle-unresolved" hidden></button>
         <button type="button" class="wb-clear-filters" hidden></button>
         <span class="wb-shown-count"></span>
@@ -242,6 +243,109 @@ describe('renderAll smoke test', () => {
 
     expect(root.querySelector('.wb-shown-count').textContent).toBe('1 shown');
     expect(root.querySelectorAll('.wb-search').length).toBe(1);
+  });
+});
+
+// IPG-42/M1 (IPG-53): the disclosure line and the over-cap "send the file"
+// line are mutually exclusive and swap live as filtering changes the view
+// size relative to share-link.js's URL_CAP_CHARS. Copy is verbatim (Bilac,
+// IPG-50; verified against the code by Psyger, IPG-51) — don't reword it here.
+describe('Share-link disclosure / over-cap notice (IPG-42/M1)', () => {
+  var root;
+  var DISCLOSURE = 'The IPs are in the link itself, not saved on our server. Anyone with the link can see them.';
+  var OVER_CAP = 'Filter to fewer IPs to get a link, or download the view file and send that. To open it, the recipient pastes the file\'s contents into ip2geo.';
+
+  beforeEach(() => {
+    root = buildDom();
+  });
+
+  function row(ip, country) {
+    return { ip: ip, country: country || 'US', region: '', city: '', asn: 'AS1', asnOrg: 'Test', category: 'cloud', drop: false, hits: 1 };
+  }
+
+  // IPv6 addresses (2001:db8::/32, synthetic per HANDOFF) pack heavier
+  // (17 bytes each) than IPv4, so a few hundred are enough to comfortably
+  // clear the ~8 KB share-link URL cap without a huge fixture.
+  function manyRows(n) {
+    var out = [];
+    for (var i = 1; i <= n; i++) {
+      out.push(row('2001:db8::' + i.toString(16)));
+    }
+    return out;
+  }
+
+  test('shows the disclosure line while the view is under the share-link cap', () => {
+    var state = WB.makeState();
+    state.rows = [row('198.51.100.1')];
+    WB.renderAll(root, state);
+
+    expect(root.querySelector('.wb-share-notice').textContent).toBe(DISCLOSURE);
+    expect(root.querySelector('.wb-share-btn').disabled).toBe(false);
+  });
+
+  test('shows the over-cap line instead, once the view exceeds the share-link cap', () => {
+    var state = WB.makeState();
+    state.rows = manyRows(400);
+    WB.renderAll(root, state);
+
+    expect(root.querySelector('.wb-share-notice').textContent).toBe(OVER_CAP);
+    expect(root.querySelector('.wb-share-btn').disabled).toBe(true);
+  });
+
+  test('only one of the two lines ever shows', () => {
+    var underState = WB.makeState();
+    underState.rows = [row('198.51.100.1')];
+    WB.renderAll(root, underState);
+    expect(root.querySelectorAll('.wb-share-notice').length).toBe(1);
+
+    var overState = WB.makeState();
+    overState.rows = manyRows(400);
+    WB.renderAll(root, overState);
+    expect(root.querySelectorAll('.wb-share-notice').length).toBe(1);
+  });
+
+  test('a filter that brings the view back under the cap swaps the over-cap line for the disclosure live', () => {
+    var state = WB.makeState();
+    state.rows = manyRows(400).concat([row('198.51.100.9', 'DE')]);
+    WB.renderAll(root, state);
+    expect(root.querySelector('.wb-share-notice').textContent).toBe(OVER_CAP);
+
+    var deChip = Array.from(root.querySelectorAll('.wb-chips-country .wb-chip'))
+      .find(function (l) { return l.textContent.indexOf('DE') !== -1; });
+    expect(deChip).toBeTruthy();
+    deChip.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+
+    expect(root.querySelector('.wb-shown-count').textContent).toBe('1 shown');
+    expect(root.querySelector('.wb-share-notice').textContent).toBe(DISCLOSURE);
+  });
+
+  test('a filter that pushes the view back over the cap swaps the disclosure for the over-cap line live', () => {
+    var state = WB.makeState();
+    state.rows = manyRows(400).concat([row('198.51.100.9', 'DE')]);
+    state.filters = { categories: new Set(), countries: new Set(['DE']), search: '' };
+    WB.renderAll(root, state);
+    expect(root.querySelector('.wb-shown-count').textContent).toBe('1 shown');
+    expect(root.querySelector('.wb-share-notice').textContent).toBe(DISCLOSURE);
+
+    var deChip = Array.from(root.querySelectorAll('.wb-chips-country .wb-chip'))
+      .find(function (l) { return l.textContent.indexOf('DE') !== -1; });
+    expect(deChip).toBeTruthy();
+    deChip.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })); // deselect DE, back to all rows
+
+    expect(root.querySelector('.wb-shown-count').textContent).toBe('401 shown');
+    expect(root.querySelector('.wb-share-notice').textContent).toBe(OVER_CAP);
+  });
+
+  test('the share toast reads "Link copied · N IPs", with the disclosure living only in the notice line', () => {
+    var state = WB.makeState();
+    state.rows = [row('198.51.100.1'), row('198.51.100.2')];
+    WB.renderAll(root, state);
+
+    root.querySelector('.wb-share-btn').click();
+
+    var toast = root.querySelector('.wb-toast-host .wb-toast');
+    expect(toast).toBeTruthy();
+    expect(toast.textContent).toBe('Link copied · 2 IPs');
   });
 });
 

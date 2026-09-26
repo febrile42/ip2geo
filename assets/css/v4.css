@@ -2765,6 +2765,7 @@ button.button.small:hover {
   padding: 0;
 }
 .wb-share-btn--disabled { color: var(--text-muted); cursor: not-allowed; }
+.wb-share-notice { color: var(--text-muted); font-size: 12px; margin: -2px 0 10px; }
 
 .wb-export { position: relative; display: inline-block; }
 .wb-export-btn { display: inline-flex; gap: 6px; align-items: center; }

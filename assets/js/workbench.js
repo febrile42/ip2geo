@@ -53,6 +53,10 @@
   // Same text as DROP_EXPLAINER in includes/summary.php (tests/DropExplainerTest.php).
   var DROP_EXPLAINER = 'Spamhaus DROP (Don\'t Route Or Peer): this IP is in a netblock Spamhaus lists as hijacked or run by spam or cybercrime operations. Legitimate traffic from these ranges is rare.';
 
+  // IPG-42/M1 copy (Bilac, IPG-50; verified against the code by Psyger, IPG-51) — verbatim, do not reword.
+  var SHARE_DISCLOSURE = 'The IPs are in the link itself, not saved on our server. Anyone with the link can see them.';
+  var SHARE_OVER_CAP_NOTICE = 'Filter to fewer IPs to get a link, or download the view file and send that. To open it, the recipient pastes the file\'s contents into ip2geo.';
+
   function el(tag, attrs, children) {
     var e = document.createElement(tag);
     attrs = attrs || {};
@@ -545,7 +549,7 @@
       if (shareResult.overCap) return;
       var url = window.location.origin + window.location.pathname + '#v=' + shareResult.payload;
       var done = function () {
-        showToast(root, 'Link copied · ' + visible.length.toLocaleString() + ' IPs · the link contains the IPs');
+        showToast(root, 'Link copied · ' + visible.length.toLocaleString() + ' IPs');
         try { window.umami && window.umami.track('share_link_created'); } catch (e) { /* no-op */ }
       };
       if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -554,6 +558,9 @@
         done();
       }
     };
+
+    var shareNotice = root.querySelector('.wb-share-notice');
+    shareNotice.textContent = shareResult.overCap ? SHARE_OVER_CAP_NOTICE : SHARE_DISCLOSURE;
 
     var downloadBtn = root.querySelector('.wb-share-download');
     downloadBtn.hidden = !shareResult.overCap;
