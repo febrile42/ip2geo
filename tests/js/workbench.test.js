@@ -181,6 +181,30 @@ describe('renderAll smoke test', () => {
     expect(root.querySelector('.wb-clear-filters').hidden).toBe(false);
   });
 
+  test('Clear filters resets both chip rows and moves focus to search (D10, IPG-85)', () => {
+    var state = WB.makeState();
+    state.rows = rows();
+    WB.renderAll(root, state);
+    var total = root.querySelector('.wb-shown-count').textContent;
+
+    Array.from(root.querySelectorAll('.wb-chips-category .wb-chip'))
+      .find(function (l) { return l.textContent.indexOf('Scanning') !== -1; })
+      .dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    root.querySelector('.wb-chips-country .wb-chip')
+      .dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    expect(root.querySelector('.wb-shown-count').textContent).not.toBe(total);
+
+    var clearBtn = root.querySelector('.wb-clear-filters');
+    clearBtn.click();
+
+    expect(state.filters.categories.size).toBe(0);
+    expect(state.filters.countries.size).toBe(0);
+    expect(root.querySelector('.wb-shown-count').textContent).toBe(total);
+    expect(root.querySelectorAll('.wb-chip--sel').length).toBe(0);
+    expect(clearBtn.hidden).toBe(true);
+    expect(document.activeElement).toBe(root.querySelector('.wb-search'));
+  });
+
   test('DROP tag appears in the category cell for drop rows', () => {
     var state = WB.makeState();
     state.rows = rows();
