@@ -625,6 +625,7 @@ if (isset($_POST['ip_list'])) {
 						<span class="wb-shown-count"></span>
 						<button type="button" class="wb-clear-filters" hidden>Clear filters</button>
 					</div>
+					<p class="wb-share-notice"></p>
 					<div class="table-wrapper" style="overflow-x:auto">
 						<table class="wb-table" id="wb-results-table">
 							<caption style="position:absolute;left:-9999px">Lookup results, one row per IP address</caption>
