@@ -1,0 +1,7 @@
+# Deny web access to repo files that aren't pages or assets (IPG-10 F1).
+# Applies in every subdirectory. Directories that are never web content
+# (scripts/, migrations/, vendor/, tests/, includes/, data/) also carry their
+# own "Require all denied" .htaccess.
+<FilesMatch "^(composer\.(json|lock)|package(-lock)?\.json|phpunit\.xml|(jest|playwright)\.config\.js|config(\.sample)?\.php|asn_classification\.php|report_functions\.php|spamhaus_drop_data\.php|.*\.(md|sql|sh|yml|lock))$">
+    Require all denied
+</FilesMatch>

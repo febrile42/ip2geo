@@ -10,8 +10,10 @@ data/geoip/
 # Google Search Console verification — place manually on server if needed
 google*.html
 
-# Composer — vendor dir not committed; composer.json is
-vendor/
+# Composer — vendor dir not committed; composer.json is. vendor/.htaccess is,
+# so the deploy's git reset puts the web-access deny in place (IPG-10 F1).
+/vendor/*
+!/vendor/.htaccess
 
 # Node / Jest
 node_modules/
