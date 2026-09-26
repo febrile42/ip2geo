@@ -847,3 +847,64 @@ describe('mountSharedView (IPG-39: v4/v6 split, recipient pill has no line count
     });
   });
 });
+
+describe('no-country chip label (IPG-81/IPG-82)', () => {
+  var Share = require('../../assets/js/share-link.js');
+  var root;
+  beforeEach(() => {
+    root = buildDom();
+  });
+  afterEach(() => {
+    delete global.fetch;
+  });
+
+  function rows() {
+    return [
+      { ip: '192.0.2.10', country: '', region: '', city: '', asn: '', asnOrg: '', category: 'unknown', drop: false, hits: 1 },
+      { ip: '198.51.100.7', country: '', region: '', city: '', asn: '', asnOrg: '', category: 'unknown', drop: false, hits: 1 },
+      { ip: '203.0.113.5', country: '', region: '', city: '', asn: '', asnOrg: '', category: 'unknown', drop: false, hits: 1 },
+      { ip: '8.8.8.8', country: 'US', region: '', city: '', asn: 'AS15169', asnOrg: 'Google LLC', category: 'cloud', drop: false, hits: 1 },
+    ];
+  }
+
+  function countryChips() {
+    return Array.prototype.slice.call(root.querySelectorAll('.wb-chips-country .wb-chip'));
+  }
+
+  test('the chip for country \'\' reads "No country 3" and its accessible name is "No country, 3 IPs"', () => {
+    var state = WB.makeState();
+    state.rows = rows();
+    WB.renderAll(root, state);
+
+    var chips = countryChips();
+    expect(chips.map(function (c) { return c.textContent; })).toEqual(['No country 3', 'US 1']);
+    expect(chips[0].querySelector('input').getAttribute('aria-label')).toBe('No country, 3 IPs');
+  });
+
+  test('the filter value stays \'\': clicking the chip shows the 3 no-country rows, whose Country cells stay empty', () => {
+    var state = WB.makeState();
+    state.rows = rows();
+    WB.renderAll(root, state);
+
+    countryChips()[0].click();
+    expect(Array.from(state.filters.countries)).toEqual(['']);
+    var trs = root.querySelectorAll('.wb-table tbody tr');
+    expect(trs.length).toBe(3);
+    Array.prototype.forEach.call(trs, function (tr) {
+      expect(tr.children[1].textContent).toBe('');
+    });
+    expect(countryChips()[0].textContent).toBe('✓ No country 3');
+  });
+
+  test('the shared-view banner names category labels and "No country", with no raw key or trailing comma', () => {
+    global.fetch = jest.fn().mockRejectedValue(new Error('offline'));
+    var payload = Share.encodeShareState({
+      ips: ['192.0.2.10', '198.51.100.7', '203.0.113.5', '2001:db8::1', '8.8.8.8'],
+      categories: ['cloud'], countries: [''], search: ''
+    });
+    var banner = null;
+    return WB.mountSharedView(root, payload, function (text) { banner = text; }).then(function () {
+      expect(banner).toBe('Shared view · 5 IPs · filters: Cloud exit, No country');
+    });
+  });
+});
