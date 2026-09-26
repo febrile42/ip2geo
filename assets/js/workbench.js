@@ -40,6 +40,13 @@
 
   var CATEGORY_LABELS = Summary.SUMMARY_CATEGORY_LABELS;
   var RECENT_CHIP_COUNT = 6; // D3.5: top 6 countries + "+N more"
+  var SEARCH_TRACK_DEBOUNCE_MS = 600; // D9: don't fire filter_search per keystroke
+  var searchTrackTimer = null;
+
+  // D9: dimension only, never the filter value (no IPs/ASNs/countries the visitor typed or clicked).
+  function trackFilterUse(dim) {
+    try { window.umami && window.umami.track('filter_' + dim); } catch (e) { /* no-op */ }
+  }
 
   // ── small DOM helpers ───────────────────────────────────────────────────
 
@@ -410,6 +417,8 @@
         search.addEventListener('input', function () {
           var current = wrap._wbState;
           current.filters = { categories: current.filters.categories, countries: current.filters.countries, search: search.value };
+          window.clearTimeout(searchTrackTimer);
+          searchTrackTimer = window.setTimeout(function () { trackFilterUse('search'); }, SEARCH_TRACK_DEBOUNCE_MS);
           renderAll(root, current);
         });
         wrap.appendChild(search);
@@ -506,10 +515,12 @@
 
     renderChipRow(root, '.wb-chips-category', 'categories', 'Category', categoryOrder, counts.categories, state, function (value, gesture) {
       state.filters = { categories: Filters.chipClick(state.filters.categories, value, gesture), countries: state.filters.countries, search: state.filters.search };
+      trackFilterUse('category');
       renderAll(root, state);
     });
     renderChipRow(root, '.wb-chips-country', 'countries', 'Country', countryOrder, counts.countries, state, function (value, gesture) {
       state.filters = { categories: state.filters.categories, countries: Filters.chipClick(state.filters.countries, value, gesture), search: state.filters.search };
+      trackFilterUse('country');
       renderAll(root, state);
     });
 

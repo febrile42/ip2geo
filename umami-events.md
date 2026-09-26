@@ -48,6 +48,23 @@ Someone copied a `#v=` share link. No properties. The IPs live only in the URL
 fragment, and the fragment is stripped before the tracker loads (R3), so
 opening a shared link never sends its contents to analytics.
 
+### `filter_category` / `filter_country` / `filter_search`
+Someone used one of the workbench's own filter controls: the category chips,
+the country chips, or the free-text search box. No properties (D9): only the
+dimension that was touched is recorded, never the value — not the category
+name, not the country code, and never the search text, since a visitor can
+type an IP or hostname into search. `filter_search` is debounced 600ms after
+the last keystroke so a single search doesn't spam events per character.
+
+This replaced a v5 gap: the workbench's filter chips (`assets/js/filters.js`)
+used to fire nothing, so filter usage went unmeasured once a browser-side
+lookup swapped the server-rendered `#results` table for `#workbench-root`.
+See `filter_category` / `filter_country` below for the older, still-present
+handlers on the server-rendered table — those fire only for visitors who
+never get a workbench (no-JS, or JS load failure), and their `filter_category`
+carries different fields, so don't merge the two in a dashboard without
+checking which section the row came from.
+
 ---
 
 ## Home page — firewall rules panel (ip2geo-app.js)
@@ -63,14 +80,17 @@ This is the stronger signal — they actually grabbed the rules to use somewhere
 
 ---
 
-## Home page — filters (ip2geo-app.js)
+## Home page — filters, no-workbench fallback (ip2geo-app.js)
 
-⚠️ **v5 gap:** these two handlers bind to the server-rendered results table
-(`#filter-countries`, `.filter-category`), which v5 visitors with JS never
-see. The workbench's own filter chips (`assets/js/filters.js`) fire no event
-yet, so filter usage stops being measured once 5.0.0 ships. The approved plan
-(design doc D9) is a `filter_<dim>` event carrying the dimension, never the
-value. Not implemented as of 2026-09-25.
+These two handlers bind to the server-rendered results table
+(`#filter-countries`, `.filter-category`) inside `#results`. A visitor only
+sees that table — and these events only fire — when the workbench never took
+over: no JS, or the browser-side lookup in `assets/js/workbench.js` never
+ran. Once a lookup succeeds client-side, `#results` stays hidden and
+`#workbench-root` takes its place, so the same filter action instead fires
+the `filter_category` / `filter_country` / `filter_search` events documented
+above under workbench — note `filter_category` here still carries the
+`category`/`checked` fields that the workbench version dropped for D9.
 
 ### `filter_country`
 Someone used the country filter chips. No properties (R9/D8): the country
