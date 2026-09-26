@@ -19,14 +19,15 @@
  *   [remaining bytes: UTF-8 JSON { c: [categories], k: [countries], s: search }]
  *
  * UMD: exposes `window.ip2geoShareLink`, and `module.exports` for Jest.
+ * Needs assets/js/summary.js loaded first (category vocabulary).
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {
-    module.exports = factory();
+    module.exports = factory(require('./summary.js'));
   } else {
-    root.ip2geoShareLink = factory();
+    root.ip2geoShareLink = factory(root.ip2geoSummary);
   }
-})(typeof self !== 'undefined' ? self : this, function () {
+})(typeof self !== 'undefined' ? self : this, function (Summary) {
   'use strict';
 
   var VERSION = 1;
@@ -184,10 +185,29 @@
     return bytesToBase64Url(buf);
   }
 
+  // A link's filters end up in the recipient banner and the filter state, so
+  // anything the sender's workbench couldn't have produced is rejected
+  // (IPG-10 S2): categories from the summary vocabulary, ISO country codes
+  // ('' is the no-country chip), and a short search string.
+  var SEARCH_MAX_CHARS = 256;
+  var COUNTRY_RE = /^([A-Z]{2})?$/;
+
+  function validFilters(f) {
+    if (!f || typeof f !== 'object' || Array.isArray(f)) return false;
+    var c = f.c === undefined ? [] : f.c;
+    var k = f.k === undefined ? [] : f.k;
+    var s = f.s === undefined ? '' : f.s;
+    if (!Array.isArray(c) || !Array.isArray(k) || typeof s !== 'string') return false;
+    if (s.length > SEARCH_MAX_CHARS) return false;
+    var cats = Summary.SUMMARY_CATEGORY_LABELS;
+    return c.every(function (v) { return typeof v === 'string' && Object.prototype.hasOwnProperty.call(cats, v); }) &&
+      k.every(function (v) { return typeof v === 'string' && COUNTRY_RE.test(v); });
+  }
+
   /**
    * @param {string} payload the base64url string (without "#v=")
    * @returns {?{ips: string[], categories: string[], countries: string[], search: string}}
-   *   null if the payload is malformed/unparseable.
+   *   null if the payload is malformed/unparseable or its filters fail validFilters().
    */
   function decodeShareState(payload) {
     try {
@@ -213,6 +233,7 @@
       }
 
       var filters = JSON.parse(utf8Decode(buf.subarray(offset)));
+      if (!validFilters(filters)) return null;
       return {
         ips: ips,
         categories: filters.c || [],
