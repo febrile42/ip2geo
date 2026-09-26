@@ -330,32 +330,45 @@ describe('filter_<dim> analytics (D9)', () => {
   });
 });
 
-describe('renderSummary (bug: the summary bar rendered empty because nothing ever called buildSummary)', () => {
+describe('renderSummary (IPG-33: DROP count + single Top ASN only)', () => {
   var root;
   beforeEach(() => {
     root = buildDom();
   });
 
+  // Two rows on AS14061 (a clear leader over AS16509's one) and one DROP hit,
+  // so both facts render.
   function rows() {
     return [
-      { ip: '1.1.1.1', country: 'US', region: 'CA', city: 'Fremont', asn: 'AS14061', asnOrg: 'DigitalOcean, LLC', category: 'cloud', drop: false, hits: 5 },
-      { ip: '2.2.2.2', country: 'CN', region: '', city: '', asn: 'AS4134', asnOrg: 'Chinanet', category: 'scanning', drop: true, hits: 12 },
-      { ip: '3.3.3.3', country: 'US', region: 'NY', city: 'New York', asn: 'AS16509', asnOrg: 'Amazon.com, Inc.', category: 'cloud', drop: false, hits: 1 },
+      { ip: '1.1.1.1', country: 'US', region: 'CA', city: 'Fremont', asn: 'AS14061', asnOrg: 'DigitalOcean, LLC', category: 'cloud', drop: true, hits: 5 },
+      { ip: '2.2.2.2', country: 'US', region: 'CA', city: 'Fremont', asn: 'AS14061', asnOrg: 'DigitalOcean, LLC', category: 'cloud', drop: false, hits: 3 },
+      { ip: '3.3.3.3', country: 'CN', region: '', city: '', asn: 'AS4134', asnOrg: 'Chinanet', category: 'scanning', drop: true, hits: 12 },
     ];
   }
 
-  test('renders non-empty text into .wb-summary for a fixture result set', () => {
+  test('renders the DROP count and Top ASN facts for a fixture result set', () => {
     var state = WB.makeState();
     state.rows = rows();
     WB.renderSummary(root, state);
 
     var host = root.querySelector('.wb-summary');
+    expect(host.hidden).toBe(false);
     expect(host.textContent.trim()).not.toBe('');
-    expect(host.textContent).toMatch(/3 IPs looked up/);
-    expect(host.textContent).toMatch(/Spamhaus DROP netblocks/);
+    expect(host.textContent).toMatch(/2 IPs in Spamhaus DROP netblocks/);
+    expect(host.textContent).toMatch(/Top ASN: AS14061 DigitalOcean, LLC \(2 IPs\)/);
   });
 
-  test('top ASNs carry the org name from table rows (bug: rows use asnOrg, buildSummary reads asn_org)', () => {
+  test('old summary text (total looked up, category counts, "top ASNs") is gone', () => {
+    var state = WB.makeState();
+    state.rows = rows();
+    WB.renderSummary(root, state);
+    var text = root.querySelector('.wb-summary').textContent;
+    expect(text).not.toMatch(/looked up/);
+    expect(text).not.toMatch(/top ASNs/);
+    expect(text).not.toMatch(/\(\d+%\)/);
+  });
+
+  test('Top ASN carries the org name from table rows (bug: rows use asnOrg, buildSummary reads asn_org)', () => {
     var state = WB.makeState();
     state.rows = rows();
     WB.renderSummary(root, state);
@@ -382,12 +395,49 @@ describe('renderSummary (bug: the summary bar rendered empty because nothing eve
     state.rows = rows();
     WB.renderSummary(root, state);
     var facts = Array.from(root.querySelectorAll('.wb-summary .lookup-summary-fact')).map(function (f) { return f.textContent; });
-    expect(facts.length).toBeGreaterThan(1);
+    expect(facts.length).toBe(2);
     // Each fact is its own element with no leading/trailing space of its
     // own; the " · " separator is CSS generated content (::before) between
     // adjacent .lookup-summary-fact siblings, so nothing here should carry
     // a stray leading/trailing space that would double up with it.
     facts.forEach(function (t) { expect(t).toBe(t.trim()); });
+  });
+
+  test('singular grammar for exactly 1 DROP row', () => {
+    var state = WB.makeState();
+    state.rows = [{ ip: '1.1.1.1', asn: '', asnOrg: '', category: 'scanning', drop: true, hits: 1 }];
+    WB.renderSummary(root, state);
+    expect(root.querySelector('.wb-summary').textContent).toBe('1 IP in a Spamhaus DROP netblock');
+  });
+
+  test('no DROP rows and no clear leader: host is hidden and empty', () => {
+    var state = WB.makeState();
+    state.rows = [{ ip: '1.1.1.1', asn: 'AS1', asnOrg: 'Org', category: 'cloud', drop: false, hits: 1 }];
+    WB.renderSummary(root, state);
+    var host = root.querySelector('.wb-summary');
+    expect(host.hidden).toBe(true);
+    expect(host.textContent.trim()).toBe('');
+  });
+
+  test('tied leading ASNs: no Top ASN fact', () => {
+    var state = WB.makeState();
+    state.rows = [
+      { ip: '8.8.8.8', asn: 'AS15169', asnOrg: 'Google LLC', category: 'cloud', drop: false, hits: 1 },
+      { ip: '8.8.4.4', asn: 'AS15169', asnOrg: 'Google LLC', category: 'cloud', drop: false, hits: 1 },
+      { ip: '1.1.1.1', asn: 'AS13335', asnOrg: 'Cloudflare, Inc.', category: 'cloud', drop: false, hits: 1 },
+      { ip: '1.0.0.1', asn: 'AS13335', asnOrg: 'Cloudflare, Inc.', category: 'cloud', drop: false, hits: 1 },
+    ];
+    WB.renderSummary(root, state);
+    expect(root.querySelector('.wb-summary').textContent).not.toMatch(/Top ASN/);
+  });
+
+  test('the DROP fact carries the explainer abbr, reachable via abbr-popover.js selectors', () => {
+    var state = WB.makeState();
+    state.rows = [{ ip: '1.1.1.1', asn: '', asnOrg: '', category: 'scanning', drop: true, hits: 1 }];
+    WB.renderSummary(root, state);
+    var abbr = root.querySelector('.lookup-summary-drop abbr');
+    expect(abbr).toBeTruthy();
+    expect(abbr.getAttribute('title')).toMatch(/Don't Route Or Peer/);
   });
 });
 

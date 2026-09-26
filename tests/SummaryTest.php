@@ -9,9 +9,11 @@ use PHPUnit\Framework\TestCase;
 require_once __DIR__ . '/../includes/summary.php';
 
 /**
- * Tests for build_summary() (design doc D4/D5): base = resolved IPs, fixed
- * (not filter-driven), zero-count categories omitted, Unknown shown only
- * when above zero, top 3 ASNs by unique IPs, and the Spamhaus DROP count.
+ * Tests for build_summary() (design doc D4/D5, slimmed by IPG-33): base =
+ * resolved IPs, fixed (not filter-driven), zero-count categories omitted,
+ * Unknown shown only when above zero, top 3 ASNs by unique IPs kept in the
+ * return shape — but the rendered `line` now holds only the Spamhaus DROP
+ * count and a single leading Top ASN (IPG-33).
  */
 class SummaryTest extends TestCase
 {
@@ -28,11 +30,27 @@ class SummaryTest extends TestCase
         $this->assertSame([], $summary['categories']);
         $this->assertSame([], $summary['top_asns']);
         $this->assertSame(0, $summary['drop_count']);
+        $this->assertNull($summary['top_asn']);
         $this->assertSame('', $summary['line']);
     }
 
-    public function testZeroCountCategoriesAreOmitted(): void
+    public function testNeitherFactAppliesRendersEmptyLine(): void
     {
+        // No DROP rows and no ASN with a clear lead (single row, single ASN,
+        // but only 1 IP on it — the 1-IP rule keeps this from being a "top").
+        $rows = [$this->row('cloud', 'AS1', 'Org')];
+        $summary = build_summary($rows);
+
+        $this->assertSame(0, $summary['drop_count']);
+        $this->assertNull($summary['top_asn']);
+        $this->assertSame('', $summary['line']);
+    }
+
+    public function testZeroCountCategoriesAreOmittedFromCategoriesField(): void
+    {
+        // categories/top_asns stay in the return shape (other callers, e.g.
+        // the filter chips, still use them) even though the line no longer
+        // renders them.
         $rows = [
             $this->row('cloud', 'AS1', 'A'),
             $this->row('cloud', 'AS1', 'A'),
@@ -41,20 +59,6 @@ class SummaryTest extends TestCase
 
         $keys = array_column($summary['categories'], 'key');
         $this->assertSame(['cloud'], $keys);
-        $this->assertStringNotContainsString('Scanning', $summary['line']);
-        $this->assertStringNotContainsString('VPN/Proxy', $summary['line']);
-        $this->assertStringNotContainsString('Residential', $summary['line']);
-        $this->assertStringNotContainsString('Unknown', $summary['line']);
-    }
-
-    public function testUnknownShownOnlyWhenAboveZero(): void
-    {
-        $rows = [$this->row('cloud', 'AS1', 'A'), $this->row('unknown')];
-        $summary = build_summary($rows);
-
-        $keys = array_column($summary['categories'], 'key');
-        $this->assertContains('unknown', $keys);
-        $this->assertStringContainsString('Unknown', $summary['line']);
     }
 
     public function testUnrecognizedCategoryFallsBackToUnknown(): void
@@ -68,7 +72,8 @@ class SummaryTest extends TestCase
     public function testCategoriesOrderedByCountDescending(): void
     {
         // Matches the design doc's worked example ordering: the biggest
-        // category leads, not a fixed vocabulary order.
+        // category leads, not a fixed vocabulary order. (categories field
+        // only — the line itself no longer shows category breakdowns.)
         $rows = array_merge(
             array_fill(0, 2, $this->row('scanning')),
             array_fill(0, 6, $this->row('cloud')),
@@ -79,29 +84,23 @@ class SummaryTest extends TestCase
         $this->assertSame(['cloud', 'scanning', 'vpn'], array_column($summary['categories'], 'key'));
     }
 
-    public function testPercentagesRoundToNearestInt(): void
-    {
-        $rows = [$this->row('cloud'), $this->row('cloud'), $this->row('scanning')];
-        $summary = build_summary($rows);
-
-        $byKey = array_column($summary['categories'], null, 'key');
-        $this->assertSame(67, $byKey['cloud']['pct']); // 2/3 -> 67%
-        $this->assertSame(33, $byKey['scanning']['pct']); // 1/3 -> 33%
-    }
-
     public function testBaseIsResolvedIpsNotFiltered(): void
     {
         // build_summary() takes exactly the rows it's given — it has no
         // notion of "currently filtered"; the caller is responsible for
         // always passing every resolved row (D4: "fixed, not filter-driven").
-        $rows = [$this->row('cloud'), $this->row('scanning'), $this->row('vpn')];
+        $rows = [
+            $this->row('cloud', 'AS1', 'Org', true),
+            $this->row('scanning', 'AS2', 'Other', false),
+            $this->row('vpn', 'AS3', 'Third', false),
+        ];
         $summary = build_summary($rows);
 
         $this->assertSame(3, $summary['total']);
-        $this->assertStringStartsWith('3 IPs looked up', $summary['line']);
+        $this->assertSame('1 IP in a Spamhaus DROP netblock', $summary['line']);
     }
 
-    public function testTopThreeAsnsByUniqueIps(): void
+    public function testTopThreeAsnsByUniqueIpsKeptInReturnShape(): void
     {
         $rows = array_merge(
             array_fill(0, 5, $this->row('cloud', 'AS14061', 'DigitalOcean')),
@@ -117,10 +116,6 @@ class SummaryTest extends TestCase
             array_column($summary['top_asns'], 'asn')
         );
         $this->assertSame([5, 3, 2], array_column($summary['top_asns'], 'count'));
-        $this->assertStringContainsString(
-            'top ASNs: AS14061 DigitalOcean, AS16509 Amazon, AS4134 Chinanet',
-            $summary['line']
-        );
     }
 
     public function testAsnCountIsUniqueIpsNotOccurrenceFrequency(): void
@@ -139,24 +134,33 @@ class SummaryTest extends TestCase
 
     public function testRowsWithNoAsnAreExcludedFromRanking(): void
     {
-        $rows = [$this->row('unknown', ''), $this->row('cloud', 'AS1', 'A')];
+        $rows = [$this->row('unknown', ''), $this->row('cloud', 'AS1', 'A'), $this->row('cloud', 'AS1', 'A')];
         $summary = build_summary($rows);
 
         $this->assertCount(1, $summary['top_asns']);
         $this->assertSame('AS1', $summary['top_asns'][0]['asn']);
     }
 
-    public function testDropCountFromDropFlag(): void
+    // ── IPG-33: the slim line itself ───────────────────────────────────────
+
+    public function testDropCountSingular(): void
+    {
+        $summary = build_summary([$this->row('scanning', '', '', true)]);
+
+        $this->assertSame(1, $summary['drop_count']);
+        $this->assertSame('1 IP in a Spamhaus DROP netblock', $summary['line']);
+    }
+
+    public function testDropCountPlural(): void
     {
         $rows = [
-            $this->row('scanning', 'AS1', 'A', true),
-            $this->row('scanning', 'AS1', 'A', false),
-            $this->row('residential', '', '', true),
+            $this->row('scanning', '', '', true),
+            $this->row('scanning', '', '', true),
         ];
         $summary = build_summary($rows);
 
         $this->assertSame(2, $summary['drop_count']);
-        $this->assertStringContainsString('2 in Spamhaus DROP netblocks', $summary['line']);
+        $this->assertSame('2 IPs in Spamhaus DROP netblocks', $summary['line']);
     }
 
     public function testDropLineOmittedWhenZero(): void
@@ -168,26 +172,95 @@ class SummaryTest extends TestCase
         $this->assertStringNotContainsString('Spamhaus DROP', $summary['line']);
     }
 
-    public function testFullLineMatchesDesignDocExampleShape(): void
+    public function testDropCountUsesThousandsSeparator(): void
     {
-        $rows = array_merge(
-            array_fill(0, 61, $this->row('cloud', 'AS14061', 'DigitalOcean')),
-            array_fill(0, 18, $this->row('scanning', 'AS16509', 'Amazon')),
-            array_fill(0, 6, $this->row('vpn', 'AS4134', 'Chinanet')),
-            array_fill(0, 15, $this->row('residential'))
-        );
-        // 14 DROP hits scattered across the set.
-        for ($i = 0; $i < 14; $i++) {
-            $rows[$i]['drop'] = true;
-        }
+        $rows = array_fill(0, 1204, $this->row('scanning', '', '', true));
         $summary = build_summary($rows);
 
-        $this->assertSame(100, $summary['total']);
-        $this->assertStringContainsString('100 IPs looked up', $summary['line']);
-        $this->assertStringContainsString('Cloud exit 61 (61%)', $summary['line']);
-        $this->assertStringContainsString('Scanning 18 (18%)', $summary['line']);
-        $this->assertStringContainsString('VPN/Proxy 6 (6%)', $summary['line']);
-        $this->assertStringContainsString('top ASNs:', $summary['line']);
-        $this->assertStringContainsString('14 in Spamhaus DROP netblocks', $summary['line']);
+        $this->assertSame(1204, $summary['drop_count']);
+        $this->assertSame('1,204 IPs in Spamhaus DROP netblocks', $summary['line']);
+    }
+
+    public function testTopAsnShownWhenLeaderClearlyLeads(): void
+    {
+        $rows = array_merge(
+            array_fill(0, 12, $this->row('cloud', 'AS64500', 'Example Hosting B.V.')),
+            array_fill(0, 3, $this->row('cloud', 'AS64501', 'Runner Up LLC'))
+        );
+        $summary = build_summary($rows);
+
+        $this->assertSame(['asn' => 'AS64500', 'org' => 'Example Hosting B.V.', 'count' => 12], $summary['top_asn']);
+        $this->assertSame('Top ASN: AS64500 Example Hosting B.V. (12 IPs)', $summary['line']);
+    }
+
+    public function testTopAsnOmitsOrgWhenEmpty(): void
+    {
+        $rows = array_merge(
+            array_fill(0, 3, $this->row('cloud', 'AS64500', '')),
+            array_fill(0, 1, $this->row('cloud', 'AS64501', 'Other'))
+        );
+        $summary = build_summary($rows);
+
+        $this->assertSame('Top ASN: AS64500 (3 IPs)', $summary['line']);
+    }
+
+    public function testTopAsnOmittedOnTie(): void
+    {
+        // Tie rule: 8.8.8.8/8.8.4.4 (Google) vs 1.1.1.1/1.0.0.1 (Cloudflare)
+        // both land at 2 IPs — no Top ASN line, by design.
+        $rows = array_merge(
+            array_fill(0, 2, $this->row('cloud', 'AS15169', 'Google LLC')),
+            array_fill(0, 2, $this->row('cloud', 'AS13335', 'Cloudflare, Inc.'))
+        );
+        $summary = build_summary($rows);
+
+        $this->assertNull($summary['top_asn']);
+        $this->assertStringNotContainsString('Top ASN', $summary['line']);
+    }
+
+    public function testTopAsnOmittedWhenLeaderHasOnlyOneIp(): void
+    {
+        // 1-IP rule: a lone leader with only 1 IP is not a finding, even
+        // with no runner-up at all.
+        $summary = build_summary([$this->row('cloud', 'AS1', 'Org')]);
+
+        $this->assertNull($summary['top_asn']);
+        $this->assertStringNotContainsString('Top ASN', $summary['line']);
+    }
+
+    public function testTopAsnShownWithNoRunnerUpAtAll(): void
+    {
+        // A single ASN with >= 2 IPs and nothing to tie against still counts
+        // as a clear leader (vacuously "strictly more than the runner-up").
+        $rows = array_fill(0, 2, $this->row('cloud', 'AS1', 'Org'));
+        $summary = build_summary($rows);
+
+        $this->assertNotNull($summary['top_asn']);
+        $this->assertSame('Top ASN: AS1 Org (2 IPs)', $summary['line']);
+    }
+
+    public function testTopAsnUsesThousandsSeparator(): void
+    {
+        $rows = array_merge(
+            array_fill(0, 1500, $this->row('cloud', 'AS64500', 'Example Hosting B.V.')),
+            array_fill(0, 1, $this->row('cloud', 'AS64501', 'Other'))
+        );
+        $summary = build_summary($rows);
+
+        $this->assertSame('Top ASN: AS64500 Example Hosting B.V. (1,500 IPs)', $summary['line']);
+    }
+
+    public function testBothFactsJoinedByMiddot(): void
+    {
+        $rows = array_merge(
+            array_fill(0, 12, $this->row('cloud', 'AS64500', 'Example Hosting B.V.', true)),
+            array_fill(0, 3, $this->row('cloud', 'AS64501', 'Runner Up LLC'))
+        );
+        $summary = build_summary($rows);
+
+        $this->assertSame(
+            '12 IPs in Spamhaus DROP netblocks · Top ASN: AS64500 Example Hosting B.V. (12 IPs)',
+            $summary['line']
+        );
     }
 }

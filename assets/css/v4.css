@@ -848,31 +848,26 @@ abbr.drop-tag:focus-visible,
   font-size: 13px;
 }
 
-/* ---------- 16b-2. Summary line, notice bar, DROP + "(you)" tags (v5, D4/D5/D6/D14) ----------
-   Token map (DESIGN.md): summary = --surface card + --text, counts in mono;
-   notice = --surface-2 + --text-muted; DROP tag = --surface-2 + --text,
-   11.5px mono, never --verdict-high. Replaces the old Threat CTA box slot. */
+/* ---------- 16b-2. Summary line, notice bar, DROP + "(you)" tags (v5, D4/D5/D6/D14; slimmed IPG-33) ----------
+   IPG-33: no card. Plain line, same token map as .notice: --text-muted for
+   labels, --text for the counts (mono) and the ASN string. */
 .lookup-summary {
-  margin: 20px 0 0;
-  padding: 14px 20px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  color: var(--text);
-  font-size: 14px;
-  line-height: 1.6;
+  margin: 20px 0 0;           /* no-JS spacing unchanged */
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--text-muted);
+  font-size: 13.5px;          /* same as .notice */
+  line-height: 1.5;
 }
-.lookup-summary,
-.lookup-summary * {
-  font-feature-settings: "tnum" 1;
-}
+.lookup-summary-n   { color: var(--text); font-family: var(--font-mono); }
+.lookup-summary-asn { color: var(--text); }
 /* Desktop: one line, facts joined by " · ". */
 .lookup-summary-fact + .lookup-summary-fact::before {
   content: "\00b7";
   margin: 0 0.5em; /* spacing via margin: spaces inside content collapsed on staging */
   color: var(--text-muted);
 }
-.lookup-summary-asn-rest { color: var(--text); }
 
 /* IPv6 middle-truncation (D15): full address is always in the DOM and in
    the cell's title; only the truncated span is hidden/shown by width. */
@@ -1135,15 +1130,12 @@ button.button.small:hover {
 
 /* ---------- 16b-3. Mobile results (D15, ≤767px) ---------- */
 @media (max-width: 767px) {
-  /* Summary: one fact per line, top ASN only. */
+  /* Summary: one fact per line, no separator (IPG-33: at most two facts now). */
   .lookup-summary-fact {
     display: block;
   }
   .lookup-summary-fact + .lookup-summary-fact::before {
     content: none; /* no " · " separator once facts stack vertically */
-  }
-  .lookup-summary-asn-rest {
-    display: none; /* only the top ASN shows on mobile */
   }
 
   /* Over-10k / private-only / network-failure / 503 notices run full-width. */
@@ -2688,12 +2680,12 @@ button.button.small:hover {
 .wb-state .notice { margin: 8px 0; }
 
 /* .wb-summary is a bare DOM hook (assets/js/workbench.js queries it to
-   render the summary line); it also carries .lookup-summary (§16b-2),
-   which is what actually styles the card, the mono numerals and the
-   " · " fact separators — reused as-is rather than duplicated here so
-   the two summary renderers (PHP's build_summary() and JS's
-   ip2geoSummary) always look identical. */
-.wb-summary { margin-bottom: 14px; }
+   render the summary line, and sets it hidden when there are no facts);
+   it also carries .lookup-summary (§16b-2), which is what actually styles
+   the line, the mono numerals and the " · " fact separator — reused as-is
+   rather than duplicated here so the two summary renderers (PHP's
+   build_summary() and JS's ip2geoSummary) always look identical. */
+.wb-summary { margin: 12px 0; }
 
 .wb-filters { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
 .wb-chips-row {

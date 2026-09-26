@@ -52,14 +52,17 @@ class IndexResultsTest extends TestCase
         $this->assertStringNotContainsString('threat-cta', $html);
     }
 
-    // ── Summary line (D4/D5) ────────────────────────────────────────────────
+    // ── Summary line (D4/D5, slimmed IPG-33) ────────────────────────────────
 
-    public function testSummaryLinePresentForResolvedIps(): void
+    public function testSummaryLinePresentWithAClearTopAsn(): void
     {
-        $html = render_lookup_results(['ip_list' => '81.2.69.142 1.0.0.1'], '', self::CITY_DB, self::ASN_DB);
+        // 1.0.0.1, 1.0.0.2 and 1.0.0.3 all resolve to AS15169 (Google Inc.)
+        // in the MaxMind test fixture db — a clear 3-IP leader.
+        $html = render_lookup_results(['ip_list' => '1.0.0.1 1.0.0.2 1.0.0.3'], '', self::CITY_DB, self::ASN_DB);
 
         $this->assertStringContainsString('id="lookup-summary"', $html);
-        $this->assertStringContainsString('IPs looked up', $html);
+        $this->assertStringContainsString('Top ASN: <span class="lookup-summary-asn">AS15169 Google Inc.</span> (<span class="lookup-summary-n">3</span> IPs)', $html);
+        $this->assertStringNotContainsString('IPs looked up', $html);
     }
 
     public function testNoSummaryLineWhenNothingResolves(): void
@@ -67,6 +70,15 @@ class IndexResultsTest extends TestCase
         // Neither address is in the test fixture dbs, so both are unresolved
         // and build_summary() gets zero rows — no summary line to show.
         $html = render_lookup_results(['ip_list' => '203.0.113.1'], '', self::CITY_DB, self::ASN_DB);
+
+        $this->assertStringNotContainsString('id="lookup-summary"', $html);
+    }
+
+    public function testNoSummaryLineWhenNoDropAndNoClearAsnLeader(): void
+    {
+        // Two resolved rows, but no DROP and each on its own ASN (or none):
+        // neither fact applies, so the div is omitted entirely (D4 state 4).
+        $html = render_lookup_results(['ip_list' => '81.2.69.142 1.0.0.1'], '', self::CITY_DB, self::ASN_DB);
 
         $this->assertStringNotContainsString('id="lookup-summary"', $html);
     }
