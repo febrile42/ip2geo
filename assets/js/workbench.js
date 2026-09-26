@@ -766,7 +766,7 @@
    */
   function mountSharedView(root, payload, onRestoreBanner) {
     var decoded = Share.decodeShareState(payload);
-    if (!decoded) return null;
+    if (!decoded) return Promise.resolve(false); // callers chain .then()
 
     var hitCounts = {};
     decoded.ips.forEach(function (ip) { hitCounts[ip] = 1; });

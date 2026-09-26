@@ -331,3 +331,13 @@ describe('runLookup D6 states', () => {
     });
   });
 });
+
+// IPG-10 S2: index.php chains .then() on mountSharedView, so a rejected
+// share link must still hand back a promise, not null.
+describe('mountSharedView with a rejected payload', () => {
+  test('resolves false instead of returning null', async () => {
+    var p = WB.mountSharedView(document.createElement('div'), 'not-valid-base64!!!', () => { throw new Error('banner must not render'); });
+    expect(p).not.toBeNull();
+    await expect(p).resolves.toBe(false);
+  });
+});

