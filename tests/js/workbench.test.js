@@ -805,6 +805,9 @@ describe('startLookup over-cap arithmetic (IPG-39 count bug)', () => {
       expect(m.overCap).toBe(true);
       expect(m.v6).toBe(8);
       expect(m.v4 + m.v6).toBe(10000);
+      // en-US separators regardless of browser locale, matching the pill
+      // above it; fails under LC_ALL=de_DE.UTF-8 with a bare toLocaleString() (IPG-72).
+      expect(m.overCapNotice).toBe('Looked up the first 10,000 of 10,013 unique IPs. 13 skipped. Paste the rest separately to check them.');
     });
   });
 });
