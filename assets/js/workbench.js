@@ -531,6 +531,13 @@
     var clearBtn = root.querySelector('.wb-clear-filters');
     var hasFilter = state.filters.categories.size > 0 || state.filters.countries.size > 0;
     clearBtn.hidden = !hasFilter;
+    clearBtn.onclick = function () {
+      state.filters = Filters.clearFilters(state.filters);
+      renderAll(root, state);
+      // The button hides itself; hand focus to the search field so keyboard users aren't dropped on <body>.
+      var search = root.querySelector('.wb-search');
+      if (search) search.focus();
+    };
 
     var shareBtn = root.querySelector('.wb-share-btn');
     var shareResult = Share.buildShareLink({
