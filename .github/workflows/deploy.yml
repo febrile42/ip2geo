@@ -127,7 +127,8 @@ jobs:
         run: |
           FAIL=0
           for P in /scripts/rand_ips.php /scripts/cleanup_report_events.php /scripts/migrate.sql \
-                   /migrations/retire_reports_v5.sql /composer.json /vendor/composer/installed.json; do
+                   /migrations/retire_reports_v5.sql /composer.json /vendor/composer/installed.json \
+                   /includes/extract.php /tests/ApiLookupTest.php; do
             CODE=$(curl -s -o /dev/null -w "%{http_code}" \
               -H "Host: staging.ip2geo.org" \
               "http://${{ secrets.DEPLOY_HOST }}$P")
@@ -159,6 +160,9 @@ jobs:
           # Single random IP list avoids cross-environment MariaDB cache skew.
           # Absolute ceiling (6s) is the right check — staging and production share
           # the same physical server so relative comparison is not meaningful.
+          # POST / is rate-limited (IPG-17: 60/min per client IP, own APCu bucket).
+          # This job sends only this request and the functional test's from one
+          # runner IP, so it stays far under the limit; no bypass header exists.
           python3 -c "
           import random, ipaddress
           excl = [ipaddress.ip_network(n) for n in [
@@ -243,7 +247,8 @@ jobs:
         run: |
           FAIL=0
           for P in /scripts/rand_ips.php /scripts/cleanup_report_events.php /scripts/migrate.sql \
-                   /migrations/retire_reports_v5.sql /composer.json /vendor/composer/installed.json; do
+                   /migrations/retire_reports_v5.sql /composer.json /vendor/composer/installed.json \
+                   /includes/extract.php /tests/ApiLookupTest.php; do
             CODE=$(curl -s -o /dev/null -w "%{http_code}" \
               -H "Host: ip2geo.org" \
               "http://${{ secrets.DEPLOY_HOST }}$P")
