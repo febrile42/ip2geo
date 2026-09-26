@@ -162,7 +162,7 @@
     var count = rows.length;
     var over64kNote = format === 'kql' && bytes > ALERT_RULE_LIMIT_BYTES;
 
-    var label = meta.label + ' · ' + count.toLocaleString() + ' IP' + (count === 1 ? '' : 's') + ' · ~' + kb + ' KB';
+    var label = meta.label + ' · ' + count.toLocaleString('en-US') + ' IP' + (count === 1 ? '' : 's') + ' · ~' + kb + ' KB';
     return { label: label, count: count, approxKB: kb, text: text, over64kNote: over64kNote };
   }
 
@@ -170,7 +170,7 @@
   function toastText(format, rows) {
     var meta = FORMAT_META[format] || { label: format };
     var count = rows.length;
-    return 'Copied ' + count.toLocaleString() + ' row' + (count === 1 ? '' : 's') + ' as ' + meta.label.replace(/\s*\(.*\)$/, '');
+    return 'Copied ' + count.toLocaleString('en-US') + ' row' + (count === 1 ? '' : 's') + ' as ' + meta.label.replace(/\s*\(.*\)$/, '');
   }
 
   return {

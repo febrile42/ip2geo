@@ -203,7 +203,7 @@
     });
 
     function setLabel(shown) {
-      btn.textContent = (shown ? 'Hide ' : 'Show ') + n.toLocaleString() + ' unresolved IP' + (n === 1 ? '' : 's');
+      btn.textContent = (shown ? 'Hide ' : 'Show ') + n.toLocaleString('en-US') + ' unresolved IP' + (n === 1 ? '' : 's');
     }
     body.hidden = true;
     setLabel(false);
@@ -246,7 +246,7 @@
     }, [
       'Export / Rules ',
       el('span', { 'aria-hidden': 'true' }, ['▾']),
-      el('span', { class: 'wb-export-count' }, [count.toLocaleString() + ' IPs'])
+      el('span', { class: 'wb-export-count' }, [count.toLocaleString('en-US') + ' IPs'])
     ]);
 
     var menu = el('div', { class: 'wb-menu', role: 'menu', 'aria-labelledby': 'wb-export-btn', hidden: 'hidden' });
@@ -524,7 +524,7 @@
     renderTable(root, state, visible);
 
     var shownEl = root.querySelector('.wb-shown-count');
-    shownEl.textContent = visible.length.toLocaleString() + ' shown';
+    shownEl.textContent = visible.length.toLocaleString('en-US') + ' shown';
 
     var clearBtn = root.querySelector('.wb-clear-filters');
     var hasFilter = state.filters.categories.size > 0 || state.filters.countries.size > 0;
@@ -542,14 +542,14 @@
       shareBtn.textContent = Share.overCapLabel(visible.length);
       shareBtn.disabled = true;
     } else {
-      shareBtn.textContent = 'Copy share link · ' + visible.length.toLocaleString() + ' IPs';
+      shareBtn.textContent = 'Copy share link · ' + visible.length.toLocaleString('en-US') + ' IPs';
       shareBtn.disabled = false;
     }
     shareBtn.onclick = function () {
       if (shareResult.overCap) return;
       var url = window.location.origin + window.location.pathname + '#v=' + shareResult.payload;
       var done = function () {
-        showToast(root, 'Link copied · ' + visible.length.toLocaleString() + ' IPs');
+        showToast(root, 'Link copied · ' + visible.length.toLocaleString('en-US') + ' IPs');
         try { window.umami && window.umami.track('share_link_created'); } catch (e) { /* no-op */ }
       };
       if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -764,8 +764,8 @@
       var meta = { lines: lines, v4: v4, v6: v6, overCap: overCap, lookupMs: null, rawText: rawText };
       if (overCap) {
         var skipped = extracted.totalUnique - uniqueIps.length;
-        meta.overCapNotice = 'Looked up the first ' + uniqueIps.length.toLocaleString() + ' of ' +
-          extracted.totalUnique.toLocaleString() + ' unique IPs. ' + skipped.toLocaleString() +
+        meta.overCapNotice = 'Looked up the first ' + uniqueIps.length.toLocaleString('en-US') + ' of ' +
+          extracted.totalUnique.toLocaleString('en-US') + ' unique IPs. ' + skipped.toLocaleString('en-US') +
           ' skipped. Paste the rest separately to check them.';
       }
 
@@ -834,7 +834,7 @@
     root.hidden = false;
 
     if (onRestoreBanner) {
-      onRestoreBanner('Shared view · ' + decoded.ips.length.toLocaleString() + ' IPs' +
+      onRestoreBanner('Shared view · ' + decoded.ips.length.toLocaleString('en-US') + ' IPs' +
         (decoded.categories.length || decoded.countries.length
           ? ' · filters: ' + decoded.categories.concat(decoded.countries).join(', ')
           : ''));
