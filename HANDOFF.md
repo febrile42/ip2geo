@@ -152,6 +152,7 @@ curl -s https://staging.ip2geo.org/ | grep -o 'v[0-9.]*' | head -1
 - [ ] The owner finalizes the 5.0.0 entry in `changelog.php` and removes "DRAFT (release date TBD)".
 - [ ] Re-dispatch staging if a Spamhaus sync ran since the last deploy, and confirm the footer reads v5.0.0.
 - [ ] Decide on the workbench filter-analytics gap (section 8). Either fix it or knowingly ship without it.
+- [ ] Staging has no Umami tracker on purpose, so no `/u/` requests appear there. Check events with the console stub in `umami-events.md` ("Checking events on staging"). Real sends can only be seen on production after release.
 
 **Release:**
 
@@ -161,6 +162,7 @@ curl -s https://staging.ip2geo.org/ | grep -o 'v[0-9.]*' | head -1
    - read `https://ip2geo.org/` back, and check the footer says v5.0.0
    - check the smoke and 403 jobs
    - check that `/api/lookup.php` works
+   - check in DevTools that `/u/script.js` loads and a `lookup_submit` send goes to `/u/` (this is the first place real Umami sends can be seen)
 4. Run `scripts/rebase-develop.sh`.
 5. Paste an ip2geo.org link into Teams or Slack and check the preview card.
 6. Open and merge the `ip2geo-admin` `feat/retire-report-sections` PR. Its JSX was parse-checked only and has **never been viewed in a browser**, so look at it.
