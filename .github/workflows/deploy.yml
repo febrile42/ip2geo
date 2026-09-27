@@ -5,6 +5,12 @@ on:
     branches:
       - main
       - develop
+  # PRs into main from any branch other than develop need the required
+  # "PHP Syntax Check" too. Only lint runs: deploy jobs are gated on
+  # github.ref, which is refs/pull/<n>/merge for a PR.
+  pull_request:
+    branches:
+      - main
   # Manual trigger: bot pushes made with GITHUB_TOKEN (Spamhaus syncs) don't
   # fire the push event, leaving the required "PHP Syntax Check" unreported on
   # promotion PRs. `gh workflow run deploy.yml --ref develop` fills that gap.
