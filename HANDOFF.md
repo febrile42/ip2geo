@@ -89,7 +89,7 @@ Section 7 repeats both.
 
 ## 4. Working on it
 
-See README → Development for full commands. In short:
+See [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) for full commands. In short:
 
 ```bash
 composer install && vendor/bin/phpunit      # 209 tests, 1 skipped
