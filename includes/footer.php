@@ -9,7 +9,7 @@ $_footer_data_date = $GLOBALS['db_data_date'] ?? null;
 <footer id="footer">
     <div class="footer-inner">
         <ul class="footer-menu">
-            <li>This product includes GeoLite2 data created by MaxMind, available from <a href="https://www.maxmind.com" target="_blank">https://www.maxmind.com</a>.</li>
+            <li>This product includes GeoLite Data created by MaxMind, available from <a href="https://www.maxmind.com" target="_blank" rel="noopener">https://www.maxmind.com</a>, licensed under <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener">CC BY-SA 4.0</a>.</li>
             <li>Threat netblock data from the <a href="https://www.spamhaus.org/drop/" target="_blank" rel="noopener">Spamhaus DROP</a> list, &copy; The Spamhaus Project.</li>
         </ul>
         <ul class="footer-menu">
