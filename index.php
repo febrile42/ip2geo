@@ -484,7 +484,7 @@ if ($_POST) {
 		<?php if (($_SERVER['HTTP_HOST'] === 'ip2geo.org' || getenv('IP2GEO_E2E_FORCE_UMAMI') === '1')): ?>
 		<script data-cfasync="false" defer src="/u/script.js" data-website-id="656d7a15-6282-4079-af1e-b8ed857fba2e" data-domains="ip2geo.org" data-exclude-hash="true"></script>
 		<?php endif; ?>
-		<title>ip2geo — Bulk IP Lookup for Raw Logs, Free</title>
+		<title>Bulk IP Geolocation &amp; ASN Lookup for Raw Logs — ip2geo.org</title>
 		<meta charset="utf-8" />
 		<meta name="description" content="Paste any log and pull out up to 10,000 IPv4 and IPv6 addresses. Filter by country, ASN and category. Free, no signup." />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
