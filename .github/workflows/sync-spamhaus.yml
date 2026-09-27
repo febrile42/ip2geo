@@ -66,13 +66,26 @@ jobs:
             exit 1
           fi
 
-          # The feed's `{"type":"metadata",...}` record has no .asn — filter it out so
-          # we don't materialize an "ASnull" entry into the classification array.
-          SPAMHAUS_ASNS=$(jq -r 'select(.asn != null) | "AS" + (.asn | tostring)' "$TMP_FEED" \
-            | sort -u)
+          # Each ASN is written into PHP source below, so spamhaus_asndrop_asns()
+          # refuses the whole feed unless every .asn is an integer in 1..4294967295
+          # (a string .asn would otherwise land in asn_classification.php as code,
+          # IPG-154). It skips the metadata record, which has no .asn, and also
+          # refuses a feed with no ASNs so the auto-sync block is never emptied.
+          # sort -u (lexical) because comm below needs it.
+          SPAMHAUS_ASNS=$(php -r '
+            require "scripts/gen-spamhaus-drop.php";
+            $asns = spamhaus_asndrop_asns(stream_get_contents(STDIN));
+            if ($asns === null) {
+                fwrite(STDERR, "ASN-DROP feed has no ASNs, a line that is not JSON, or an asn that is not an integer in 1..4294967295.\n");
+                exit(1);
+            }
+            echo implode("\n", $asns), "\n";
+          ' < "$TMP_FEED" | sort -u)
 
-          if [ -z "$SPAMHAUS_ASNS" ]; then
-            echo "Spamhaus fetch returned no ASNs — aborting to avoid emptying the auto-sync block."
+          # Second fence, independent of the PHP helper: every line must be AS + digits.
+          if [ -z "$SPAMHAUS_ASNS" ] \
+            || [ "$(grep -cxE 'AS[0-9]{1,10}' <<< "$SPAMHAUS_ASNS")" != "$(wc -l <<< "$SPAMHAUS_ASNS")" ]; then
+            echo "Spamhaus ASN list is empty or has a line that is not AS<digits> — aborting."
             exit 1
           fi
 
@@ -141,6 +154,17 @@ jobs:
           open(fp, "w").write(pattern.sub(lambda m: new_block, src))
           PY
           rm -f "$BLOCK_FILE"
+
+          # php -l checks syntax only, and auto-promote ignores the block when it
+          # compares develop with main, so check the block holds nothing but
+          # comments and 'AS<digits>' => 'scanning', entries before committing.
+          php -r '
+            require "scripts/gen-spamhaus-drop.php";
+            if (!spamhaus_asndrop_block_is_safe(file_get_contents($argv[1]))) {
+                fwrite(STDERR, "ERROR: the auto-sync block in {$argv[1]} has a line that is not a comment or an AS entry.\n");
+                exit(1);
+            }
+          ' "$CLASSIFICATION_FILE"
 
           # Validate PHP still parses before pushing.
           php -l "$CLASSIFICATION_FILE"

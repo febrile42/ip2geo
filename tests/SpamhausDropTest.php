@@ -221,6 +221,110 @@ class SpamhausDropTest extends TestCase
         ], spamhaus_feed_header_lines($meta));
     }
 
+    // --- ASN-DROP: only numeric ASNs reach asn_classification.php (IPG-154) --
+
+    public function testAsnDropAsnsAreSortedDedupedAndSkipMetadata(): void
+    {
+        $feed = '{"asn":3507,"rir":"arin"}' . "\n"
+            . '{"asn":245,"rir":"arin"}' . "\n"
+            . '{"asn":3507,"rir":"arin"}' . "\n"
+            . '{"asn":4294967295,"rir":"arin"}' . "\n"
+            . self::metadataLine() . "\n";
+        $this->assertSame(['AS245', 'AS3507', 'AS4294967295'], spamhaus_asndrop_asns($feed));
+    }
+
+    /** @dataProvider unusableAsnDropFeeds */
+    public function testAsnDropAsnsRefusesFeed(string $feed): void
+    {
+        $this->assertNull(spamhaus_asndrop_asns($feed));
+    }
+
+    public static function unusableAsnDropFeeds(): array
+    {
+        $ok = '{"asn":245,"rir":"arin"}' . "\n";
+        return [
+            // Would be written as '1' => x, '' => 'scanning', and pass php -l.
+            'string asn breaking out of the quote' => [$ok . '{"asn":"1\' => x, \'"}' . "\n"],
+            'numeric string asn'                   => [$ok . '{"asn":"245"}' . "\n"],
+            'float asn'                            => [$ok . '{"asn":245.5}' . "\n"],
+            'zero'                                 => [$ok . '{"asn":0}' . "\n"],
+            'negative'                             => [$ok . '{"asn":-1}' . "\n"],
+            'above 32 bits'                        => [$ok . '{"asn":4294967296}' . "\n"],
+            'boolean'                              => [$ok . '{"asn":true}' . "\n"],
+            'array'                                => [$ok . '{"asn":[245]}' . "\n"],
+            'line that is not JSON'                => [$ok . "AS666\n"],
+            'no ASNs, only metadata'               => [self::metadataLine() . "\n"],
+            'empty'                                => [''],
+        ];
+    }
+
+    private const ASN_BLOCK_BEGIN = '    // --- BEGIN AUTO-SYNC SPAMHAUS ASN-DROP (do not hand-edit) ---';
+    private const ASN_BLOCK_END   = '    // --- END AUTO-SYNC SPAMHAUS ASN-DROP ---';
+
+    private static function asnFile(string ...$blockLines): string
+    {
+        return "<?php\n\$known_asns = [\n    'AS1' => 'hosting',\n" . self::ASN_BLOCK_BEGIN . "\n"
+            . implode('', array_map(static fn($l) => "{$l}\n", $blockLines))
+            . self::ASN_BLOCK_END . "\n];\n";
+    }
+
+    public function testAsnDropBlockCheckAcceptsCommentsAndEntries(): void
+    {
+        $this->assertTrue(spamhaus_asndrop_block_is_safe(self::asnFile(
+            '    // Copyright: © 2026 The Spamhaus Project SLU',
+            "    'AS245' => 'scanning',",
+            "    'AS4294967295' => 'scanning',"
+        )));
+    }
+
+    public function testCommittedAsnDropBlockPassesCheck(): void
+    {
+        $this->assertTrue(spamhaus_asndrop_block_is_safe(
+            file_get_contents(__DIR__ . '/../asn_classification.php')
+        ));
+    }
+
+    /** @dataProvider unsafeAsnBlocks */
+    public function testAsnDropBlockCheckRefuses(string $src): void
+    {
+        $this->assertFalse(spamhaus_asndrop_block_is_safe($src));
+    }
+
+    public static function unsafeAsnBlocks(): array
+    {
+        return [
+            // What today's jq filter writes for {"asn":"1' => x, '"}.
+            'injected entry'        => [self::asnFile("    'AS1' => x, '' => 'scanning',")],
+            'code line'             => [self::asnFile('    phpinfo(),')],
+            'other category'        => [self::asnFile("    'AS245' => 'hosting',")],
+            'trailing text'         => [self::asnFile("    'AS245' => 'scanning', phpinfo(),")],
+            'close tag in comment'  => [self::asnFile('    // x ?> <?php phpinfo(); //')],
+            'CR in comment'         => [self::asnFile("    // x\rphpinfo(); //")],
+            'unindented comment'    => [self::asnFile('// x')],
+            'blank line'            => [self::asnFile('')],
+            'no markers'            => ["<?php\n\$known_asns = [\n    'AS1' => 'hosting',\n];\n"],
+            'second END marker'     => [self::asnFile(self::ASN_BLOCK_END, "    'AS245' => 'scanning',")],
+            'END before BEGIN'      => ["<?php\n" . self::ASN_BLOCK_END . "\n" . self::ASN_BLOCK_BEGIN . "\n"],
+        ];
+    }
+
+    /**
+     * The sync must go through the two checks above; fails if the workflow
+     * goes back to writing whatever jq's tostring returns.
+     */
+    public function testSyncWorkflowUsesAsnChecks(): void
+    {
+        $yml = file_get_contents(__DIR__ . '/../.github/workflows/sync-spamhaus.yml');
+        $this->assertStringContainsString('spamhaus_asndrop_asns(', $yml);
+        $this->assertStringContainsString('spamhaus_asndrop_block_is_safe(', $yml);
+        $this->assertStringNotContainsString('tostring', $yml);
+        $this->assertLessThan(
+            strpos($yml, 'php -l "$CLASSIFICATION_FILE"'),
+            strpos($yml, 'spamhaus_asndrop_block_is_safe('),
+            'the block check must run before php -l and the commit'
+        );
+    }
+
     // --- apply_reputation_override() ---------------------------------------
 
     public function testOverrideFlipsLowToModerateAndOpensCta(): void

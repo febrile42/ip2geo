@@ -22,7 +22,9 @@
  *
  * spamhaus_feed_metadata() and spamhaus_feed_header_lines() also serve the
  * ASN-DROP feed: .github/workflows/sync-spamhaus.yml calls them to write the
- * same attribution into the auto-sync block of asn_classification.php.
+ * same attribution into the auto-sync block of asn_classification.php, and
+ * spamhaus_asndrop_asns() / spamhaus_asndrop_block_is_safe() to extract the
+ * ASNs and check the block it writes.
  */
 
 /**
@@ -90,6 +92,87 @@ function spamhaus_feed_header_lines(array $meta): array {
         "Terms: {$meta['terms']}",
         "Feed timestamp: {$meta['timestamp']} (" . gmdate('Y-m-d\\TH:i:s\\Z', $meta['timestamp']) . ')',
     ];
+}
+
+/**
+ * The ASNs listed in the ASN-DROP NDJSON feed, e.g.
+ *   {"asn":245,"rir":"arin","domain":"planningresearchcorp.com","cc":"US","asname":"PRC-AS"}
+ * as sorted, de-duplicated "AS245" strings.
+ *
+ * sync-spamhaus.yml writes each one into asn_classification.php as
+ * `'AS245' => 'scanning',`, i.e. into PHP source that auto-promote ships to
+ * production without review. So the whole feed is refused, not cleaned up, if
+ * any line is not JSON or any record's asn is not a JSON integer in
+ * 1..4294967295: a string asn such as "1' => x, '" would otherwise become code.
+ * Records without an asn (the metadata record) are skipped.
+ *
+ * @param string $ndjson  Raw ASN-DROP NDJSON feed contents.
+ * @return list<string>|null  null when the feed has no ASNs or any record is unusable.
+ */
+function spamhaus_asndrop_asns(string $ndjson): ?array {
+    $asns = [];
+    foreach (explode("\n", $ndjson) as $line) {
+        $line = trim($line);
+        if ($line === '') {
+            continue;
+        }
+        $rec = json_decode($line, true);
+        if (!is_array($rec)) {
+            return null;
+        }
+        if (!array_key_exists('asn', $rec) || $rec['asn'] === null) {
+            continue;
+        }
+        $asn = $rec['asn'];
+        if (!is_int($asn) || $asn < 1 || $asn > 4294967295) {
+            return null;
+        }
+        $asns[$asn] = true;
+    }
+    if (!$asns) {
+        return null;
+    }
+    ksort($asns);
+    return array_map(static fn(int $asn): string => "AS{$asn}", array_keys($asns));
+}
+
+/**
+ * Whether the ASN-DROP auto-sync block in asn_classification.php holds only
+ * comments and `'AS<digits>' => 'scanning',` entries. sync-spamhaus.yml checks
+ * this after writing the block and before php -l, which checks syntax only: a
+ * line that parses but runs code must stop the sync before it is committed.
+ *
+ * Requires exactly one BEGIN and one END marker, BEGIN first. Every line
+ * between them must be `    // ` plus a comment with no "?>" and no control
+ * characters (PHP also ends a // comment at \r), or
+ * `    'AS<1-10 digits>' => 'scanning',`.
+ *
+ * @param string $src  Full contents of asn_classification.php.
+ */
+function spamhaus_asndrop_block_is_safe(string $src): bool {
+    $begin = '    // --- BEGIN AUTO-SYNC SPAMHAUS ASN-DROP (do not hand-edit) ---';
+    $end   = '    // --- END AUTO-SYNC SPAMHAUS ASN-DROP ---';
+    $lines = explode("\n", $src);
+    $b = array_keys($lines, $begin, true);
+    $e = array_keys($lines, $end, true);
+    if (count($b) !== 1 || count($e) !== 1 || $e[0] <= $b[0]
+        || substr_count($src, 'AUTO-SYNC SPAMHAUS ASN-DROP') !== 2
+    ) {
+        return false;
+    }
+    for ($i = $b[0] + 1; $i < $e[0]; $i++) {
+        $line = $lines[$i];
+        if (preg_match("~^    'AS[0-9]{1,10}' => 'scanning',$~D", $line) === 1) {
+            continue;
+        }
+        if (str_starts_with($line, '    // ') && !str_contains($line, '?>')
+            && preg_match('/[\x00-\x1F\x7F]/', $line) !== 1
+        ) {
+            continue;
+        }
+        return false;
+    }
+    return true;
 }
 
 /**
