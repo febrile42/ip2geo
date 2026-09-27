@@ -263,6 +263,22 @@ class SpamhausDropTest extends TestCase
         }
     }
 
+    /**
+     * The committed data files must carry the feed's own attribution. Fails if a
+     * rebase or hand edit brings back a header without it.
+     */
+    public function testCommittedDataFilesCarrySpamhausAttribution(): void
+    {
+        $drop = file_get_contents(__DIR__ . '/../spamhaus_drop_data.php');
+        $this->assertMatchesRegularExpression('~^// Copyright: \(c\) \d{4} The Spamhaus Project SLU$~m', $drop);
+        $this->assertMatchesRegularExpression('~^// Feed timestamp: \d+ \(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\)$~m', $drop);
+
+        $asn = file_get_contents(__DIR__ . '/../asn_classification.php');
+        $block = substr($asn, strpos($asn, '// --- BEGIN AUTO-SYNC SPAMHAUS ASN-DROP'));
+        $this->assertMatchesRegularExpression('~^    // Copyright: \(c\) \d{4} The Spamhaus Project SLU$~m', $block);
+        $this->assertMatchesRegularExpression('~^    // Feed timestamp: \d+ \(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\)$~m', $block);
+    }
+
     // --- perf guard: 10k lookups must be cheap against the real set --------
 
     public function testTenThousandLookupsAreFast(): void
