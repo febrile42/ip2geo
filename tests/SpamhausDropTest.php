@@ -186,7 +186,26 @@ class SpamhausDropTest extends TestCase
             // Both would let feed text escape the // comment into executable PHP.
             'newline in copyright'     => [['copyright' => "(c) 2026 Spamhaus\nphpinfo();"]],
             'close tag in terms'       => [['terms' => 'https://example.com/?>x']],
+            // A fake END marker in the ASN-DROP block header orphans the old
+            // block on the next sync-spamhaus.yml run (IPG-153).
+            'END marker in copyright'  => [['copyright' => '(c) 2026 Spamhaus // --- END AUTO-SYNC SPAMHAUS ASN-DROP ---']],
+            'AUTO-SYNC in terms'       => [['terms' => 'https://example.com/AUTO-SYNC']],
+            'bidi override'            => [['copyright' => "(c) 2026 \u{202E}ULS tcejorP ahmapS"]],
+            'zero-width space'         => [['copyright' => "(c) 2026 Spam\u{200B}haus"]],
+            'line separator'           => [['copyright' => "(c) 2026 Spamhaus\u{2028}x"]],
+            'copyright of 201 chars'   => [['copyright' => str_repeat('a', 201)]],
+            'space in terms'           => [['terms' => 'https://www.spamhaus.org/drop/terms/ x']],
         ];
+    }
+
+    public function testGeneratorAcceptsCopyrightSign(): void
+    {
+        [$code, $out] = self::runGenerator(
+            self::FEED_CIDRS . self::metadataLine(['copyright' => '© 2026 The Spamhaus Project SLU']) . "\n"
+        );
+
+        $this->assertSame(0, $code);
+        $this->assertStringContainsString("// Copyright: © 2026 The Spamhaus Project SLU\n", $out);
     }
 
     public function testFeedHeaderLinesForAsnDropBlock(): void

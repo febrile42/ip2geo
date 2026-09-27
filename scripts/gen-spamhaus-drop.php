@@ -33,9 +33,15 @@
  *    "terms":"https://www.spamhaus.org/drop/terms/"}
  *
  * The values are written verbatim into a PHP line comment, so anything that
- * could end that comment is refused rather than cleaned up: control characters
- * (a newline would put the rest of the value outside the comment) and "?>"
- * (which closes PHP mode even inside a // comment).
+ * could end that comment or confuse the files it lands in is refused rather
+ * than cleaned up. Each value must be 1-200 characters of letters, numbers,
+ * punctuation, symbols and plain spaces, which rules out control characters (a
+ * newline would put the rest of the value outside the comment), bidi overrides,
+ * zero-width and line/paragraph separators, and invalid UTF-8. On top of that:
+ * no "?>" (it closes PHP mode even inside a // comment), no "AUTO-SYNC" (a copy
+ * of the END marker in the ASN-DROP block header would make the next
+ * sync-spamhaus.yml run stop there and orphan the old block), and terms must be
+ * an https:// URL with no whitespace.
  *
  * @param string $ndjson  Raw NDJSON feed contents (DROP or ASN-DROP).
  * @return array{copyright:string,timestamp:int,terms:string}|null  null when the
@@ -56,12 +62,13 @@ function spamhaus_feed_metadata(string $ndjson): ?array {
         }
         foreach ([$copyright, $terms] as $value) {
             if (!is_string($value) || trim($value) === ''
-                || preg_match('/[\x00-\x1F\x7F]/', $value) || str_contains($value, '?>')
+                || preg_match('/^[\p{L}\p{N}\p{P}\p{S} ]{1,200}$/u', $value) !== 1
+                || str_contains($value, '?>') || str_contains($value, 'AUTO-SYNC')
             ) {
                 return null;
             }
         }
-        if (!str_starts_with($terms, 'https://')) {
+        if (preg_match('~^https://\S+$~', $terms) !== 1) {
             return null;
         }
         return ['copyright' => $copyright, 'timestamp' => $timestamp, 'terms' => $terms];
