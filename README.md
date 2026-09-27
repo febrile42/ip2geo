@@ -1,10 +1,17 @@
 # ip2geo.org
 
-**Bulk lookup:** paste in a wall of text, log output, or a raw list of IPs. It extracts the IPv4 and IPv6 addresses and returns country, region, city, ASN, a category (scanning, VPN/proxy, cloud, residential…) and a Spamhaus DROP flag for each one. Up to 10,000 unique IPs per lookup. Results can be filtered, exported (TSV, CSV, KQL, SPL, iptables, ufw, nginx) and shared as a link whose IPs live only in the URL fragment. Threat Reports (the paid one-time report and its free precursor) were retired in v5.0.0; see "Threat Reports (retired in v5.0.0)" below.
+Free bulk IP geolocation, ASN and Spamhaus DROP lookup for raw logs. No signup.
 
-The **Community Block List** (`/intel.php`) was retired in v5.0.0 too; see "Community Block List (retired in v5.0.0)" below.
+Paste a wall of text, log output or a raw list of IPs. ip2geo extracts the IPv4 and IPv6 addresses and returns, for each one:
 
-Live at [ip2geo.org](https://ip2geo.org) since 2017. **Picking this up cold? Read [`HANDOFF.md`](HANDOFF.md) first.**
+- country, region and city
+- ASN and network name
+- a category (scanning, VPN/proxy, cloud, residential), assigned from the network's ASN, not per-IP detection
+- a Spamhaus DROP flag (DROP lists IPv4 netblocks only, so IPv6 addresses are never flagged)
+
+One lookup takes up to 10,000 unique IPs and usually finishes in well under a second on the server. You can then filter the results, export them as TSV, CSV, KQL (Sentinel), SPL (Splunk) or iptables/ufw/nginx block rules, and share them as a link that keeps the IPs in the URL fragment. It also works without JavaScript.
+
+Live at [ip2geo.org](https://ip2geo.org) since 2017. Threat Reports and the Community Block List were retired in v5.0.0 (see [below](#threat-reports-retired-in-v500)). **Picking this up cold? Read [`HANDOFF.md`](HANDOFF.md) first.**
 
 ---
 
