@@ -12,7 +12,7 @@ How ip2geo is built, set up, tested and deployed. For what the site does, see th
 - **Vanilla JS, no build step**: the v5 workbench (`assets/js/*.js`) extracts IPs in the browser, POSTs only the IPs to `/api/lookup.php`, and renders, filters and exports on the client. Without JS, `index.php` falls back to a server-rendered results table.
 - **Cloudflare** in front of the origin. Rocket Loader is on for the zone, so every `<script>` tag carries `data-cfasync="false"` (enforced by `tests/RocketLoaderOptOutTest.php`), and every asset URL carries `?v=<APP_VERSION>` so a release is never paired with day-old cached JS.
 - **APCu**: the lookup rate limit (`/api/lookup.php` and the no-JS `POST /`).
-- **GitHub Actions**: CI/CD (tests → staging → production), monthly GeoLite2 refresh, and Spamhaus DROP / ASN-DROP syncs.
+- **GitHub Actions**: CI/CD (tests → staging → production), weekly GeoLite2 refresh, and Spamhaus DROP / ASN-DROP syncs.
 - **Tests**: PHPUnit, plus Jest and Playwright (dev-only; nothing Node-based is deployed).
 
 ---
@@ -38,7 +38,7 @@ This writes `data/geoip/GeoLite2-{City,ASN}.mmdb`. The script:
 - verifies SHA256
 - spot-checks 8.8.8.8 → US / AS15169
 - swaps the files in atomically
-- does nothing if both files are less than 35 days old
+- does nothing if both files are less than 7 days old
 
 Credentials come from the environment and are never passed as arguments. `data/geoip/` is gitignored, and `data/.htaccess` denies web access, because the GeoLite2 license forbids redistribution. CI checks that the directory returns 403 on staging and production.
 
@@ -130,7 +130,7 @@ Other workflows:
 
 | Workflow | Schedule | What it does |
 |---|---|---|
-| `update-db.yml` | Monthly | Runs `~/bin/update-geoip.sh` on the server |
+| `update-db.yml` | Weekly (Mon) | Runs `~/bin/update-geoip.sh` on the server |
 | `sync-spamhaus-drop.yml` | Weekly | Syncs Spamhaus DROP and auto-promotes if the delta is pure data |
 | `sync-spamhaus.yml` | Monthly | Regenerates the ASN-DROP auto-sync block in `asn_classification.php` on `develop`, and auto-promotes if the delta is pure Spamhaus |
 

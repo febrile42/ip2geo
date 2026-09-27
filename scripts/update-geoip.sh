@@ -3,7 +3,7 @@
 # Usage: update-geoip.sh ACCOUNT_ID LICENSE_KEY
 #
 # Runs on the deployment server. Install to ~/bin/update-geoip.sh and chmod +x.
-# Triggered monthly by .github/workflows/update-db.yml via SSH.
+# Triggered weekly by .github/workflows/update-db.yml via SSH.
 set -euo pipefail
 
 ACCOUNT_ID="${1:?MaxMind Account ID required}"

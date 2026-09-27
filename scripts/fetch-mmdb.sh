@@ -4,8 +4,8 @@
 #   MAXMIND_ACCOUNT_ID=... MAXMIND_LICENSE_KEY=... scripts/fetch-mmdb.sh <app-dir>
 # Writes <app-dir>/data/geoip/GeoLite2-{City,ASN}.mmdb. data/.htaccess denies web
 # access: GeoLite2's license forbids redistributing the files.
-# Skips the download when both files exist and are newer than 35 days, so it is
-# cheap to run on every deploy. The monthly update-geoip.sh also refreshes them.
+# Skips the download when both files exist and are newer than 7 days, so it is
+# cheap to run on every deploy. The weekly update-geoip.sh also refreshes them.
 #
 #   files fresh? ──yes──▶ exit 0
 #        │no
@@ -21,9 +21,9 @@ DEST="$APP_DIR/data/geoip"
 : "${MAXMIND_LICENSE_KEY:?MAXMIND_LICENSE_KEY not set}"
 
 mkdir -p "$DEST"
-if [ -n "$(find "$DEST" -maxdepth 1 -name 'GeoLite2-City.mmdb' -mtime -35)" ] &&
-   [ -n "$(find "$DEST" -maxdepth 1 -name 'GeoLite2-ASN.mmdb' -mtime -35)" ]; then
-  echo "mmdb files are fresh (<35 days); nothing to do."
+if [ -n "$(find "$DEST" -maxdepth 1 -name 'GeoLite2-City.mmdb' -mtime -7)" ] &&
+   [ -n "$(find "$DEST" -maxdepth 1 -name 'GeoLite2-ASN.mmdb' -mtime -7)" ]; then
+  echo "mmdb files are fresh (<7 days); nothing to do."
   exit 0
 fi
 

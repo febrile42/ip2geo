@@ -82,8 +82,8 @@ Section 7 repeats both.
 | `spamhaus_drop_data.php` | Spamhaus DROP netblocks, regenerated weekly. It's a local list, with **no API and no quota** |
 | `report.php`, `intel.php` | Static 410 "retired" pages (Threat Reports; Community Block List) |
 | `migrations/retire_reports_v5.sql` | Manual, backup-first report-table retirement. **Not run yet** |
-| `scripts/fetch-mmdb.sh` | Deploy-time `.mmdb` fetch: netrc auth, SHA256 check, 8.8.8.8 spot check, atomic swap, skipped if the files are less than 35 days old |
-| `scripts/update-geoip.sh` | Monthly refresh (`.mmdb` plus legacy MySQL tables), run from `~/bin` on the server |
+| `scripts/fetch-mmdb.sh` | Deploy-time `.mmdb` fetch: netrc auth, SHA256 check, 8.8.8.8 spot check, atomic swap, skipped if the files are less than 7 days old |
+| `scripts/update-geoip.sh` | Weekly refresh (`.mmdb` plus legacy MySQL tables), run from `~/bin` on the server |
 | `changelog.php` | Public changelog. The **5.0.0 entry is a DRAFT** for the owner to finalize, in their own first-person voice |
 | `privacy.php` | Describes the JS path (the paste stays in the browser) and the no-JS path (text is sent, parsed and not stored). **Keep it exactly true** when behaviour changes |
 
