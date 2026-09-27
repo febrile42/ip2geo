@@ -33,7 +33,7 @@ The code is MIT licensed; see [`LICENSE`](LICENSE). The license covers the code 
 
 ## Credits
 
-- Geolocation data: [MaxMind GeoLite2](https://dev.maxmind.com/geoip/geolite2-free-geolocation-data). This product includes GeoLite2 data created by MaxMind, available from [maxmind.com](http://www.maxmind.com).
+- Geolocation data: [MaxMind GeoLite2](https://dev.maxmind.com/geoip/geolite2-free-geolocation-data). This product includes GeoLite Data created by MaxMind, available from [https://www.maxmind.com](https://www.maxmind.com), licensed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
 - [Claude Code](https://claude.com/product/claude-code) for helping implement all [my](https://github.com/febrile42/) lingering to-dos and then some.
 
 ### Thanks
