@@ -79,9 +79,10 @@ jobs:
           php -l "$DATA_FILE.new"
           rm -f "$TMP_FEED"
 
-          # Compare ignoring the volatile "// Last sync:" line so an unchanged DROP
+          # Compare ignoring the volatile "// Last sync:" and "// Feed timestamp:"
+          # lines (Spamhaus re-stamps the feed on every build) so an unchanged DROP
           # list does NOT produce a weekly no-op commit (and a no-op prod promote).
-          strip_date() { grep -v '^// Last sync:'; }
+          strip_date() { grep -vE '^// (Last sync|Feed timestamp):'; }
           if [ -f "$DATA_FILE" ] && diff -q <(strip_date < "$DATA_FILE") <(strip_date < "$DATA_FILE.new") >/dev/null; then
             echo "Spamhaus DROP sync: no range changes."
             rm -f "$DATA_FILE.new"

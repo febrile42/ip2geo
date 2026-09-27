@@ -156,7 +156,7 @@ curl -s https://staging.ip2geo.org/ | grep -o 'v[0-9.]*' | head -1
 
 **Release:**
 
-1. Rebase `v5` onto the current `origin/main` so it picks up any DROP syncs. Re-run the suites.
+1. Rebase `v5` onto the current `origin/main` so it picks up any DROP syncs. Re-run the suites. If the rebase conflicts on `spamhaus_drop_data.php` or the ASN-DROP block in `asn_classification.php`, don't hand-merge: regenerate them from the live feeds with v5's generator and `sync-spamhaus.yml` regen step. `SpamhausDropTest` fails if either file lost its Spamhaus copyright header (IPG-148).
 2. Open a PR `v5` → `develop` and merge it. Staging deploys from `develop`. Check the footer and staging tests.
 3. Open a PR `develop` → `main` and merge it. Production deploys. Then:
    - read `https://ip2geo.org/` back, and check the footer says v5.0.0

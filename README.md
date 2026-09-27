@@ -27,7 +27,7 @@ With JavaScript on, your paste stays in the browser: only the extracted IPs are 
 
 The code is MIT licensed; see [`LICENSE`](LICENSE). The license covers the code only:
 
-- `spamhaus_drop_data.php` and the auto-synced Spamhaus block in `asn_classification.php` are Spamhaus DROP / ASN-DROP data and stay under [Spamhaus's terms](https://www.spamhaus.org/drop/terms/).
+- `spamhaus_drop_data.php` and the auto-synced Spamhaus block in `asn_classification.php` are Spamhaus DROP / ASN-DROP data and stay under [Spamhaus's terms](https://www.spamhaus.org/drop/terms/). See [`NOTICE`](NOTICE).
 - MaxMind GeoLite2 data is not included. To self-host, get your own free MaxMind license key (see [`scripts/fetch-mmdb.sh`](scripts/fetch-mmdb.sh)).
 - `tests/fixtures/mmdb/*.mmdb` are MaxMind's test databases, under their own license (see [that folder's README](tests/fixtures/mmdb/README.md)).
 

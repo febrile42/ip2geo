@@ -1,0 +1,24 @@
+ip2geo
+Copyright (c) 2017–2026 Joshua Gister
+
+The code in this repository is licensed under the MIT License (see LICENSE).
+That license does not cover the third-party data listed below.
+
+Spamhaus DROP and ASN-DROP
+--------------------------
+
+This repository includes data from the Spamhaus DROP and ASN-DROP lists,
+(c) The Spamhaus Project SLU, used under the Spamhaus DROP terms of use:
+https://www.spamhaus.org/drop/terms/
+
+The data is in:
+
+- spamhaus_drop_data.php (from https://www.spamhaus.org/drop/drop_v4.json)
+- the auto-synced block between the "BEGIN AUTO-SYNC SPAMHAUS ASN-DROP" and
+  "END AUTO-SYNC SPAMHAUS ASN-DROP" markers in asn_classification.php
+  (from https://www.spamhaus.org/drop/asndrop.json)
+
+Each of these carries the copyright notice, feed timestamp and terms URL
+from the Spamhaus feed it was generated from. This data is excluded from the
+MIT License: it remains the property of The Spamhaus Project SLU and is
+subject only to the Spamhaus DROP terms of use.

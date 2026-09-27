@@ -60,16 +60,38 @@ jobs:
           END_MARKER="// --- END AUTO-SYNC SPAMHAUS ASN-DROP ---"
 
           # Spamhaus ASN-DROP — current bad-actor AS list (NDJSON, one object per line).
-          # The first record is a `{"type":"metadata",...}` header with no .asn — filter it
-          # out so we don't materialize an "ASnull" entry into the classification array.
-          SPAMHAUS_ASNS=$(curl -sf https://www.spamhaus.org/drop/asndrop.json \
-            | jq -r 'select(.asn != null) | "AS" + (.asn | tostring)' \
+          TMP_FEED=$(mktemp)
+          if ! curl -sf --max-time 60 https://www.spamhaus.org/drop/asndrop.json -o "$TMP_FEED"; then
+            echo "Spamhaus ASN-DROP fetch failed — aborting to avoid emptying the auto-sync block."
+            exit 1
+          fi
+
+          # The feed's `{"type":"metadata",...}` record has no .asn — filter it out so
+          # we don't materialize an "ASnull" entry into the classification array.
+          SPAMHAUS_ASNS=$(jq -r 'select(.asn != null) | "AS" + (.asn | tostring)' "$TMP_FEED" \
             | sort -u)
 
           if [ -z "$SPAMHAUS_ASNS" ]; then
             echo "Spamhaus fetch returned no ASNs — aborting to avoid emptying the auto-sync block."
             exit 1
           fi
+
+          # That metadata record's copyright, timestamp and terms go into the block's
+          # header verbatim. Same parser as the DROP generator, so a missing or
+          # malformed record (or one that could break out of the // comment) aborts
+          # the sync here instead of committing the block without attribution.
+          ATTRIBUTION=$(php -r '
+            require "scripts/gen-spamhaus-drop.php";
+            $meta = spamhaus_feed_metadata(stream_get_contents(STDIN));
+            if ($meta === null) {
+                fwrite(STDERR, "ASN-DROP feed has no usable metadata record (copyright, timestamp, terms).\n");
+                exit(1);
+            }
+            foreach (spamhaus_feed_header_lines($meta) as $line) {
+                echo "    // {$line}\n";
+            }
+          ' < "$TMP_FEED")
+          rm -f "$TMP_FEED"
 
           # Manual entries = ASNs in $known_asns ABOVE the BEGIN marker.
           # Anything below the marker is owned by this workflow and gets replaced.
@@ -91,6 +113,8 @@ jobs:
             echo "    // Synced monthly from https://www.spamhaus.org/drop/asndrop.json by"
             echo "    // .github/workflows/sync-spamhaus.yml. To override an entry's classification,"
             echo "    // move it OUT of this block into the appropriate manual section above."
+            echo "$ATTRIBUTION"
+            echo "    // Spamhaus data, not covered by this repository's license; see NOTICE."
             echo "    // Last sync: $(date -u +%Y-%m-%d)"
             while IFS= read -r asn; do
               [ -n "$asn" ] && echo "    '$asn' => 'scanning',"
@@ -112,7 +136,9 @@ jobs:
           if not pattern.search(src):
               sys.stderr.write("ERROR: BEGIN/END markers not found in " + fp + "\n")
               sys.exit(2)
-          open(fp, "w").write(pattern.sub(new_block, src))
+          # Callable replacement: the block now carries feed text, so it must not be
+          # read as a template (a backslash in it would otherwise be an escape).
+          open(fp, "w").write(pattern.sub(lambda m: new_block, src))
           PY
           rm -f "$BLOCK_FILE"
 

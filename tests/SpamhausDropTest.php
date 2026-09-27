@@ -14,8 +14,9 @@ require_once __DIR__ . '/../scripts/gen-spamhaus-drop.php'; // spamhaus_drop_ran
  * residential attackers the ASN verdict would otherwise miss.
  *
  * Covers the lookup (binary search), the generator (CIDR -> sorted/merged int
- * ranges, skipping metadata + IPv6), the verdict override, the committed data
- * file's integrity, and a perf guard for the 10k hot loop.
+ * ranges, skipping metadata + IPv6), the attribution header written from the
+ * feed's metadata record, the verdict override, the committed data files'
+ * integrity, and a perf guard for the 10k hot loop.
  */
 class SpamhausDropTest extends TestCase
 {
@@ -103,6 +104,102 @@ class SpamhausDropTest extends TestCase
         $GLOBALS['spamhaus_drop_ranges'] = $ranges;
         $this->assertTrue(ip_in_spamhaus_drop((int) sprintf('%u', ip2long('45.155.205.99'))));
         $this->assertFalse(ip_in_spamhaus_drop((int) sprintf('%u', ip2long('45.155.206.0'))));
+    }
+
+    // --- generator CLI: Spamhaus attribution header (IPG-148) --------------
+
+    private const FEED_CIDRS = '{"cidr":"192.0.2.0/24","sblid":"SBL1","rir":"ripencc"}' . "\n"
+        . '{"cidr":"198.51.100.0/24","sblid":"SBL2","rir":"arin"}' . "\n";
+
+    /** A metadata record shaped like the live feed's, with a timestamp no real sync will match. */
+    private static function metadataLine(array $overrides = []): string
+    {
+        return json_encode(array_merge([
+            'type'      => 'metadata',
+            'timestamp' => 1790518442,
+            'size'      => 104402,
+            'records'   => 2,
+            'copyright' => '(c) 2026 The Spamhaus Project SLU',
+            'terms'     => 'https://www.spamhaus.org/drop/terms/',
+        ], $overrides), JSON_UNESCAPED_SLASHES);
+    }
+
+    /**
+     * Run the generator the way sync-spamhaus-drop.yml does (feed on stdin,
+     * data file on stdout) and return [exit code, stdout].
+     *
+     * @return array{0:int,1:string}
+     */
+    private static function runGenerator(string $feed): array
+    {
+        $proc = proc_open(
+            [PHP_BINARY, __DIR__ . '/../scripts/gen-spamhaus-drop.php'],
+            [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+            $pipes
+        );
+        fwrite($pipes[0], $feed);
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        return [proc_close($proc), $stdout];
+    }
+
+    public function testGeneratorHeaderCarriesFeedCopyrightTimestampAndTerms(): void
+    {
+        [$code, $out] = self::runGenerator(self::FEED_CIDRS . self::metadataLine() . "\n");
+
+        $this->assertSame(0, $code);
+        $this->assertStringContainsString("// Copyright: (c) 2026 The Spamhaus Project SLU\n", $out);
+        $this->assertStringContainsString("// Terms: https://www.spamhaus.org/drop/terms/\n", $out);
+        $this->assertStringContainsString("// Feed timestamp: 1790518442 (2026-09-27T14:14:02Z)\n", $out);
+        $this->assertStringContainsString("// Spamhaus data, not covered by this repository's license; see NOTICE.\n", $out);
+        $this->assertMatchesRegularExpression('~^// Last sync: \d{4}-\d{2}-\d{2}$~m', $out);
+    }
+
+    public function testGeneratorRefusesFeedWithoutMetadataRecord(): void
+    {
+        [$code, $out] = self::runGenerator(self::FEED_CIDRS);
+
+        $this->assertNotSame(0, $code, 'a feed with no metadata record must abort the sync');
+        $this->assertSame('', $out, 'nothing may be written over the committed data file');
+    }
+
+    /** @dataProvider unusableMetadata */
+    public function testGeneratorRefusesUnusableMetadata(array $overrides): void
+    {
+        [$code, $out] = self::runGenerator(self::FEED_CIDRS . self::metadataLine($overrides) . "\n");
+
+        $this->assertNotSame(0, $code);
+        $this->assertSame('', $out);
+    }
+
+    public static function unusableMetadata(): array
+    {
+        return [
+            'no copyright'             => [['copyright' => null]],
+            'no timestamp'             => [['timestamp' => null]],
+            'no terms'                 => [['terms' => null]],
+            'timestamp as a string'    => [['timestamp' => '1790518442']],
+            'terms not https'          => [['terms' => 'http://www.spamhaus.org/drop/terms/']],
+            // Both would let feed text escape the // comment into executable PHP.
+            'newline in copyright'     => [['copyright' => "(c) 2026 Spamhaus\nphpinfo();"]],
+            'close tag in terms'       => [['terms' => 'https://example.com/?>x']],
+        ];
+    }
+
+    public function testFeedHeaderLinesForAsnDropBlock(): void
+    {
+        // sync-spamhaus.yml writes these lines into the ASN-DROP block header.
+        $meta = spamhaus_feed_metadata(
+            '{"asn":245,"rir":"arin"}' . "\n" . self::metadataLine(['timestamp' => 1790522042])
+        );
+        $this->assertSame([
+            'Copyright: (c) 2026 The Spamhaus Project SLU',
+            'Terms: https://www.spamhaus.org/drop/terms/',
+            'Feed timestamp: 1790522042 (2026-09-27T15:14:02Z)',
+        ], spamhaus_feed_header_lines($meta));
     }
 
     // --- apply_reputation_override() ---------------------------------------
