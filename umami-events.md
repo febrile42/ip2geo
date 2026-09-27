@@ -62,9 +62,8 @@ lookup swapped the server-rendered `#results` table for `#workbench-root`.
 See `filter_category` / `filter_country` below for the older, still-present
 handlers on the server-rendered table — those fire only for visitors who
 get the server-rendered table because the workbench never took over (with JS
-fully off, neither set fires), and their `filter_category`
-carries different fields, so don't merge the two in a dashboard without
-checking which section the row came from.
+fully off, neither set fires). Both sets send the same event names with no
+properties, so a dashboard counts them together.
 
 ---
 
@@ -90,8 +89,7 @@ over, i.e. the browser-side lookup in `assets/js/workbench.js` never ran but
 `ip2geo-app.js` did. With JS fully disabled nothing fires at all. Once a lookup succeeds client-side, `#results` stays hidden and
 `#workbench-root` takes its place, so the same filter action instead fires
 the `filter_category` / `filter_country` / `filter_search` events documented
-above under workbench — note `filter_category` here still carries the
-`category`/`checked` fields that the workbench version dropped for D9.
+above under workbench.
 
 ### `filter_country`
 Someone used the country filter chips. No properties (R9/D8): the country
@@ -101,8 +99,9 @@ filter-usage volume; the per-country breakdown chart in Umami stops here.
 
 ### `filter_category`
 Someone toggled one of the category checkboxes (Scanning, VPN/Proxy, Cloud,
-Residential, etc.). Fields: `category` (the category name — a fixed ip2geo
-label, not paste data) and `checked` (true = turned on, false = turned off).
+Residential, etc.). No properties (D9): which category and whether it was
+turned on or off are not sent (IPG-134; before that it sent `category` and
+`checked`).
 
 ---
 

@@ -194,7 +194,7 @@ curl -s https://staging.ip2geo.org/ | grep -o 'v[0-9.]*' | head -1
 
 ## 8. Known gaps and unverified items
 
-- **The workbench filters send no analytics.** `filter_country`/`filter_category` fire only from the server-rendered table, which JS users no longer see. The approved rule (D9) is a `filter_<dim>` event with the dimension only, never the value. It isn't built yet; see `umami-events.md`.
+- **Filter analytics follow D9 (dimension only, never the value).** The workbench fires `filter_category`, `filter_country` and `filter_search` (debounced 600ms) with no properties (`trackFilterUse()` in `assets/js/workbench.js`). The server-rendered table's fallback handlers in `assets/js/ip2geo-app.js` fire the same `filter_category`/`filter_country` names, also with no properties (IPG-134). See `umami-events.md`.
 - **Why free reports stopped after 2026-09-04** was never proven. It looked like "no clicks", but the server error logs couldn't be read. It's moot now that reports are retired.
 - **The admin branch** has not been seen in a browser (above).
 - **Nothing has been QA'd on a physical phone yet.** Mobile behaviour was verified in Playwright's Pixel 7 emulation against staging.

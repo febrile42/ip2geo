@@ -246,7 +246,7 @@
     document.addEventListener('change', function (e) {
         if (!e.target) return;
         if (e.target.classList.contains('filter-category')) {
-            window.umami && umami.track('filter_category', { category: e.target.value, checked: e.target.checked });
+            window.umami && umami.track('filter_category'); // D9: dimension only, no category/checked properties
             applyFilters();
         } else if (e.target.classList.contains('filter-country')) {
             applyFilters();
