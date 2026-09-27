@@ -175,6 +175,7 @@ curl -s https://staging.ip2geo.org/ | grep -o 'v[0-9.]*' | head -1
 - After production has v5's `vendor/`, install `scripts/update-geoip.sh` to `~/bin`. It's the version that also refreshes the `.mmdb` files.
 - Take a backup, then run `migrations/retire_reports_v5.sql`.
 - In Stripe, disable the webhook endpoint and revoke the old keys.
+- In the GitHub repo's "About" settings, replace the description with the one approved on IPG-118: "Free bulk IP geolocation, ASN and Spamhaus DROP lookup for raw logs. Paste up to 10,000 IPv4/IPv6 addresses, then filter and export to CSV, KQL, SPL or firewall rules. Live at ip2geo.org since 2017." Keep the website as `https://ip2geo.org`. The approved topics (`ip-geolocation` `bulk-ip-lookup` `asn` `spamhaus` `ipv6` `soc` `threat-intelligence` `maxmind`) wait for the git-history secret scan (IPG-106 item 1.3), not for release day.
 
 **Rollback:** redeploy the tag `v4-final`. The MySQL GeoIP tables are deliberately kept so v4 still works.
 
