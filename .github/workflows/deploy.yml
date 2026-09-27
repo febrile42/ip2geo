@@ -45,6 +45,15 @@ jobs:
         with:
           php-version: '8.4'
           tools: composer
+          # The lookup limiter fails closed without APCu (IPG-145); Playwright's
+          # php -S needs it or every lookup is a 503.
+          extensions: apcu
+      - name: APCu is loaded (IPG-145)
+        run: |
+          if ! php -r 'exit(extension_loaded("apcu") ? 0 : 1);'; then
+            echo "APCu is not loaded; the lookup limiter fails closed without it"
+            exit 1
+          fi
       - name: PHPUnit
         run: |
           composer install --no-interaction --no-progress
@@ -147,6 +156,19 @@ jobs:
           done
           exit $FAIL
 
+      - name: Staging lookup API answers 200 (APCu loaded; the limiter fails closed without it, IPG-145)
+        run: |
+          CODE=$(curl -s -o /tmp/api_body -w "%{http_code}" -X POST \
+            -H "Host: staging.ip2geo.org" -H "Content-Type: application/json" \
+            "http://${{ secrets.DEPLOY_HOST }}/api/lookup.php" \
+            --data '{"ips":["8.8.8.8"]}')
+          if [ "$CODE" != "200" ]; then
+            echo "/api/lookup.php returned HTTP $CODE: $(head -c 200 /tmp/api_body)"
+            [ "$CODE" = "503" ] && echo "503 here usually means APCu is not loaded for the web SAPI (or the .mmdb files are missing)."
+            exit 1
+          fi
+          echo "lookup API passed: HTTP $CODE"
+
       - name: Functional test — known IP lookup returns expected country
         run: |
           RESPONSE=$(curl -s -X POST \
@@ -237,6 +259,19 @@ jobs:
             exit 1
           fi
           echo "Production smoke test passed"
+
+      - name: Production lookup API answers 200 (APCu loaded; the limiter fails closed without it, IPG-145)
+        run: |
+          CODE=$(curl -s -o /tmp/api_body -w "%{http_code}" -X POST \
+            -H "Host: ip2geo.org" -H "Content-Type: application/json" \
+            "http://${{ secrets.DEPLOY_HOST }}/api/lookup.php" \
+            --data '{"ips":["8.8.8.8"]}')
+          if [ "$CODE" != "200" ]; then
+            echo "/api/lookup.php returned HTTP $CODE: $(head -c 200 /tmp/api_body)"
+            [ "$CODE" = "503" ] && echo "503 here usually means APCu is not loaded for the web SAPI (or the .mmdb files are missing)."
+            exit 1
+          fi
+          echo "lookup API passed: HTTP $CODE"
 
       - name: Production lookup data is not web-reachable (GeoLite2 license)
         run: |

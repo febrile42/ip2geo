@@ -90,13 +90,82 @@ class RateLimitBudgetTest extends TestCase
         $this->assertFalse($this->charge('198.51.100.1', 1, self::T0, \LOOKUP_RATE_BUCKET_NOJS)['limited']);
     }
 
-    public function testIpv6Slash64SharesOneBudget(): void
+    // IPG-145: rotating /64s inside one /56 doesn't mint new budgets.
+    public function testIpv6Slash56SharesOneBudget(): void
     {
-        $this->charge('2001:db8:1:2::1', 600);
-        $this->assertTrue($this->charge('2001:db8:1:2::ffff', 1)['limited']);
+        $this->charge('2001:db8:1:200::1', 600);
+        $this->assertTrue($this->charge('2001:db8:1:2ab::ffff', 1)['limited']);
+        $this->assertTrue($this->charge('2001:db8:1:2ff:1::1', 1)['limited']);
+        $this->assertFalse($this->charge('2001:db8:1:300::1', 1)['limited']);
     }
 
-    public function testFailsOpenWhenTheStoreErrors(): void
+    // ── global ceiling (IPG-145) ────────────────────────────────────────────
+
+    public function testGlobalCeilingLimitsManyClientsEachWithinTheirOwnBudget(): void
+    {
+        // Every client stays under its 600 units; together they hit the ceiling.
+        $spent = 0;
+        for ($i = 1; $spent + 11 <= \LOOKUP_RATE_GLOBAL_MAX_API; $i++) {
+            $this->assertFalse($this->charge('198.51.100.' . $i, 11)['limited'], "client #$i");
+            $spent += 11;
+        }
+        $result = $this->charge('203.0.113.1', 11, self::T0 + 20);
+
+        $this->assertTrue($result['limited'], 'a fresh client is refused once the global budget is spent');
+        $this->assertSame('global', $result['reason']);
+        $this->assertSame(40, $result['retry_after']);
+    }
+
+    public function testGlobalCeilingResetsNextWindow(): void
+    {
+        $this->charge('198.51.100.1', 600);
+        $this->charge('198.51.100.2', \LOOKUP_RATE_GLOBAL_MAX_API - 600);
+        $this->assertTrue($this->charge('198.51.100.3', 1, self::T0 + 59)['limited']);
+        $this->assertFalse($this->charge('198.51.100.3', 1, self::T0 + 60)['limited']);
+    }
+
+    public function testGlobalCeilingIsPerPath(): void
+    {
+        $this->charge('198.51.100.1', \LOOKUP_RATE_GLOBAL_MAX_NOJS, self::T0, \LOOKUP_RATE_BUCKET_NOJS);
+
+        $nojs = $this->charge('198.51.100.2', 11, self::T0, \LOOKUP_RATE_BUCKET_NOJS);
+        $this->assertTrue($nojs['limited']);
+        $this->assertSame('global', $nojs['reason']);
+        $this->assertFalse($this->charge('198.51.100.2', 11)['limited'], 'a no-JS flood leaves the API working');
+    }
+
+    public function testAClientOverItsOwnBudgetDoesNotDrainTheGlobalOne(): void
+    {
+        $this->charge('198.51.100.1', 600);
+        for ($i = 0; $i < 1000; $i++) {
+            $this->assertSame('client', $this->charge('198.51.100.1', 11)['reason']);
+        }
+        $this->assertFalse($this->charge('198.51.100.2', 11)['limited']);
+    }
+
+    // ── fails closed without APCu (IPG-145) ─────────────────────────────────
+
+    public function testFailsClosedWithoutAStore(): void
+    {
+        $result = \lookup_rate_check('198.51.100.1', \LOOKUP_RATE_BUCKET_API, 1, null, self::T0 + 15);
+
+        $this->assertTrue($result['limited']);
+        $this->assertSame('unavailable', $result['reason']);
+        $this->assertSame(45, $result['retry_after']);
+    }
+
+    public function testDefaultLimiterFailsClosedWhenApcuIsNotUsable(): void
+    {
+        if (\lookup_rate_apcu_increment() !== null) {
+            $this->markTestSkipped('APCu is loaded and enabled for the CLI here; covered by testFailsClosedWithoutAStore.');
+        }
+        $result = \default_lookup_rate_limiter('198.51.100.1');
+
+        $this->assertTrue($result['limited']);
+        $this->assertSame('unavailable', $result['reason']);
+    }
+
+    public function testLetsTheRequestThroughWhenOneIncrementErrors(): void
     {
         $result = \default_lookup_rate_limiter('198.51.100.1', \LOOKUP_RATE_BUCKET_API, 1, static fn() => false, self::T0);
         $this->assertFalse($result['limited']);

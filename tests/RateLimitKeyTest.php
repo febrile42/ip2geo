@@ -9,9 +9,10 @@ use PHPUnit\Framework\TestCase;
 require_once __DIR__ . '/../includes/rate-limit.php';
 
 /**
- * rate_limit_key() (IPG-21): the lookup rate limit keys IPv6 clients on their
- * /64, so one client can't take a fresh bucket per request by rotating
- * addresses inside the /64 it controls. IPv4 is keyed as is.
+ * rate_limit_key() (IPG-21, IPG-145): the lookup rate limit keys IPv6
+ * clients on their /56, so one client can't take a fresh bucket per request
+ * by rotating addresses, or /64s, inside the /56 it controls. IPv4 is keyed
+ * as is.
  */
 class RateLimitKeyTest extends TestCase
 {
@@ -21,14 +22,21 @@ class RateLimitKeyTest extends TestCase
             \rate_limit_key('2001:db8:1:2::1'),
             \rate_limit_key('2001:db8:1:2:ffff::9')
         );
-        $this->assertSame('2001:db8:1:2::/64', \rate_limit_key('2001:db8:1:2::1'));
     }
 
-    public function testIpv6AddressInAnotherSlash64GetsADifferentKey(): void
+    // IPG-145: every /64 in a /56 is one client.
+    public function testIpv6Slash64sInTheSameSlash56ShareAKey(): void
+    {
+        $this->assertSame('2001:db8:1:200::/56', \rate_limit_key('2001:db8:1:2ab::1'));
+        $this->assertSame(\rate_limit_key('2001:db8:1:200::1'), \rate_limit_key('2001:db8:1:2ff:ffff::9'));
+        $this->assertSame(\rate_limit_key('2001:db8:1:2::1'), \rate_limit_key('2001:db8:1:3::1'));
+    }
+
+    public function testIpv6AddressInAnotherSlash56GetsADifferentKey(): void
     {
         $this->assertNotSame(
-            \rate_limit_key('2001:db8:1:2::1'),
-            \rate_limit_key('2001:db8:1:3::1')
+            \rate_limit_key('2001:db8:1:2ff::1'),
+            \rate_limit_key('2001:db8:1:300::1')
         );
     }
 

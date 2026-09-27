@@ -16,7 +16,8 @@
  *   client IP (CF-Connecting-IP if REMOTE_ADDR is a Cloudflare edge, else REMOTE_ADDR)
  *          │
  *          ▼
- *   [rate limit check, APCu]  ──▶ limited ───────────────────────▶ 429
+ *   [rate limit check, APCu]  ──▶ limited (client or global) ────▶ 429
+ *                             ──▶ APCu missing (fails closed) ────▶ 503
  *          │                                                       (Retry-After header)
  *          ▼  not limited (or APCu unavailable: skipped, never blocks)
  *   split ips: valid (filter_var FILTER_VALIDATE_IP) / unresolved (rest)
@@ -89,7 +90,7 @@ function lookup_endpoint_json_error(int $status, string $message, array $extraHe
  * @param callable $lookup       function(string[] $ips): array<string,array> — normally
  *                                fn(array $ips) => lookup_ips($ips), injectable so tests
  *                                can simulate a missing/corrupt database
- * @param ?callable $rateLimiter function(string $clientIp, int $cost): array{limited:bool,retry_after:int},
+ * @param ?callable $rateLimiter function(string $clientIp, int $cost): array{limited:bool,retry_after:int,reason?:string},
  *                                defaults to default_lookup_rate_limiter() on the API bucket;
  *                                $cost is lookup_rate_cost() of the unique IP count.
  *                                Injectable so tests can force the 429 path without real APCu
@@ -145,11 +146,15 @@ function handle_lookup_request(array $server, string $body, callable $lookup, ?c
     $rate     = $rateLimiter($clientIp, lookup_rate_cost(count($rawIps)));
     if (!empty($rate['limited'])) {
         $retryAfter = (int)($rate['retry_after'] ?? LOOKUP_RATE_LIMIT_WINDOW_SECONDS);
-        return lookup_endpoint_json_error(
-            429,
-            "Too many lookups from your network. Try again in {$retryAfter}s.",
-            ['Retry-After' => (string)$retryAfter]
-        );
+        $headers    = ['Retry-After' => (string)$retryAfter];
+        switch ($rate['reason'] ?? 'client') {
+            case 'unavailable':
+                return lookup_endpoint_json_error(503, 'Lookups are temporarily unavailable. Try again in a minute.', $headers);
+            case 'global':
+                return lookup_endpoint_json_error(429, "ip2geo is busy right now. Try again in {$retryAfter}s.", $headers);
+            default:
+                return lookup_endpoint_json_error(429, "Too many lookups from your network. Try again in {$retryAfter}s.", $headers);
+        }
     }
 
     $validIps   = [];

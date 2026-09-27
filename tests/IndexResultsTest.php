@@ -245,6 +245,29 @@ class IndexResultsTest extends TestCase
         $this->assertStringContainsString('id="results"', $result['html']);
     }
 
+    // IPG-145: the global ceiling is a 429 too, and a missing APCu a 503.
+    public function testNoJsGlobalCeilingAndMissingApcu(): void
+    {
+        foreach (['global' => 429, 'unavailable' => 503] as $reason => $status) {
+            $rendered = 0;
+            $result   = handle_nojs_lookup(
+                ['ip_list' => '81.2.69.142'],
+                ['REMOTE_ADDR' => '198.51.100.1'],
+                '',
+                static fn(string $ip): array => ['limited' => true, 'retry_after' => 42, 'reason' => $reason],
+                function () use (&$rendered): string {
+                    $rendered++;
+                    return '';
+                }
+            );
+
+            $this->assertSame(0, $rendered, "no lookup may run ($reason)");
+            $this->assertSame($status, $result['status'], $reason);
+            $this->assertSame('42', $result['headers']['Retry-After']);
+            $this->assertStringContainsString('role="alert"', $result['html']);
+        }
+    }
+
     public function testNotLimitedNoJsLookupRendersResults(): void
     {
         $result = handle_nojs_lookup(

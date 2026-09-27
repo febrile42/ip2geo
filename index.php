@@ -403,7 +403,8 @@ function render_lookup_results(array $post, string $visitor_ip = '', ?string $ci
  * (LOOKUP_RATE_BUCKET_NOJS; see includes/rate-limit.php for why). The
  * limiter runs before extraction, so every no-JS POST is charged as a full
  * EXTRACT_IPS_CAP lookup (IPG-48). When limited, no lookup runs and the
- * results section is a role="alert" notice sent with 429 + Retry-After.
+ * results section is a role="alert" notice sent with 429 + Retry-After
+ * (per-client or global budget), or 503 when APCu is missing (IPG-145).
  *
  * Returns status/headers/html instead of sending them so tests can drive it
  * without a real request, APCu or GeoIP database.
@@ -411,7 +412,7 @@ function render_lookup_results(array $post, string $visitor_ip = '', ?string $ci
  * @param array     $post         like $_POST
  * @param array     $server       like $_SERVER (client IP for the limiter)
  * @param string    $visitor_ip   passed through to render_lookup_results() (R16)
- * @param ?callable $rateLimiter  function(string $clientIp): array{limited:bool,retry_after:int}
+ * @param ?callable $rateLimiter  function(string $clientIp): array{limited:bool,retry_after:int,reason?:string}
  * @param ?callable $render       function(array $post, string $visitor_ip): string,
  *                                defaults to render_lookup_results()
  *
@@ -425,11 +426,16 @@ function handle_nojs_lookup(array $post, array $server, string $visitor_ip = '',
     $rate = $rateLimiter(lookup_endpoint_client_ip($server));
     if (!empty($rate['limited'])) {
         $retryAfter = (int)($rate['retry_after'] ?? LOOKUP_RATE_LIMIT_WINDOW_SECONDS);
+        $reason     = $rate['reason'] ?? 'client';
+        $message    = [
+            'unavailable' => 'Lookups are temporarily unavailable. Try again in a minute.',
+            'global'      => 'ip2geo is busy right now. Try again in ' . $retryAfter . 's.',
+        ][$reason] ?? 'Too many lookups from your network. Try again in ' . $retryAfter . 's.';
         return [
-            'status'  => 429,
+            'status'  => $reason === 'unavailable' ? 503 : 429,
             'headers' => ['Retry-After' => (string)$retryAfter],
             'html'    => '<section id="results" class="block"><div class="section-head"><h2 id="result">Lookup Results</h2><span class="section-tag">01 / Results</span></div>'
-                . '<p class="notice" role="alert">Too many lookups from your network. Try again in ' . $retryAfter . 's.</p>'
+                . '<p class="notice" role="alert">' . $message . '</p>'
                 . '</section>',
         ];
     }

@@ -304,15 +304,60 @@ class ApiLookupTest extends TestCase
         $this->assertStringNotContainsString('81.2.69.142', $this->errorLogContents());
     }
 
-    // ── APCu-missing default rate limiter never blocks ──────────────────────
+    // ── limiter reasons map to 429 / 503 (IPG-145) ──────────────────────────
 
-    public function testDefaultRateLimiterSkipsGracefullyWithoutApcu(): void
+    private function limitedBy(string $reason): array
     {
-        if (function_exists('apcu_inc')) {
-            $this->markTestSkipped('APCu is loaded in this environment; the skip-gracefully path is untestable here.');
+        $looked = 0;
+        $result = handle_lookup_request(
+            ['REQUEST_METHOD' => 'POST', 'REMOTE_ADDR' => '198.51.100.1'],
+            json_encode(['ips' => ['81.2.69.142']]),
+            function () use (&$looked): array {
+                $looked++;
+                return [];
+            },
+            static fn(): array => ['limited' => true, 'retry_after' => 42, 'reason' => $reason]
+        );
+        $this->assertSame(0, $looked, 'no lookup may run when limited');
+        return $result;
+    }
+
+    public function testGlobalCeilingReturns429(): void
+    {
+        $result = $this->limitedBy('global');
+
+        $this->assertSame(429, $result['status']);
+        $this->assertSame('42', $result['headers']['Retry-After']);
+        $this->assertStringContainsString('busy', json_decode($result['body'], true)['error']);
+    }
+
+    public function testMissingApcuReturns503(): void
+    {
+        $result = $this->limitedBy('unavailable');
+
+        $this->assertSame(503, $result['status']);
+        $this->assertSame('42', $result['headers']['Retry-After']);
+    }
+
+    // The default limiter, with no injected store, refuses rather than letting
+    // lookups through unmetered when APCu is missing.
+    public function testDefaultRateLimiterFailsClosedWithoutApcu(): void
+    {
+        if (\lookup_rate_apcu_increment() !== null) {
+            $this->markTestSkipped('APCu is loaded and enabled for the CLI here; the fail-closed path is covered by RateLimitBudgetTest.');
         }
 
-        $result = \default_lookup_rate_limiter('198.51.100.1');
-        $this->assertFalse($result['limited']);
+        $looked = 0;
+        $result = handle_lookup_request(
+            ['REQUEST_METHOD' => 'POST', 'REMOTE_ADDR' => '198.51.100.1'],
+            json_encode(['ips' => ['81.2.69.142']]),
+            function () use (&$looked): array {
+                $looked++;
+                return [];
+            }
+        );
+
+        $this->assertSame(503, $result['status']);
+        $this->assertSame(0, $looked);
     }
 }
