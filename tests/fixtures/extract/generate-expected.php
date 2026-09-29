@@ -13,10 +13,10 @@
  * Run once, by hand, whenever a fixture or extract_ips() changes:
  *   php tests/fixtures/extract/generate-expected.php
  *
- * The worst-case-2mb fixture is intentionally excluded: it is generated at
- * test time (identically in PHP and JS) rather than committed, and its
- * expected output is asserted by direct comparison in both test suites
- * instead of a stored *.full.json.
+ * The worst-case-2mb and cap-12k fixtures are intentionally excluded: both
+ * are generated at test time (identically in PHP and JS) rather than
+ * committed, and their expected output is asserted by direct comparison in
+ * both test suites instead of a stored *.full.json.
  */
 
 declare(strict_types=1);
@@ -29,7 +29,6 @@ $fixtures = [
     'netstat',
     'nginx-access',
     'mixed-v4v6',
-    'cap-12k',
     'private-only',
     'empty',
     'defanged-and-ports',

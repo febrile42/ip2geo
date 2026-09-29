@@ -6,8 +6,8 @@
 //   default-time-zone = '+00:00'
 // Then restart: sudo systemctl restart mariadb
 // Verify: mysql -e "SELECT @@global.time_zone;"  → must return +00:00
-// PHP runs in UTC; a timezone mismatch breaks the DATETIME comparisons used
-// by the community-block-list and intel-cache windows.
+// PHP runs in UTC; a timezone mismatch breaks the NOW()-based DATETIME
+// comparisons in scripts/cleanup_report_events.php's retention windows.
 $db_host = 'localhost';
 $db_user = 'your_db_user';
 $db_pass = 'your_db_password';

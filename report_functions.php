@@ -5,7 +5,7 @@
  * Threat Reports were retired in v5.0.0 (R17): the report-generation, free
  * teaser, and AbuseIPDB-enrichment functions that used to live here are gone.
  * What's left is the Spamhaus DROP reputation axis, which the lookup page
- * still uses directly (ip_in_spamhaus_drop, apply_reputation_override).
+ * and the JSON API both use directly (ip2geo_ip_in_spamhaus_drop()).
  *
  * Keeping these here (not embedded inline) makes them unit-testable
  * without booting the full page or a DB connection.
@@ -39,9 +39,9 @@ require_once __DIR__ . '/spamhaus_drop_data.php';
  *
  * Binary search over the sorted, disjoint $spamhaus_drop_ranges → O(log n).
  *
- * @param int $ip_int  Unsigned 32-bit IPv4 as int. Pass (int) ipToLong($ip);
- *                     ipToLong() returns sprintf('%u', ip2long($ip)) as a string,
- *                     and IPv6/invalid IPs collapse to 0 (never listed in DROP).
+ * @param int $ip_int  Unsigned 32-bit IPv4 as int. IPv6/invalid IPs should
+ *                     never reach here — use ip2geo_ip_in_spamhaus_drop()
+ *                     for a full IP string, which handles that.
  * @return bool
  */
 function ip_in_spamhaus_drop(int $ip_int): bool {
@@ -62,43 +62,23 @@ function ip_in_spamhaus_drop(int $ip_int): bool {
 }
 
 /**
- * Apply the Spamhaus DROP reputation override to a computed verdict + CTA state.
+ * Spamhaus DROP flag for one resolved IP — shared by index.php's HTML page
+ * and api/lookup.php's JSON endpoint so both stay in lockstep. DROP is an
+ * IPv4-only netblock list, so IPv6 (and any unparseable input) always
+ * returns false, same as REPUTATION_AXIS_ENABLED being off.
  *
- * A DROP hit is high-confidence criminal/hijacked space. Any hit (with the
- * existing >=5-IP floor) opens the CTA and floors the verdict at MODERATE, even
- * when the ASN-based verdict is LOW — this is what makes a residential fail2ban
- * paste fire. reputation_count == 0 returns the inputs unchanged (regression-safe).
- *
- * Pure: extracted from the index.php lookup path so it is unit-testable.
- * The REPUTATION_AXIS_ENABLED kill switch is checked by the caller.
- *
- * @param string $verdict_level   'HIGH' | 'MODERATE' | 'LOW'
- * @param bool   $show_cta        Whether the CTA would show pre-override
- * @param int    $matches_total   Non-good-country IP count (the >=5 floor)
- * @param int    $reputation_count Count of IPs on the Spamhaus DROP list
- * @param string $verdict_reason  Reason string computed pre-override ('' if none)
- * @return array{verdict_level:string, show_cta:bool, verdict_reason:string}
+ * Replaces the formerly-duplicated ipToLong() (index.php) and
+ * lookup_endpoint_ip4_to_uint() (api/lookup.php), which existed only to feed
+ * ip_in_spamhaus_drop() an unsigned 32-bit int.
  */
-function apply_reputation_override(
-    string $verdict_level,
-    bool $show_cta,
-    int $matches_total,
-    int $reputation_count,
-    string $verdict_reason
-): array {
-    if ($matches_total >= 5 && $reputation_count >= 1) {
-        $show_cta = true;
-        if ($verdict_level === 'LOW') {
-            $verdict_level = 'MODERATE';
-        }
-        if ($verdict_reason === '') {
-            $verdict_reason = $reputation_count . ' IP' . ($reputation_count === 1 ? '' : 's')
-                . ' on the Spamhaus DROP list (hijacked/criminal netblocks).';
-        }
+function ip2geo_ip_in_spamhaus_drop(string $ip): bool
+{
+    if (!REPUTATION_AXIS_ENABLED) {
+        return false;
     }
-    return [
-        'verdict_level'  => $verdict_level,
-        'show_cta'       => $show_cta,
-        'verdict_reason' => $verdict_reason,
-    ];
+    $long = ip2long($ip);
+    if ($long === false) {
+        return false;
+    }
+    return ip_in_spamhaus_drop((int) sprintf('%u', $long));
 }
