@@ -1,0 +1,10 @@
+internal chatter 10.0.0.1 to 10.0.0.2
+internal chatter 192.168.0.1 to 192.168.0.254
+loopback 127.0.0.1
+loopback 127.0.0.1
+class b private 172.16.0.1
+class b private 172.31.255.254
+v6 loopback ::1
+v6 unique-local fc00::1
+v6 unique-local fd00::1
+v6 link-local fe80::1

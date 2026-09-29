@@ -28,6 +28,14 @@ class AsnClassificationTest extends TestCase
         $this->assertSame('cloud', classify_asn('15169', 'GOOGLE'));
     }
 
+    /** All three Censys ARIN ASNs (RIPEstat holders CENSYS-ARIN-01/02/03). */
+    public function testCensysAsnsAreScanning(): void
+    {
+        foreach (['398324', '398705', '398722'] as $asn) {
+            $this->assertSame('scanning', classify_asn($asn, 'Censys, Inc.'), "AS$asn");
+        }
+    }
+
     public function testDigitalOceanIsScanning(): void
     {
         $this->assertSame('scanning', classify_asn('14061', 'DIGITALOCEAN-ASN'));

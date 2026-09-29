@@ -10,6 +10,12 @@ render_page_open('Changelog — ip2geo.org', 'Release notes for ip2geo.org.');
         </div>
 
         <div class="prose">
+            <h3>5.0.0 — 2026-09-29</h3>
+            <p>Rebuilt the site around the part people actually use: paste a pile of log text, get the IPs sorted out. A 10,000-IP paste now comes back in a fraction of a second, not the 3&ndash;4 seconds it used to take, which was just long enough to wonder whether the tab had died. IPv6 addresses get looked up now instead of politely skipped. It's 2026.</p>
+            <p>Once the results are in, you can filter by category, country or a search, see how many times each IP showed up in your paste, and export to a bunch of formats or as ready-made iptables, ufw and nginx rules. Found something worth showing a colleague? Share the filtered view as a link. Also added a sample log to poke at, with your own IP in it. Say hi.</p>
+            <p>Gone: Threat Reports and the paid upgrade. Almost nobody wanted one, and an upsell sitting in the middle of your results wasn't making the tool any better. Also gone: the Community Block List, since it was fed by Threat Reports and never had anything to list.</p>
+            <p>Nerd note: the new speed comes from finally dropping MySQL. The old site asked the database about every IP separately, so a 10,000-IP paste meant 10,000 queries digging through a table of address ranges. They were surprisingly fast, but tuning only got them so far. Lookups now read MaxMind's <code>.mmdb</code> files, which are a compact binary tree built for exactly this job. No database server in the way.</p>
+
             <h3>4.3.3 — 2026-09-23</h3>
             <p>Recent lookups now counts, anonymously, when someone actually reopens a saved lookup. Nothing from the lookup goes with it, just "this got used". Before, I could only see who switched it off. It's a feature your browser keeps for you, and I'd like to know whether it's earning its spot.</p>
 
@@ -69,7 +75,7 @@ render_page_open('Changelog — ip2geo.org', 'Release notes for ip2geo.org.');
             <p>A few small tweaks and bugfixes. That last polish with your sleeve before guests come over.</p>
 
             <h3>3.1.0 — 2026-04-03</h3>
-            <p>A rolling 7-day <a href="/intel.php">Community Block List</a> built from opted-in Threat Reports. CIDR ranges corroborated by three or more independent users &mdash; filtered by prefix size and hit density so coarse ISP blocks don't slip through &mdash; appear on the public list, downloadable as iptables, ufw, nginx, or plain CIDR format.</p>
+            <p>A rolling 7-day Community Block List built from opted-in Threat Reports. CIDR ranges corroborated by three or more independent users &mdash; filtered by prefix size and hit density so coarse ISP blocks don't slip through &mdash; appear on the public list, downloadable as iptables, ufw, nginx, or plain CIDR format. (Retired in 5.0.0.)</p>
 
             <h3>3.0.0 — 2026-04-02</h3>
             <p>Threat Reports: paste a batch of IPs from your server logs, pay once, and get back a verdict (clean, watchlist, or threat), AbuseIPDB scores for the worst offenders, and ASN CIDR ranges so you can block whole subnets instead of individual addresses. Ready-to-run block scripts for iptables, ufw, and nginx download directly from the report. Reports are token-tied and expire after 30 days.</p>
