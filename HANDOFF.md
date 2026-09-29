@@ -130,6 +130,7 @@ curl -s https://staging.ip2geo.org/ | grep -o 'v[0-9.]*' | head -1
    - So:
      - (a) **never merge `v5` into `develop` before release day**, or the bot ships v5 to production
      - (b) **re-dispatch the v5 staging deploy after every sync**, or staging is showing v4
+   - The syncs run the generator and `scripts/validate-spamhaus-promote.sh` from a checkout of **`main`** (`.trusted/`), never from `develop`, and the validator accepts only the exact lines the generators write. If you change what `gen-spamhaus-drop.php` or the `sync-spamhaus.yml` block writes, change the validator's skeleton and `tests/SpamhausPromoteValidatorTest.php` in the same PR, or the next auto-promote fails closed and production DROP data goes stale.
 4. **Asset caching.** Cloudflare caches `/assets/*` for 24 h, so bump `APP_VERSION`/`VERSION` for every release, or the new HTML gets paired with old JS. The Cloudflare API token on the owner's machine **can't purge cache**, because it lacks that permission.
 5. **Line endings.** `.github/workflows/deploy.yml` and `update-db.yml` are **CRLF**. Edit them without normalizing, or the diff rewrites every line.
 6. **Parity pairs.**

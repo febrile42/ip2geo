@@ -43,12 +43,33 @@ jobs:
           fi
           echo "Branch 'develop' found."
 
+      # develop is only data here: nothing from this checkout is executed, and
+      # no credentials are left in its .git/config. Anyone who can push to
+      # develop can change its scripts, so the scripts this job runs (the
+      # generator and the promote validator) come from the main checkout below.
+      # Only the "Push to develop" step gets a token.
       - name: Checkout develop
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
         with:
           ref: develop
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: false
+
+      # develop must not ship its own .trusted (e.g. a symlink) for the main
+      # checkout to land in or through.
+      - name: Refuse a develop tree that contains .trusted
+        run: |
+          if [ -e .trusted ] || [ -L .trusted ]; then
+            echo "::error::develop contains a .trusted path; refusing to run. Remove it from develop."
+            exit 1
+          fi
+
+      - name: Checkout main (trusted scripts)
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          ref: main
+          path: .trusted
+          persist-credentials: false
 
       - name: Regenerate Spamhaus auto-sync block
         id: regen
@@ -73,7 +94,7 @@ jobs:
           # refuses a feed with no ASNs so the auto-sync block is never emptied.
           # sort -u (lexical) because comm below needs it.
           SPAMHAUS_ASNS=$(php -r '
-            require "scripts/gen-spamhaus-drop.php";
+            require ".trusted/scripts/gen-spamhaus-drop.php";
             $asns = spamhaus_asndrop_asns(stream_get_contents(STDIN));
             if ($asns === null) {
                 fwrite(STDERR, "ASN-DROP feed has no ASNs, a line that is not JSON, or an asn that is not an integer in 1..4294967295.\n");
@@ -94,7 +115,7 @@ jobs:
           # malformed record (or one that could break out of the // comment) aborts
           # the sync here instead of committing the block without attribution.
           ATTRIBUTION=$(php -r '
-            require "scripts/gen-spamhaus-drop.php";
+            require ".trusted/scripts/gen-spamhaus-drop.php";
             $meta = spamhaus_feed_metadata(stream_get_contents(STDIN));
             if ($meta === null) {
                 fwrite(STDERR, "ASN-DROP feed has no usable metadata record (copyright, timestamp, terms).\n");
@@ -159,7 +180,7 @@ jobs:
           # compares develop with main, so check the block holds nothing but
           # comments and 'AS<digits>' => 'scanning', entries before committing.
           php -r '
-            require "scripts/gen-spamhaus-drop.php";
+            require ".trusted/scripts/gen-spamhaus-drop.php";
             if (!spamhaus_asndrop_block_is_safe(file_get_contents($argv[1]))) {
                 fwrite(STDERR, "ERROR: the auto-sync block in {$argv[1]} has a line that is not a comment or an AS entry.\n");
                 exit(1);
@@ -183,8 +204,17 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add "$CLASSIFICATION_FILE"
           git commit -m "chore: sync Spamhaus ASN-DROP — +${ADDED} / -${REMOVED} ($(date -u +%Y-%m-%d))"
-          git push origin develop
           echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      # The only step with a token that can write to the repo via git. The develop
+      # checkout keeps no credentials, so pass it for this one push.
+      - name: Push to develop
+        if: steps.regen.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:develop
 
       # GITHUB_TOKEN-driven pushes don't trigger the CI/CD workflow (GitHub
       # loop-prevention), so the monthly sync would land on develop but staging
@@ -218,13 +248,18 @@ jobs:
           set -euo pipefail
           git fetch origin main develop
 
-          if [ "$(git rev-parse origin/develop)" = "$(git rev-parse origin/main)" ]; then
+          # Pin the develop commit the checks below inspect, and merge only that
+          # commit (--match-head-commit). Otherwise a push to develop landing
+          # between the checks and the merge would ride the auto-promote to prod.
+          DEVELOP_SHA=$(git rev-parse origin/develop)
+
+          if [ "$DEVELOP_SHA" = "$(git rev-parse origin/main)" ]; then
             echo "develop is already at main; nothing to promote."
             echo "promoted=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          OTHER_FILES=$(git diff origin/main..origin/develop --name-only \
+          OTHER_FILES=$(git diff "origin/main..$DEVELOP_SHA" --name-only \
             | grep -v '^asn_classification.php$' || true)
           if [ -n "$OTHER_FILES" ]; then
             echo "develop has unreleased non-Spamhaus changes; not auto-promoting:"
@@ -233,18 +268,30 @@ jobs:
             exit 0
           fi
 
-          # Strip the entire auto-sync block (including the Last-sync date comment)
-          # from both versions; if the rest of the file is identical, the delta is
-          # pure Spamhaus and safe to auto-promote.
-          strip_block() {
-            awk '/BEGIN AUTO-SYNC SPAMHAUS ASN-DROP/{f=1; next} /END AUTO-SYNC SPAMHAUS ASN-DROP/{f=0; next} !f'
-          }
-          MAIN_STRIPPED=$(git show origin/main:asn_classification.php | strip_block)
-          DEV_STRIPPED=$(git show origin/develop:asn_classification.php | strip_block)
-          if [ "$MAIN_STRIPPED" != "$DEV_STRIPPED" ]; then
-            echo "asn_classification.php has changes outside the auto-sync block; not auto-promoting."
+          # Validate the exact develop commit that would be merged, with the
+          # validator from main: exactly one BEGIN/END marker pair (whole lines),
+          # only generator-shaped lines inside the block, the block where main has
+          # it, and the rest of the file byte-identical to main. See scripts/validate-spamhaus-promote.sh.
+          git show origin/main:asn_classification.php > "$RUNNER_TEMP/asn_main.php"
+          git show "$DEVELOP_SHA:asn_classification.php" > "$RUNNER_TEMP/asn_develop.php"
+          RC=0
+          bash .trusted/scripts/validate-spamhaus-promote.sh asn \
+            "$RUNNER_TEMP/asn_main.php" "$RUNNER_TEMP/asn_develop.php" || RC=$?
+          if [ "$RC" -eq 2 ]; then
+            echo "asn_classification.php has changes outside the auto-sync block (or the block moved); not auto-promoting."
             echo "promoted=false" >> "$GITHUB_OUTPUT"
             exit 0
+          elif [ "$RC" -ne 0 ]; then
+            echo "::error::develop ${DEVELOP_SHA}: the ASN-DROP auto-sync block in asn_classification.php is not what sync-spamhaus.yml writes. NOT promoting to main. Inspect develop before any release."
+            echo "promoted=false" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+          # Defense in depth: the checks above exist to rule out a file that fails
+          # to parse in production, so check that directly too (parse only, no run).
+          if ! php -l "$RUNNER_TEMP/asn_develop.php"; then
+            echo "::error::develop ${DEVELOP_SHA}: asn_classification.php does not parse. NOT promoting to main. Inspect develop before any release."
+            echo "promoted=false" >> "$GITHUB_OUTPUT"
+            exit 1
           fi
 
           echo "Pure-Spamhaus delta detected. Opening PR develop -> main."
@@ -265,7 +312,7 @@ jobs:
             echo "Reusing existing PR #${PR_NUMBER}."
           fi
 
-          if gh pr merge "$PR_NUMBER" --squash; then
+          if gh pr merge "$PR_NUMBER" --squash --match-head-commit "$DEVELOP_SHA"; then
             echo "Merged PR #${PR_NUMBER}."
             echo "promoted=true" >> "$GITHUB_OUTPUT"
           else

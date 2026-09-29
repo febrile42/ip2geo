@@ -1,0 +1,250 @@
+#!/usr/bin/env bash
+# Decide whether develop's Spamhaus data may be auto-promoted to main.
+#
+# Background: sync-spamhaus.yml and sync-spamhaus-drop.yml merge develop into
+# main and deploy it to production with no human review whenever develop's only
+# delta is the Spamhaus data. "Only touches the data file" is not enough: anyone
+# who can push to develop could put PHP code inside that file. So before any
+# merge the workflows run this script (from a trusted main checkout, never from
+# develop) against the exact develop commit they will merge, and it accepts only
+# the line shapes the generators produce.
+#
+# Usage:
+#   validate-spamhaus-promote.sh asn  <main asn_classification.php> <develop asn_classification.php>
+#   validate-spamhaus-promote.sh drop <develop spamhaus_drop_data.php>
+#
+# Exit codes:
+#   0  promotable
+#   1  develop content is not what the generator writes: do NOT promote, fail the job
+#   2  (asn only) asn_classification.php differs from main outside the auto-sync
+#      block or the block is not where main has it, i.e. a hand edit that needs a
+#      normal release PR: do NOT promote
+#   64 usage error
+
+set -euo pipefail
+export LC_ALL=C
+
+ASN_BEGIN_MARKER="    // --- BEGIN AUTO-SYNC SPAMHAUS ASN-DROP (do not hand-edit) ---"
+ASN_END_MARKER="    // --- END AUTO-SYNC SPAMHAUS ASN-DROP ---"
+
+# Both generators copy the feed's metadata record into the header as
+# "Copyright: ...", "Terms: ..." and "Feed timestamp: ..." lines
+# (spamhaus_feed_header_lines() in scripts/gen-spamhaus-drop.php). Those values
+# come from the feed, so they are the one free-text part of a generated file.
+# Accept them only in a narrow ASCII form with no "?" or ">" (so no "?>"): a
+# feed that changes its wording fails the promote closed rather than open.
+FEED_COPYRIGHT_RE="[A-Za-z0-9 (),.&'/-]{1,200}"
+FEED_TERMS_RE='https://[A-Za-z0-9._~/%-]{1,190}'
+FEED_TIMESTAMP_RE='[1-9][0-9]{0,11} \([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z\)'
+NOTICE_LINE_RE="Spamhaus data, not covered by this repository's license; see NOTICE\\."
+
+fail() {
+    echo "validate-spamhaus-promote: $*" >&2
+    exit 1
+}
+
+# Print lines of the file that do not match any of the given extended regexes
+# (each anchored to the whole line), prefixed with their line numbers.
+unexpected_lines() {
+    local file=$1; shift
+    local args=()
+    for re in "$@"; do args+=(-e "$re"); done
+    grep -nvxE "${args[@]}" "$file" || true
+}
+
+# Print "BEGIN END" line numbers of the auto-sync block in the given file. Fails
+# unless there is exactly one of each marker (whole lines) and BEGIN comes first.
+asn_block_lines() {
+    local file=$1 label=$2 n_begin n_end l_begin l_end
+    n_begin=$(grep -cxF -- "$ASN_BEGIN_MARKER" "$file" || true)
+    n_end=$(grep -cxF -- "$ASN_END_MARKER" "$file" || true)
+    [ "$n_begin" = 1 ] || fail "asn: $label: expected exactly 1 BEGIN marker line, found $n_begin"
+    [ "$n_end" = 1 ] || fail "asn: $label: expected exactly 1 END marker line, found $n_end"
+    l_begin=$(grep -nxF -- "$ASN_BEGIN_MARKER" "$file" | cut -d: -f1)
+    l_end=$(grep -nxF -- "$ASN_END_MARKER" "$file" | cut -d: -f1)
+    [ "$l_begin" -lt "$l_end" ] || fail "asn: $label: END marker (line $l_end) comes before BEGIN marker (line $l_begin)"
+    echo "$l_begin $l_end"
+}
+
+validate_asn() {
+    local main_file=$1 dev_file=$2
+
+    # Markers: exactly one of each, as whole lines, BEGIN before END, in both
+    # files. main is trusted, but a broken main must not promote either.
+    local m_begin m_end l_begin l_end pos
+    pos=$(asn_block_lines "$main_file" main) || exit 1
+    read -r m_begin m_end <<< "$pos"
+    pos=$(asn_block_lines "$dev_file" develop) || exit 1
+    read -r l_begin l_end <<< "$pos"
+
+    # Every line strictly between the markers is an ASN entry or one of the
+    # fixed comment lines sync-spamhaus.yml writes.
+    local block bad
+    block=$(mktemp)
+    sed -n "$((l_begin + 1)),$((l_end - 1))p" "$dev_file" > "$block"
+    bad=$(unexpected_lines "$block" \
+        "    'AS[0-9]{1,10}' => 'scanning'," \
+        '    // Synced monthly from https://www\.spamhaus\.org/drop/asndrop\.json by' \
+        '    // \.github/workflows/sync-spamhaus\.yml\. To override an entry'"'"'s classification,' \
+        '    // move it OUT of this block into the appropriate manual section above\.' \
+        "    // Copyright: $FEED_COPYRIGHT_RE" \
+        "    // Terms: $FEED_TERMS_RE" \
+        "    // Feed timestamp: $FEED_TIMESTAMP_RE" \
+        "    // $NOTICE_LINE_RE" \
+        '    // Last sync: [0-9]{4}-[0-9]{2}-[0-9]{2}')
+    rm -f "$block"
+    if [ -n "$bad" ]; then
+        echo "validate-spamhaus-promote: asn: unexpected line(s) inside the auto-sync block (line numbers relative to the block):" >&2
+        echo "$bad" | head -20 >&2
+        exit 1
+    fi
+
+    # Outside the block the file must be byte-identical to main, and the block
+    # must sit where main has it: the lines before BEGIN and after END are
+    # compared separately. (Comparing the file with the block cut out is not
+    # enough: moving the whole block to top level or into a docblock leaves that
+    # unchanged, and ships a parse fatal or an empty classification.)
+    if ! cmp -s <(head -n "$((m_begin - 1))" "$main_file") <(head -n "$((l_begin - 1))" "$dev_file") ||
+       ! cmp -s <(tail -n "+$((m_end + 1))" "$main_file") <(tail -n "+$((l_end + 1))" "$dev_file"); then
+        echo "validate-spamhaus-promote: asn: asn_classification.php differs from main outside the auto-sync block, or the block has moved." >&2
+        exit 2
+    fi
+}
+
+# spamhaus_drop_data.php is entirely generated by scripts/gen-spamhaus-drop.php
+# (spamhaus_drop_render). Reduce the file to its shape: the date line becomes
+# <DATE>, the three feed attribution lines become <COPYRIGHT>, <TERMS> and
+# <FEEDTS> (see FEED_*_RE above), each run of data rows becomes one <RANGES> or
+# <CIDRS> line, and every other line is kept verbatim behind a "|" (so a literal
+# "<RANGES>" line in the file cannot pose as a placeholder). The shape must equal
+# the generator's skeleton exactly. No other free-form // lines are allowed: a
+# "?>" inside a // comment ends the PHP block and turns the rest of the file into
+# output.
+# Integer literal exactly as PHP's "{$int}" interpolation writes it: canonical
+# decimal. A leading zero would make PHP read the literal as octal (and a stray
+# 8 or 9 after it is a compile-time "Invalid numeric literal" fatal).
+DROP_INT='(0|[1-9][0-9]{0,9})'
+
+DROP_SKELETON='<?php
+// AUTO-GENERATED by .github/workflows/sync-spamhaus-drop.yml — do not hand-edit.
+// Source: https://www.spamhaus.org/drop/drop_v4.json (combined DROP, includes former EDROP)
+<COPYRIGHT>
+<TERMS>
+<FEEDTS>
+// Spamhaus data, not covered by this repository'"'"'s license; see NOTICE.
+<DATE>
+//
+// Sorted ascending by start_int, non-overlapping (merged on generation).
+// One [start_int, end_int] inclusive unsigned-32-bit IPv4 pair per listed CIDR.
+// Consumed by ip_in_spamhaus_drop() in report_functions.php (binary search).
+global $spamhaus_drop_ranges;
+$spamhaus_drop_ranges = [
+<RANGES>
+];
+
+// Un-merged original CIDRs as [start_int, end_int, "cidr"], sorted ascending by
+// start. The merge above throws away CIDR boundaries; the threat report needs to
+// name + block the specific netblock, so the originals are retained here.
+// Consumed by spamhaus_drop_cidr_for_ip() in report_functions.php (binary search).
+global $spamhaus_drop_cidrs;
+$spamhaus_drop_cidrs = [
+<CIDRS>
+];'
+
+validate_drop() {
+    local dev_file=$1
+
+    # The generator always ends the file with a newline; anything after the last
+    # newline would be invisible to the line-based check below.
+    [ -s "$dev_file" ] || fail "drop: file is empty"
+    [ "$(tail -c1 "$dev_file" | od -An -tx1 | tr -d ' ')" = 0a ] \
+        || fail "drop: file does not end with a newline"
+
+    local expected actual
+    expected=$(mktemp)
+    actual=$(mktemp)
+    printf '%s\n' "$DROP_SKELETON" | sed -E '/^<(DATE|COPYRIGHT|TERMS|FEEDTS|RANGES|CIDRS)>$/!s/^/|/' > "$expected"
+    sed -E \
+        -e 's/^/|/' \
+        -e 's#^\|// Last sync: [0-9]{4}-[0-9]{2}-[0-9]{2}$#<DATE>#' \
+        -e "s#^\\|// Copyright: $FEED_COPYRIGHT_RE\$#<COPYRIGHT>#" \
+        -e "s#^\\|// Terms: $FEED_TERMS_RE\$#<TERMS>#" \
+        -e "s#^\\|// Feed timestamp: $FEED_TIMESTAMP_RE\$#<FEEDTS>#" \
+        -e "s#^\\|    \\[$DROP_INT, $DROP_INT\\],\$#<RANGES>#" \
+        -e "s#^\\|    \\[$DROP_INT, $DROP_INT, '[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}/[0-9]{1,2}'\\],\$#<CIDRS>#" \
+        "$dev_file" \
+        | awk '($0 == "<RANGES>" || $0 == "<CIDRS>") && $0 == prev { next } { print; prev = $0 }' \
+        > "$actual"
+
+    if ! cmp -s "$expected" "$actual"; then
+        echo "validate-spamhaus-promote: drop: spamhaus_drop_data.php does not match the generator's output shape (< expected, > found):" >&2
+        diff "$expected" "$actual" | head -20 >&2 || true
+        rm -f "$expected" "$actual"
+        exit 1
+    fi
+    rm -f "$expected" "$actual"
+
+    # The shape is right; now the values. ip_in_spamhaus_drop() and
+    # spamhaus_drop_cidr_for_ip() binary-search these arrays, so a well-shaped
+    # but reordered file would silently give wrong DROP verdicts. Check what the
+    # generator guarantees: every pair is a valid unsigned 32-bit start <= end;
+    # merged ranges ascend with a gap between them (overlapping or adjacent
+    # ranges are merged on generation); each CIDR row's start/end is exactly its
+    # CIDR's network and broadcast address; CIDR rows ascend by (start, end).
+    local bad
+    bad=$(awk '
+        function num_check(a, b) {
+            if (a + 0 > 4294967295 || b + 0 > 4294967295) return "value above 4294967295"
+            if (a + 0 > b + 0) return "start > end"
+            return ""
+        }
+        /^    \[[0-9]+, [0-9]+\],$/ {
+            split(substr($0, 6, length($0) - 7), v, ", ")
+            err = num_check(v[1], v[2])
+            if (err == "" && nr > 0 && v[1] + 0 <= prev_end + 1)
+                err = "range overlaps, touches or precedes the previous range"
+            if (err != "") { print NR ": " err; exit }
+            prev_end = v[2] + 0; nr++
+            next
+        }
+        /^    \[[0-9]+, [0-9]+, / {
+            line = $0
+            sub(/^    \[/, "", line); sub(/\],$/, "", line)
+            split(line, v, ", ")
+            cidr = v[3]; gsub(/\047/, "", cidr)
+            split(cidr, cp, "/"); split(cp[1], o, ".")
+            err = num_check(v[1], v[2])
+            if (err == "" && (o[1] + 0 > 255 || o[2] + 0 > 255 || o[3] + 0 > 255 || o[4] + 0 > 255 || cp[2] + 0 > 32))
+                err = "invalid CIDR " cidr
+            if (err == "") {
+                size = 2 ^ (32 - cp[2] - 0)
+                net = ((o[1] * 256 + o[2]) * 256 + o[3]) * 256 + o[4]
+                if (net % size != 0) err = "CIDR " cidr " is not a network address"
+                else if (v[1] + 0 != net || v[2] + 0 != net + size - 1)
+                    err = "[start, end] does not match CIDR " cidr
+            }
+            if (err == "" && nc > 0 && (v[1] + 0 < ps || (v[1] + 0 == ps && v[2] + 0 < pe)))
+                err = "CIDR row out of order"
+            if (err != "") { print NR ": " err; exit }
+            ps = v[1] + 0; pe = v[2] + 0; nc++
+        }
+    ' "$dev_file")
+    [ -z "$bad" ] || fail "drop: spamhaus_drop_data.php line $bad"
+}
+
+case "${1:-}" in
+    asn)
+        [ $# -eq 3 ] || { echo "usage: $0 asn <main-file> <develop-file>" >&2; exit 64; }
+        validate_asn "$2" "$3"
+        ;;
+    drop)
+        [ $# -eq 2 ] || { echo "usage: $0 drop <develop-file>" >&2; exit 64; }
+        validate_drop "$2"
+        ;;
+    *)
+        echo "usage: $0 asn <main-file> <develop-file> | drop <develop-file>" >&2
+        exit 64
+        ;;
+esac
+
+echo "validate-spamhaus-promote: $1: OK"
