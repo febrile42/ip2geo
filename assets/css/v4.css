@@ -34,9 +34,9 @@
   --r-lg: 8px;
   --r-pill: 9999px;
 
-  /* Verdict palette — drives .asn-verdict, .asn-category, .threat-cta-box, .cat-* chip
-     accents, and CTA button fills. Single source so the report's color language stays
-     consistent across pill / row text / border / fill contexts. */
+  /* Verdict palette — drives .asn-category and .cat-* chip accents. Single
+     source so the results table's color language stays consistent across
+     pill / row text / border contexts. */
   --verdict-high: #e06c9f;
   --verdict-moderate: #e0a85a;
   --verdict-low: #6cb87a;
@@ -378,32 +378,6 @@ main {
   align-items: flex-start;
 }
 
-/* Processing overlay — full-viewport scrim shown while the bulk-IP lookup
-   AJAX round-trip is in flight. Heritage gradient at theme-aware lightness
-   (see --overlay-from / --overlay-to in §1) so dark theme doesn't flash-bomb
-   visitors mid-scroll. Built dynamically by the submit handler in index.php. */
-.processing-overlay {
-  position: fixed;
-  inset: 0;
-  background: linear-gradient(to right, var(--overlay-from), var(--overlay-to));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2147483647;
-}
-.processing-overlay__msg {
-  font-family: var(--font-mono);
-  font-size: 1.1em;
-  color: #fff;
-  letter-spacing: 0.05em;
-  opacity: 0.9;
-}
-.processing-overlay__dots {
-  display: inline-block;
-  width: 1.8em;
-  text-align: left;
-}
-
 /* ============================================================
    8. BUTTONS
    ============================================================ */
@@ -434,9 +408,6 @@ main {
   border: 1px solid var(--border);
 }
 .button.alt:hover { background: var(--surface); border-color: var(--text-muted); color: var(--text); }
-
-.button.magenta { background: var(--magenta); color: #fff; }
-.button.magenta:hover { background: var(--magenta-hover); color: #fff; }
 
 .button.small { padding: 8px 14px; font-size: 13px; }
 
@@ -492,79 +463,6 @@ section.block { padding: 72px 0 42px; border-top: 1px solid var(--border); }
 .block-body p { margin: 0 0 16px; color: var(--text-muted); }
 .block-body p strong { color: var(--text); font-weight: 500; }
 .block-body p:last-child { margin-bottom: 0; }
-
-/* ============================================================
-   11. TWO-COLUMN GRID (Reports: Free / Full)
-   ============================================================ */
-.two-col {
-  display: grid;
-  grid-template-columns: 1fr 1.25fr;
-  gap: 48px;
-  max-width: 1100px;
-}
-
-/* Feature list with terminal-flavored arrow markers in accent-purple. */
-.feature-list { list-style: none; padding: 0; margin: 0 0 24px; }
-.feature-list li {
-  position: relative;
-  padding: 6px 0 6px 20px;
-  color: var(--text-muted);
-  font-size: 15px;
-  line-height: 1.55;
-}
-.feature-list li::before {
-  content: "→";
-  position: absolute;
-  left: 0;
-  top: 6px;
-  font-family: var(--font-mono);
-  font-weight: 500;
-  color: var(--accent-purple);
-  line-height: 1.55;
-}
-.feature-list strong { color: var(--text); font-weight: 500; }
-
-.price {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
-  margin-bottom: 12px;
-}
-.price .amount { font-family: var(--font-mono); font-weight: 500; color: var(--text); font-size: 22px; }
-.price .label { font-size: 13px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
-
-h3.subhead {
-  font-family: var(--font-sans);
-  font-weight: 700;
-  font-size: 22px;
-  letter-spacing: -0.015em;
-  margin: 0 0 12px;
-  color: var(--text);
-}
-
-/* ============================================================
-   12. INTEL CARD (Community Block List summary)
-   ============================================================ */
-.intel-card {
-  margin-top: 24px;
-  padding: 20px 24px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24px;
-  flex-wrap: wrap;
-}
-.intel-meta {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-.intel-meta strong { color: var(--accent-purple); font-weight: 500; }
 
 /* ============================================================
    13. ABOUT (long-form prose)
@@ -663,21 +561,9 @@ footer#footer a:hover {
    ============================================================ */
 
 /* ---------- 16a. Verdict + ASN category palette ----------
-   Used by the report verdict bar, the threat-CTA box, the results-table
-   ASN category column, and the filter-chip color accents. The palette is
-   tokenised in §1 so every consumer reads from one place. */
-.asn-verdict {
-    font-family: monospace;
-    font-size: 1.4em;
-    font-weight: bold;
-    text-transform: uppercase;
-    letter-spacing: 0.15em;
-    padding-left: 0.75em;
-    margin-bottom: 0.25em;
-}
-.asn-verdict--high     { color: var(--verdict-high);     border-left: 3px solid var(--verdict-high); }
-.asn-verdict--moderate { color: var(--verdict-moderate); border-left: 3px solid var(--verdict-moderate); }
-.asn-verdict--low      { color: var(--verdict-low);      border-left: 3px solid var(--verdict-low); }
+   Used by the results-table ASN category column and the filter-chip color
+   accents. The palette is tokenised in §1 so every consumer reads from
+   one place. */
 
 /* ASN category labels in #results-table. Pill variant lives in §18 under
    .report-inner — it inherits the same color via currentColor. */
@@ -845,16 +731,6 @@ abbr.drop-tag:focus-visible,
     text-overflow: ellipsis;
 }
 
-/* Report table mirror — same density + truncation as the public results table
-   (used in report.php contexts that don't sit under #results-table). */
-.report-table { font-size: 0.85em; }
-.report-table .cell-asn-org {
-    max-width: 14em;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
 /* Empty filter message — center align inside the table card. */
 #empty-filter-msg {
   color: var(--text-muted);
@@ -927,8 +803,7 @@ abbr.drop-tag:focus-visible,
 }
 
 /* Accordion summary: chevron + mono uppercase label. */
-#filter-details > summary,
-#report-filter-details > summary {
+#filter-details > summary{
   cursor: pointer;
   padding: 0.4em 0;
   list-style: none;
@@ -939,15 +814,12 @@ abbr.drop-tag:focus-visible,
   letter-spacing: 0.08em;
   color: var(--text-muted);
 }
-#filter-details > summary::-webkit-details-marker,
-#report-filter-details > summary::-webkit-details-marker { display: none; }
-#filter-details > summary::before,
-#report-filter-details > summary::before {
+#filter-details > summary::-webkit-details-marker{ display: none; }
+#filter-details > summary::before{
     content: '▸ ';
     font-size: 0.85em;
 }
-#filter-details[open] > summary::before,
-#report-filter-details[open] > summary::before { content: '▾ '; }
+#filter-details[open] > summary::before{ content: '▾ '; }
 
 #filter-summary #filter-count,
 #filter-summary #filter-total { color: var(--text); }
@@ -988,9 +860,7 @@ abbr.drop-tag:focus-visible,
 
 /* Section headers above chip columns */
 #filter-countries > strong,
-#filter-categories > strong,
-#report-filter-countries > strong,
-#report-filter-categories > strong {
+#filter-categories > strong{
     display: flex;
     justify-content: space-between;
     align-items: baseline;
@@ -1029,9 +899,7 @@ abbr.drop-tag:focus-visible,
 
 /* Toggle chip labels — inactive state. font-mono so "(N)" counts align. */
 #filter-countries label,
-#filter-categories label,
-#report-filter-countries label,
-#report-filter-categories label {
+#filter-categories label{
     font-family: var(--font-mono);
     font-size: 0.7em;
     font-weight: normal;
@@ -1051,51 +919,35 @@ abbr.drop-tag:focus-visible,
 
 /* Active (checked) state */
 #filter-countries label:has(input:checked),
-#filter-categories label:has(input:checked),
-#report-filter-countries label:has(input:checked),
-#report-filter-categories label:has(input:checked) {
+#filter-categories label:has(input:checked){
     opacity: 1;
     border-color: var(--text-muted);
     background: var(--surface-2);
 }
 
 /* ASN category chip accent colors */
-#filter-categories label.cat-scanning,
-#report-filter-categories label.cat-scanning    { color: var(--verdict-high); }
-#filter-categories label.cat-cloud,
-#report-filter-categories label.cat-cloud       { color: var(--verdict-cloud); }
-#filter-categories label.cat-vpn,
-#report-filter-categories label.cat-vpn         { color: var(--verdict-moderate); }
-#filter-categories label.cat-residential,
-#report-filter-categories label.cat-residential { color: var(--verdict-low); }
-#filter-categories label.cat-unknown,
-#report-filter-categories label.cat-unknown     { color: var(--verdict-unknown); }
+#filter-categories label.cat-scanning{ color: var(--verdict-high); }
+#filter-categories label.cat-cloud{ color: var(--verdict-cloud); }
+#filter-categories label.cat-vpn{ color: var(--verdict-moderate); }
+#filter-categories label.cat-residential{ color: var(--verdict-low); }
+#filter-categories label.cat-unknown{ color: var(--verdict-unknown); }
 
 /* Active category chip: border color matches accent */
-#filter-categories label.cat-scanning:has(input:checked),
-#report-filter-categories label.cat-scanning:has(input:checked)    { border-color: rgba(224,108,159,0.6); }
-#filter-categories label.cat-cloud:has(input:checked),
-#report-filter-categories label.cat-cloud:has(input:checked)       { border-color: rgba(138,180,212,0.6); }
-#filter-categories label.cat-vpn:has(input:checked),
-#report-filter-categories label.cat-vpn:has(input:checked)         { border-color: rgba(224,168,90,0.6);  }
-#filter-categories label.cat-residential:has(input:checked),
-#report-filter-categories label.cat-residential:has(input:checked) { border-color: rgba(108,184,122,0.6); }
-#filter-categories label.cat-unknown:has(input:checked),
-#report-filter-categories label.cat-unknown:has(input:checked)     { border-color: rgba(170,170,170,0.4); }
+#filter-categories label.cat-scanning:has(input:checked){ border-color: rgba(224,108,159,0.6); }
+#filter-categories label.cat-cloud:has(input:checked){ border-color: rgba(138,180,212,0.6); }
+#filter-categories label.cat-vpn:has(input:checked){ border-color: rgba(224,168,90,0.6);  }
+#filter-categories label.cat-residential:has(input:checked){ border-color: rgba(108,184,122,0.6); }
+#filter-categories label.cat-unknown:has(input:checked){ border-color: rgba(170,170,170,0.4); }
 
 /* Zero-count chip: heavily dimmed (JS toggles .chip--empty when count is 0). */
 #filter-countries label.chip--empty,
-#filter-categories label.chip--empty,
-#report-filter-countries label.chip--empty,
-#report-filter-categories label.chip--empty {
+#filter-categories label.chip--empty{
     opacity: 0.15;
 }
 
 /* Hide native checkbox; keep in tab order for a11y. */
 #filter-countries input[type="checkbox"],
-#filter-categories input[type="checkbox"],
-#report-filter-countries input[type="checkbox"],
-#report-filter-categories input[type="checkbox"] {
+#filter-categories input[type="checkbox"]{
     position: absolute;
     opacity: 0;
     width: 0;
@@ -1242,210 +1094,6 @@ button.button.small:hover {
   white-space: nowrap;
 }
 
-/* ---------- 16g. Cancel notice (Stripe redirect-back banner) ---------- */
-#cancel-notice {
-    background: rgba(255,255,255,0.07);
-    border-left: 3px solid var(--verdict-moderate);
-    padding: 0.6em 1em;
-    margin-bottom: 1em;
-    font-size: 0.9em;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-#cancel-notice button {
-    background: none;
-    border: none;
-    color: inherit;
-    cursor: pointer;
-    font-size: 1.1em;
-    opacity: 0.6;
-    padding: 0 0.25em;
-}
-
-/* ---------- 16h. Threat CTA box ----------
-   Verdict-color border + tinted background; bottom band houses the CTA button.
-   Per-classification color drives both the inset border and the button fill,
-   with a darkening :hover effect for the !important verdict fills. */
-.threat-cta-box {
-    display: flex;
-    flex-direction: column;
-    border: 1px solid rgba(255,255,255,0.1);
-    border-left-width: 4px;
-    border-radius: var(--r-md);
-    margin: 2em 0;
-    overflow: hidden;
-}
-.threat-cta-box--high     { border-left-color: var(--verdict-high);     border-color: rgba(224,108,159,0.25); background: rgba(224,108,159,0.06); }
-.threat-cta-box--moderate { border-left-color: var(--verdict-moderate); border-color: rgba(224,168,90,0.25);  background: rgba(224,168,90,0.06); }
-.threat-cta-box--low      { border-left-color: var(--verdict-low);      border-color: rgba(108,184,122,0.25); background: rgba(108,184,122,0.06); }
-
-.threat-cta-box form {
-    display: contents;
-}
-
-.threat-cta-top {
-    display: grid;
-    /* Left column carries all the prose (verdict, reason, stats, DROP callout,
-       locked count); the right holds three short bullets. A 50/50 split crammed
-       the text and orphaned trailing words ("netblocks", "IPs)"). Give the text
-       ~63% so the long lines fit, and the bullets shift right into the slack. */
-    grid-template-columns: 1.7fr 1fr;
-    gap: 2em;
-    padding: 1.4em 1.6em;
-}
-
-.threat-cta-left {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    gap: 0.4em;
-    padding: 1.4em 1.6em;
-}
-.threat-cta-left .asn-verdict {
-    margin: 0;
-}
-.threat-cta-reason {
-    font-size: 1em;
-    color: var(--text-muted);
-    margin: 0;
-}
-.threat-cta-stats {
-    font-size: 0.9em;
-    color: var(--text-muted);
-    margin: 0;
-}
-/* Keep the last line of each prose block from dropping to a single orphaned
-   word — backstops the column-width fix above on longer copy. */
-.threat-cta-reason,
-.threat-cta-stats,
-.threat-score-drop,
-.threat-score-locked {
-    text-wrap: pretty;
-}
-
-/* Inline threat-score teaser: real proof scores for the top 1-2 attackers,
-   then the flagged-IP count whose full scores live behind the $9 report. */
-.threat-cta-scores {
-    margin: 0.35em 0 0;
-    font-size: 0.9em;
-    line-height: 1.5;
-}
-.threat-score {
-    font-family: var(--font-mono);
-    display: block;            /* stack each proof score on its own line */
-    white-space: nowrap;
-}
-.threat-score-ip {
-    display: inline-block;
-    min-width: 15ch;           /* align the score column across rows (widest IPv4 = 15 chars) */
-    color: var(--text-muted);
-}
-.threat-score strong { color: var(--verdict-high); font-weight: 600; }
-.threat-cta-box--moderate .threat-score strong { color: var(--verdict-moderate); }
-.threat-score-src {
-    display: block;            /* source label sits above the stacked scores */
-    margin-bottom: 0.15em;
-    color: var(--text-muted);
-    font-size: 0.85em;
-}
-.threat-score-locked {
-    display: block;
-    margin-top: 0.4em;
-    color: var(--text-muted);
-}
-/* Free, zero-quota proof line, raised to a contained callout: the box's own
-   left-border + faint verdict tint makes the criminal-netblock count the visual
-   anchor without a loud pill (DESIGN.md restraint). Default = high/pink; the
-   moderate variant overrides to amber to match the box verdict color. */
-.threat-score-drop {
-    display: block;
-    margin-top: 0.6em;
-    padding: 0.5em 0.7em;
-    border-left: 3px solid var(--verdict-high);
-    background: rgba(224, 108, 159, 0.12);
-    border-radius: 0 4px 4px 0;
-    color: var(--text);
-}
-.threat-score-drop strong { color: var(--verdict-high); font-weight: 600; font-size: 1.12em; }
-.threat-cta-box--moderate .threat-score-drop {
-    border-left-color: var(--verdict-moderate);
-    background: rgba(224, 168, 90, 0.12);
-}
-.threat-cta-box--moderate .threat-score-drop strong { color: var(--verdict-moderate); }
-
-.threat-cta-right {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-}
-
-.threat-cta-features {
-    list-style: none;
-    padding: 14px 0 0;
-    margin: 0;
-    font-size: 0.9em;
-    color: var(--text);
-}
-.threat-cta-features li {
-    padding: 0.18em 0;
-    color: var(--text-muted);
-}
-.threat-cta-features li::before {
-    content: '✓  ';
-    opacity: 0.55;
-}
-
-/* Bottom band: button + fine print side by side */
-.threat-cta-bottom {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 1.4em;
-    padding: 0.85em 1.6em;
-    border-top: 1px solid var(--border);
-    background: var(--surface-2);
-}
-
-/* Prominent CTA button — verdict-color fill */
-#cta-button {
-    flex-shrink: 0;
-    font-weight: bold;
-    letter-spacing: 0.04em;
-    border-color: transparent !important;
-    color: #111 !important;
-    margin: 0;
-    transition: filter 100ms ease-out, transform 100ms ease-out;
-}
-.threat-cta-box--high     #cta-button { background-color: var(--verdict-high)     !important; }
-.threat-cta-box--moderate #cta-button { background-color: var(--verdict-moderate) !important; }
-.threat-cta-box--low      #cta-button { background-color: var(--verdict-low)      !important; }
-
-/* brightness(1.15) lifts each verdict color by ~15% — a clear interaction
-   signal that works for all three verdict variants without per-color rules. */
-.threat-cta-box #cta-button:hover { filter: brightness(1.15); }
-.threat-cta-box #cta-button:active { transform: translateY(1px); }
-
-.threat-cta-fine {
-    font-size: 0.75em;
-    color: var(--text-muted);
-    opacity: 0.8;
-    margin: 0;
-    line-height: 1.55;
-}
-
-@media (max-width: 767px) {
-    .threat-cta-top {
-        grid-template-columns: 1fr;
-        gap: 1.2em;
-    }
-    .threat-cta-bottom {
-        flex-direction: column-reverse;
-        align-items: flex-start;
-        gap: 0.6em;
-    }
-}
-
 /* ---------- 16i. Recent lookups menu (IPG-30) ----------
    The pill widget is gone; entries are rendered inside #rl-menu (a .wb-menu,
    see §21/.actions-row rules above). These classes are reused by the menu's
@@ -1525,10 +1173,6 @@ button.button.small:hover {
         flex-wrap: wrap;
         gap: 1em;
     }
-    #report-filter-layout {
-        flex-direction: column;
-        gap: 1em;
-    }
 }
 
 /* ============================================================
@@ -1556,7 +1200,6 @@ button.button.small:hover {
   .form-side { min-height: 0; }
   .ip-textarea { min-height: 152px; }
 
-  .two-col { grid-template-columns: 1fr; gap: 32px; max-width: 100%; }
   .about-grid { grid-template-columns: 1fr; gap: 32px; }
 }
 
@@ -1571,9 +1214,10 @@ button.button.small:hover {
 
 /* ============================================================
    18. REPORT PAGE (report.php)
-   Reuses the #results-table / palette tokens above and adds report-only
-   structure: range groups, block-rules tabs, format previews, hosting
-   callouts, the report-filter mirror, and the marketing CTAs.
+   report.php is a 410 stub (retired in v5.0.0) but still uses
+   .report-section/.report-inner (shared with legal.php, privacy.php,
+   changelog.php — see §19). .block-rules-panel/.format-* below back
+   copy-btn.test.js's characterization of the old report.php markup.
    ============================================================ */
 .report-section {
   padding: 56px 0 64px;
@@ -1589,8 +1233,7 @@ button.button.small:hover {
 }
 
 /* Header rows: H2 + meta + verdict badge. */
-.report-inner > h2,
-.report-header-row h2 {
+.report-inner > h2{
   font-family: var(--font-sans);
   font-weight: 900;
   font-size: 34px;
@@ -1621,46 +1264,6 @@ button.button.small:hover {
   padding: 1px 6px;
   border-radius: var(--r-sm);
 }
-
-/* Stat-pill: surface-2 with hairline. */
-.report-inner .stat-pill {
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  color: var(--text-muted);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  border-radius: var(--r-pill);
-  padding: 5px 12px;
-  opacity: 1;
-  white-space: nowrap;
-}
-
-/* Header meta line (123 IPs · April 30, 2026) */
-.report-inner .report-header-stats {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  letter-spacing: 0.04em;
-  color: var(--text-muted);
-  opacity: 1;
-}
-
-/* Email notice + community banner: surface card with accent-purple inset bar. */
-.report-inner .report-email-notice,
-.report-inner .community-intel-banner,
-.report-inner #community-consent-banner {
-  background: var(--surface) !important;
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--accent-purple) !important;
-  border-radius: var(--r-md);
-  color: var(--text-muted);
-  padding: 14px 18px !important;
-  margin-bottom: 20px !important;
-  font-size: 14px !important;
-}
-.report-inner .report-email-notice strong,
-.report-inner .community-intel-banner strong { color: var(--text); }
 
 /* Demo banner — same surface treatment, magenta inset to signal "preview". */
 .report-inner > div[style*="background:rgba(224,168,90"] {
@@ -1745,228 +1348,8 @@ button.button.small:hover {
   background: color-mix(in srgb, currentColor 12%, transparent);
 }
 
-/* ---------- 18a. Ranges + Block Rules layout ---------- */
-.ranges-stack {
-    margin-bottom: 2em;
-}
-.block-rules-fullwidth {
-    margin-bottom: 2em;
-}
-
-.ranges-rules-grid {
-    display: flex !important;
-    gap: 2.5em;
-    align-items: flex-start;
-    margin-bottom: 2em;
-}
-.ranges-col {
-    flex: 2;
-    min-width: 0;
-    overflow: hidden;
-}
-.rules-col {
-    flex: 1;
-    min-width: 0;
-    position: sticky;
-    top: 2em;
-    align-self: flex-start;
-}
-
-/* In the right column, stack download buttons vertically full-width. */
-.rules-col .block-rules-panel {
-    flex-direction: column;
-    gap: 0.45em;
-}
-.rules-col .block-rules-panel .button {
-    display: block;
-    width: 100%;
-    box-sizing: border-box;
-    text-align: center;
-}
-
-/* Block Rules + Hosting Callout side-by-side at desktop, stacked below.
-   Activates ONLY in stack mode (.block-rules-fullwidth parent). */
-.report-inner .block-rules-grid > .block-rules-grid-main,
-.report-inner .block-rules-grid > .block-rules-grid-rail { min-width: 0; }
-@media (min-width: 960px) {
-  .report-inner .block-rules-fullwidth > .block-rules-grid {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 320px;
-    gap: 32px;
-    align-items: start;
-  }
-}
-
-/* ---------- 18b. ASN range groups + CIDR chips ---------- */
-.asn-range-group {
-    margin-bottom: 1em;
-    padding-bottom: 1em;
-    border-bottom: 1px solid rgba(255,255,255,0.07);
-}
-.asn-range-group:last-child {
-    border-bottom: none;
-    padding-bottom: 0;
-    margin-bottom: 0;
-}
-.asn-range-header {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: 0.35em;
-    margin-bottom: 0.5em;
-}
-.asn-range-org {
-    font-size: 0.88em;
-    opacity: 0.65;
-}
-.asn-range-count {
-    font-size: 0.72em;
-    opacity: 0.4;
-}
-.cidr-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.35em;
-}
-.cidr-chip {
-    font-family: var(--font-mono);
-    font-size: 0.78em;
-    background: rgba(255,255,255,0.06);
-    border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 3px;
-    padding: 0.2em 0.5em;
-    white-space: nowrap;
-    line-height: 1.4;
-    user-select: all;
-}
-
-/* ---------- 18c. Spamhaus DROP surfaces (free=proof, paid=action) ---------- */
-
-/* Per-IP flag in the Top Threat Sources Category cell. Outlined (not filled) so
-   it reads as a secondary tag next to the filled category pill; the text label
-   "DROP" keeps it legible without relying on color (colorblind-safe). */
-.drop-flag {
-    display: inline-block;
-    font-family: var(--font-mono);
-    font-size: 0.72em;
-    font-weight: 500;
-    letter-spacing: 0.06em;
-    color: var(--verdict-high);
-    border: 1px solid color-mix(in srgb, var(--verdict-high) 45%, transparent);
-    border-radius: var(--r-sm);
-    padding: 0.1em 0.4em;
-    line-height: 1.4;
-    vertical-align: middle;
-    white-space: nowrap;
-}
-
-/* Verdict count line under the threat banner (both tiers). Muted prose with the
-   count itself raised in the moderate accent so it carries the eye. */
-.report-drop-count {
-    color: var(--text-muted);
-    font-size: 0.95em;
-}
-/* Scope under .report-inner so this beats `.report-inner p strong` (0,1,2),
-   which otherwise repaints the count white and kills the intended accent. */
-.report-inner .report-drop-count strong {
-    color: var(--verdict-moderate);
-    font-weight: 600;
-}
-/* Free report folds this line inside the verdict banner: the flex column already
-   supplies the gap, so drop the standalone margin and add a hair of separation,
-   and let the count pick up the box verdict color instead of the fixed amber so
-   it reads as part of the banner (pink on HIGH, amber on MODERATE). */
-.threat-cta-left .report-drop-count {
-    margin: 0.3em 0 0;
-}
-.threat-cta-box--high     .report-drop-count strong { color: var(--verdict-high); }
-.threat-cta-box--moderate .report-drop-count strong { color: var(--verdict-moderate); }
-.threat-cta-box--low      .report-drop-count strong { color: var(--verdict-low); }
-
-/* Paid Block-by-Range: the DROP netblock group sits above the ASN ranges. Pink
-   (verdict-high) heading + chips mark it as confirmed criminal infrastructure —
-   a step above the neutral ASN ranges below it. */
-.cidr-group--drop {
-    margin-bottom: 1.5em;
-    padding-bottom: 1.25em;
-    border-bottom: 1px solid var(--border);
-}
-.cidr-group--drop .section-head h3 {
-    color: var(--verdict-high);
-    font-size: 20px;
-}
-.cidr-group--drop .cidr-group-note {
-    font-size: 0.78em;
-    color: var(--text-muted);
-    margin: 0.6em 0 0;
-}
-.cidr-chip--drop {
-    color: var(--verdict-high);
-    border-color: color-mix(in srgb, var(--verdict-high) 38%, transparent);
-    background: color-mix(in srgb, var(--verdict-high) 10%, transparent);
-}
-
-/* Stack ranges/rules columns on tablet and below */
-@media (max-width: 900px) {
-    .ranges-rules-grid {
-        flex-direction: column;
-        gap: 0;
-    }
-    .rules-col {
-        position: static;
-        margin-top: 3.5em;
-    }
-    .rules-col .block-rules-panel {
-        flex-direction: row;
-        flex-wrap: wrap;
-    }
-    .rules-col .block-rules-panel .button {
-        display: inline-block;
-        width: auto;
-    }
-}
-
 /* ---------- 18c. Block-rules tabs + panel ---------- */
-.block-rules-tablist {
-    display: flex;
-    gap: 0;
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 1em;
-}
-.block-rules-tab {
-    cursor: pointer;
-    padding: 0.3em 1.2em 0.4em;
-    font-family: var(--font-mono);
-    font-size: 12px;
-    font-weight: bold;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--text-muted);
-    white-space: nowrap;
-    opacity: 0.45;
-    border-bottom: 2px solid transparent;
-    border-color: var(--border);
-    margin-bottom: -1px;
-    user-select: none;
-    transition: opacity 0.15s ease, border-color 0.15s ease;
-    outline: none;
-}
-.block-rules-tab.active {
-    opacity: 1;
-    color: var(--text);
-    border-bottom-color: var(--accent-purple);
-}
-.block-rules-tab:not(.active):not(.brt-disabled):hover {
-    opacity: 0.7;
-}
-.block-rules-tab:focus-visible {
-    outline: 2px solid rgba(255,255,255,0.5);
-    outline-offset: 2px;
-}
-.block-rules-tab.brt-disabled {
-    opacity: 0.2;
-    cursor: not-allowed;
-}
+
 .block-rules-panel {
     display: flex;
     flex-wrap: wrap;
@@ -2038,364 +1421,6 @@ button.button.small:hover {
     background: transparent;
     transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
-.cidr-explainer {
-    font-size: 0.82em;
-    opacity: 0.7;
-    margin: 0 0 0.75em;
-    font-style: italic;
-}
-
-/* ---------- 18e. AbuseIPDB + hosting callouts ---------- */
-.report-inner .abuseipdb-callout {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--accent-purple);
-  border-radius: var(--r-md);
-  padding: 14px 18px;
-  margin: 16px 0 20px;
-  font-size: 14px;
-  color: rgba(138,180,212,0.9);
-}
-
-.hosting-callout {
-    margin-bottom: 1.25em;
-    padding: 0.7em 1em;
-    font-size: 0.86em;
-    border: 1px solid var(--border);
-    border-radius: var(--r-md);
-    background: rgba(255,255,255,0.04);
-    line-height: 1.5;
-}
-.report-inner .hosting-callout { margin-top: 1.25em; }
-.hosting-callout-links {
-    margin: 0.4em 0 0;
-    padding-left: 1.4em;
-}
-.hosting-callout-links li { margin-bottom: 0.2em; }
-.hosting-note {
-    opacity: 0.6;
-    font-size: 0.92em;
-}
-.report-inner .hosting-note { margin: 10px 0 0; }
-.report-inner .hosting-prose-fine {
-  font-size: 0.9em;
-  color: var(--text-muted);
-  opacity: 0.85;
-  margin-bottom: 8px;
-}
-
-/* ---------- 18f. Free-report upgrade CTA ---------- */
-.free-report-upgrade {
-    margin: 1.5em 0 2em;
-    padding: 1.2em 1.4em;
-    border: 1px solid rgba(224,168,90,0.25);
-    border-left-width: 3px;
-    border-left-color: var(--verdict-moderate);
-    border-radius: var(--r-md);
-    background: rgba(224,168,90,0.07);
-}
-.free-report-upgrade__headline {
-    margin: 0 0 0.5em;
-    font-weight: bold;
-}
-.free-report-upgrade__features {
-    list-style: none;
-    padding: 0;
-    margin: 0 0 1em;
-    font-size: 0.88em;
-}
-.free-report-upgrade__features li {
-    padding: 0.2em 0;
-}
-.free-report-upgrade__features li::before {
-    content: '✓  ';
-    opacity: 0.45;
-}
-.free-report-upgrade__fine {
-    margin: 0.6em 0 0;
-    font-size: 0.82em;
-    opacity: 0.55;
-}
-
-/* ---------- 18g. Report-page block-script filter (mirror of the home filter) ---------- */
-#report-filter {
-    margin-bottom: 2em;
-}
-
-#report-filter-layout {
-    display: flex;
-    gap: 1.5em;
-    padding: 0.6em 0 0.5em;
-    flex-wrap: wrap;
-    align-items: flex-start;
-}
-
-#report-filter-categories {
-    display: flex;
-    flex-direction: column;
-    gap: 0.3em;
-}
-
-#report-filter-countries {
-    display: flex;
-    flex-direction: column;
-    gap: 0.3em;
-}
-
-#report-filter-countries .filter-chips {
-    max-height: 9.8em;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 0.3em;
-}
-
-/* ---------- 18h. Inline-style sweep — classes backing the styles previously
-   hardcoded on the markup in report.php / report_functions.php. ---------- */
-
-/* Free-report top-IPs table */
-.report-inner .report-table-wrap { overflow-x: auto; }
-.report-inner .report-free-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.9em;
-}
-.report-inner .report-free-table th,
-.report-inner .report-free-table td {
-  padding: 6px 10px;
-  text-align: left;
-}
-.report-inner .report-free-table th { white-space: nowrap; }
-.report-inner .report-free-table .col-num { color: var(--text-muted); opacity: 0.7; }
-.report-inner .report-free-table .col-mono { font-family: var(--font-mono); font-feature-settings: "tnum" 1; }
-
-/* Global col-mono — the canonical "monospace digits, aligned" class. Used
-   unwrapped in report.php Top Threat Sources (IP, hits) and intel.php (CIDR),
-   where there's no per-table wrapper class to scope against. */
-.col-mono { font-family: var(--font-mono); font-feature-settings: "tnum" 1; }
-.report-inner .report-free-table .col-asn { font-size: 0.85em; }
-.report-inner .report-free-table .col-asn .asn-org { opacity: 0.6; margin-left: 4px; }
-.report-inner .report-free-table .col-right { text-align: right; }
-.report-inner .report-free-table .col-locked { text-align: right; opacity: 0.35; }
-.report-inner .report-free-table th.col-locked { opacity: 1; color: var(--text-muted); }
-
-/* Generic dim-dash placeholder (was inline span style="opacity:0.4">—</span>) */
-.dim-dash { opacity: 0.4; }
-
-/* Small note above tables */
-.report-inner .report-table-note {
-  font-size: 0.85em;
-  color: var(--text-muted);
-  margin: 0 0 8px;
-}
-
-/* H3 inline summary span (the "showing X of Y" in Top Threat Sources) */
-.report-inner .report-list-summary {
-  font-size: 0.6em;
-  font-weight: normal;
-  color: var(--text-muted);
-  opacity: 0.7;
-  margin-left: 8px;
-  letter-spacing: 0.04em;
-}
-
-/* Free-report expiry banner */
-.report-inner .free-report-expiry {
-  margin: 1.5em 0;
-  padding: 12px 16px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--text-muted);
-  border-radius: var(--r-md);
-  font-size: 14px;
-  color: var(--text-muted);
-}
-.report-inner .free-report-expiry a {
-  margin-left: 8px;
-  color: var(--accent-purple);
-}
-
-/* Free-report share row */
-.report-inner .free-report-share { margin: 1.5em 0; }
-.report-inner .free-report-share-label {
-  margin: 0 0 8px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-muted);
-}
-.report-inner .free-report-share-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-.report-inner .free-report-share-input {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  padding: 8px 12px;
-  background: var(--surface);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
-  flex: 1;
-  min-width: 0;
-  max-width: 36em;
-}
-
-/* Bottom attribution line on the free report */
-.report-inner .report-footer-note {
-  margin-top: 2em;
-  padding-top: 16px;
-  border-top: 1px solid var(--border);
-  font-size: 12px;
-  color: var(--text-muted);
-  opacity: 0.7;
-}
-.report-inner .report-footer-note a { color: var(--text-muted); }
-.report-inner .report-footer-note a:hover { color: var(--accent-purple); }
-
-/* Report header row — title left, meta right; verdict-row variant. */
-.report-inner .report-header-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 8px;
-}
-.report-inner .report-header-row h2 { margin: 0; }
-.report-inner .report-verdict-row { margin-top: 12px; }
-.report-inner .report-verdict-row .asn-verdict { margin: 0; }
-.report-inner .report-actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-.report-inner .report-actions .button { white-space: nowrap; }
-@media (max-width: 736px) {
-  .report-inner .report-header-row { flex-direction: column; align-items: flex-start; gap: 4px; }
-  .report-inner .print-report-btn { display: none; }
-}
-
-/* "No high-confidence threats" note (LOW verdict) and "no ASN ranges" */
-.report-inner .report-quiet-note,
-.report-inner .report-no-ranges {
-  font-size: 0.9em;
-  color: var(--text-muted);
-  opacity: 0.85;
-  margin: 8px 0;
-}
-
-/* Demo banner — reuse for both "Demo Report" and any preview banner. */
-.report-inner .demo-banner {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--magenta);
-  border-radius: var(--r-md);
-  padding: 12px 18px;
-  margin-bottom: 1.5em;
-  font-size: 14px;
-  color: var(--text-muted);
-}
-.report-inner .demo-banner strong { color: var(--text); }
-.report-inner .demo-banner a {
-  margin-left: 12px;
-  color: var(--accent-purple);
-}
-
-/* Community Intel banner consent buttons + collapsed state */
-.report-inner .community-banner-prose {
-  margin: 6px 0 12px;
-}
-.report-inner .community-banner-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.report-inner .community-banner-fine {
-  margin: 10px 0 0;
-  font-size: 12px;
-  color: var(--text-muted);
-  opacity: 0.7;
-}
-.report-inner .consent-collapsed {
-  font-size: 13px;
-  color: var(--text-muted);
-}
-.report-inner .consent-reconsider-link {
-  color: var(--accent-purple);
-  text-decoration: underline;
-  cursor: pointer;
-  margin-left: 4px;
-}
-.report-inner .privacy-link {
-  color: var(--text-muted);
-  font-size: 0.9em;
-  margin-left: 4px;
-}
-.report-inner .community-banner-prose-tight { margin: 8px 0 5px; opacity: 0.85; }
-.report-inner .community-banner-list { margin: 0; padding-left: 24px; }
-.report-inner .community-banner-refresh-row { margin: 12px 0 0; }
-
-/* Generic fine print at the bottom of report sections (e.g. data-retention notes) */
-.report-inner .report-fine-print {
-  font-size: 12px;
-  color: var(--text-muted);
-  opacity: 0.7;
-  margin: 1em 0 0;
-}
-
-/* Community-preview table (the locked-tier teaser) */
-.report-inner .community-preview-banner {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--accent-purple);
-  border-radius: var(--r-md);
-  padding: 12px 18px;
-  margin-bottom: 1.5em;
-  font-size: 14px;
-  color: var(--text-muted);
-}
-.report-inner .community-preview-banner strong { color: var(--text); }
-.report-inner .community-preview-tag {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-muted);
-  margin-left: 6px;
-}
-.report-inner .community-preview-table {
-  width: 100%;
-  font-size: 0.85em;
-  border-collapse: collapse;
-  margin: 8px 0 0;
-}
-.report-inner .community-preview-table th {
-  text-align: left;
-  padding: 4px 12px 4px 0;
-  font-weight: normal;
-  color: var(--text-muted);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-.report-inner .community-preview-table td {
-  padding: 3px 12px 3px 0;
-  color: var(--text-muted);
-}
-.report-inner .community-preview-table .ip-mono {
-  font-family: var(--font-mono);
-  color: var(--text);
-  opacity: 0.85;
-}
-
-/* Inline link with utility margin (was style="margin-left:0.5em" or "1em") */
-.report-inner .inline-after { margin-left: 8px; }
-.report-inner .inline-after-lg { margin-left: 16px; }
-.report-inner .margin-top-1 { margin-top: 1em; }
 
 /* ============================================================
    19. MARKETING / UTILITY PAGES
@@ -2404,13 +1429,6 @@ button.button.small:hover {
    under .report-inner so they inherit the same content rhythm as the
    report page.
    ============================================================ */
-
-/* Subtitle line directly under a section-head H1 (e.g. intel "Past 7 days") */
-.report-inner .section-subtitle {
-  margin: -4px 0 24px;
-  color: var(--text-muted);
-  font-size: 14px;
-}
 
 /* Long-form prose: changelog, legal, privacy, etc. */
 .report-inner .prose h3 {
@@ -2441,105 +1459,6 @@ button.button.small:hover {
   border: 1px solid var(--border);
   border-radius: 3px;
   color: var(--text);
-}
-
-/* Subtle inline link */
-.report-inner .link-muted {
-  font-size: 13px;
-  color: var(--text-muted);
-  text-decoration: underline;
-  text-decoration-color: var(--border);
-}
-.report-inner .link-muted:hover { color: var(--accent-purple); }
-
-/* Horizontal button row with consistent gap + wrap */
-.report-inner .button-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin: 1.5em 0;
-}
-
-/* Horizontal-scroll wrapper for tables wider than the inner column */
-.report-inner .table-wrapper--scroll { overflow-x: auto; }
-
-/* Community block list table (intel.php) */
-.report-inner .intel-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 0.5em 0 0;
-  font-size: 14px;
-}
-.report-inner .intel-table th,
-.report-inner .intel-table td {
-  padding: 10px 14px;
-  text-align: left;
-  border-bottom: 1px solid var(--border);
-}
-.report-inner .intel-table th {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-muted);
-  background: var(--surface);
-}
-.report-inner .intel-table td { color: var(--text); }
-.report-inner .intel-table .col-mono {
-  font-family: var(--font-mono);
-  font-feature-settings: "tnum" 1;
-}
-
-/* Hairline separator between body and CTAs */
-.report-inner .section-rule {
-  height: 1px;
-  border: 0;
-  background: var(--border);
-  margin: 2em 0 1.5em;
-}
-
-/* Form-level error message */
-.report-inner .form-error {
-  color: var(--magenta);
-  margin: 0 0 1em;
-}
-
-/* Mono-display token */
-.report-inner .token-display {
-  font-family: var(--font-mono);
-  font-size: 13px;
-  color: var(--text-muted);
-  word-break: break-all;
-}
-
-/* Resend-link form: constrain width + space the submit button */
-.report-inner .resend-form { max-width: 420px; }
-.report-inner .resend-form .field { margin-bottom: 1em; }
-.report-inner .form-actions { margin-top: 1em; }
-
-/* ============================================================
-   20. COMMUNITY BLOCK LIST CALLOUT
-   The "No console/SSH access?" link below the iptables/ufw/nginx buttons.
-   Inline opacity:0.7 on the wrapper used to dim the link too, killing
-   affordance — prose stays muted, link uses accent + underline so it reads
-   as a CTA.
-   ============================================================ */
-.cbl-callout {
-  margin: 12px 0 0;
-  font-size: 13px;
-  color: var(--text-muted);
-}
-.cbl-link {
-  color: var(--accent-purple);
-  text-decoration: underline;
-  text-decoration-color: var(--accent-purple);
-  text-underline-offset: 5px;
-  font-weight: 500;
-  white-space: nowrap;
-}
-.cbl-link:hover {
-  color: var(--magenta);
-  text-decoration-color: var(--magenta);
 }
 
 /* ============================================================

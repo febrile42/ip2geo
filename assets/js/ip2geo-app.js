@@ -108,36 +108,34 @@
         return ips;
     }
 
-    function generateRules() {
-        var ips = getVisibleIPs();
-
-        var iptablesPre = document.getElementById('rules-iptables-pre');
-        var ufwPre      = document.getElementById('rules-ufw-pre');
-        var nginxPre    = document.getElementById('rules-nginx-pre');
-
-        if (!ips.length) {
-            // All rows filtered out — clear stale rules
-            if (iptablesPre) iptablesPre.textContent = '';
-            if (ufwPre)      ufwPre.textContent = '';
-            if (nginxPre)    nginxPre.textContent = '';
-            return;
-        }
-
-        if (iptablesPre) {
-            iptablesPre.textContent = ips.map(function (ip) {
-                return 'iptables -A INPUT -s ' + ip + ' -j DROP';
-            }).join('\n');
-        }
-        if (ufwPre) {
-            ufwPre.textContent = ips.map(function (ip) {
-                return 'ufw deny from ' + ip + ' to any';
-            }).join('\n');
-        }
-        if (nginxPre) {
-            nginxPre.textContent = 'geo $block_ip {\n    default 0;\n' +
+    // B5: only one rule block can be open at a time (toggleRulesBlock closes
+    // the others), so building/writing text for the two closed <pre>s on
+    // every filter change is wasted work. A closed block's <pre> is skipped
+    // here and gets fresh text for free when it's opened: toggleRulesBlock()
+    // calls generateRules() again right after showing it.
+    var RULE_BLOCKS = [
+        { blockId: 'rules-iptables', preId: 'rules-iptables-pre', build: function (ips) {
+            return ips.map(function (ip) { return 'iptables -A INPUT -s ' + ip + ' -j DROP'; }).join('\n');
+        } },
+        { blockId: 'rules-ufw', preId: 'rules-ufw-pre', build: function (ips) {
+            return ips.map(function (ip) { return 'ufw deny from ' + ip + ' to any'; }).join('\n');
+        } },
+        { blockId: 'rules-nginx', preId: 'rules-nginx-pre', build: function (ips) {
+            return 'geo $block_ip {\n    default 0;\n' +
                 ips.map(function (ip) { return '    ' + ip + ' 1;'; }).join('\n') +
                 '\n}';
-        }
+        } }
+    ];
+
+    function generateRules() {
+        var ips = getVisibleIPs();
+        RULE_BLOCKS.forEach(function (b) {
+            var pre = document.getElementById(b.preId);
+            if (!pre) return;
+            var block = document.getElementById(b.blockId);
+            if (block && block.style.display === 'none') return;
+            pre.textContent = ips.length ? b.build(ips) : '';
+        });
     }
 
     // ── Show/hide rule blocks ──────────────────────────────────────────────
@@ -252,26 +250,6 @@
             applyFilters();
         }
     });
-
-    // ── After AJAX results inject: init filters ─────────────────────────────
-    // The existing AJAX handler in index.php replaces #results via outerHTML.
-    // We use a MutationObserver to detect when #results is newly added to the DOM.
-    //
-    // IMPORTANT: only check addedNodes, not document.getElementById('results').
-    // generateRules() writes to <pre> elements which are subtree children of body,
-    // so a naive "does #results exist?" check re-fires on every DOM write it causes,
-    // creating an infinite loop that freezes the browser tab.
-    var observer = new MutationObserver(function (mutations) {
-        var resultsAdded = mutations.some(function (m) {
-            return Array.from(m.addedNodes).some(function (node) {
-                return node.nodeType === 1 &&
-                    (node.id === 'results' || (node.querySelector && node.querySelector('#results')));
-            });
-        });
-        if (!resultsAdded) return;
-        applyFilters();
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
 
     // ── "Try a sample log" (D11 + R13 + R16) ────────────────────────────────
     // Loads the public sample-fail2ban.txt (built only from published scanner,
