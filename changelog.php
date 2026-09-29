@@ -10,6 +10,9 @@ render_page_open('Changelog — ip2geo.org', 'Release notes for ip2geo.org.');
         </div>
 
         <div class="prose">
+            <h3>5.0.1 — DRAFT (release date TBD)</h3>
+            <p>Faster lookups on large pastes, and less work for your browser while you filter them. Nothing looks different. On phones, category badges like "Cloud exit" no longer wrap onto two lines.</p>
+
             <h3>5.0.0 — 2026-09-29</h3>
             <p>Rebuilt the site around the part people actually use: paste a pile of log text, get the IPs sorted out. A 10,000-IP paste now comes back in a fraction of a second, not the 3&ndash;4 seconds it used to take, which was just long enough to wonder whether the tab had died. IPv6 addresses get looked up now instead of politely skipped. It's 2026.</p>
             <p>Once the results are in, you can filter by category, country or a search, see how many times each IP showed up in your paste, and export to a bunch of formats or as ready-made iptables, ufw and nginx rules. Found something worth showing a colleague? Share the filtered view as a link. Also added a sample log to poke at, with your own IP in it. Say hi.</p>
