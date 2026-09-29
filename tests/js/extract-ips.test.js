@@ -147,6 +147,32 @@ describe('extractIps: defanged / ports', () => {
   });
 });
 
+// ── Repeated IPs (IPG-215): private-range check is cached per unique IP ────
+
+describe('extractIps: repeated IP addresses', () => {
+  test('repeating public and private v4/v6 IPs yields identical, correctly-counted output', () => {
+    const text = '1.2.3.4 1.2.3.4 192.168.1.1 192.168.1.1 1.2.3.4 ' +
+      '2001:4860:4860::8888 2001:4860:4860::8888 fe80::1 fe80::1';
+    const result = extractIps(text);
+
+    expect(result.ips).toEqual([
+      ['1.2.3.4', 3],
+      ['2001:4860:4860::8888', 2],
+    ]);
+    expect(result.totalUnique).toBe(2);
+    expect(result.v6Count).toBe(1);
+  });
+
+  test('an IP repeated many times matches the shape of a single occurrence', () => {
+    const once = extractIps('9.9.9.9 seen once');
+    const repeated = extractIps(Array(50).fill('9.9.9.9 seen').join(' '));
+
+    expect(repeated.ips).toEqual([['9.9.9.9', 50]]);
+    expect(repeated.totalUnique).toBe(once.totalUnique);
+    expect(repeated.v6Count).toBe(once.v6Count);
+  });
+});
+
 // ── Worst case (R15): performance + backtracking guard ─────────────────────
 
 /**
