@@ -529,8 +529,6 @@ $known_asns = [
  * Returns a category string or 'unknown'.
  */
 function keyword_classify(string $org): string {
-    $org_lower = strtolower($org);
-
     // VPN / proxy signals (no leading word-boundary: catches NordVPN, TunnelBear, etc.)
     if (preg_match('/(vpn|proxy|privacy|anonymi[sz]|tunnel|socks|residential.?prox)/i', $org)) {
         return 'vpn';
@@ -559,10 +557,17 @@ function keyword_classify(string $org): string {
 function classify_asn(string $asn_number, string $asn_org): string {
     global $known_asns;
 
-    $key = 'AS' . $asn_number;
-    if (isset($known_asns[$key])) {
-        return $known_asns[$key];
+    // Memoized per (asn_number, asn_org) within the request: many IPs in a
+    // single lookup batch share the same ASN, so this skips repeated
+    // keyword_classify() regex matching for the same org string.
+    static $cache = [];
+    if (isset($cache[$asn_number][$asn_org])) {
+        return $cache[$asn_number][$asn_org];
     }
 
-    return keyword_classify($asn_org);
+    $key = 'AS' . $asn_number;
+    $category = $known_asns[$key] ?? keyword_classify($asn_org);
+    $cache[$asn_number][$asn_org] = $category;
+
+    return $category;
 }
