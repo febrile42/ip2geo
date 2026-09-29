@@ -22,7 +22,6 @@ const FIXTURES = [
   'netstat',
   'nginx-access',
   'mixed-v4v6',
-  'cap-12k',
   'private-only',
   'empty',
   'defanged-and-ports',
@@ -34,6 +33,26 @@ function readFixture(name) {
 
 function readExpected(name) {
   return JSON.parse(fs.readFileSync(path.join(FIXTURE_DIR, `${name}.full.json`), 'utf8'));
+}
+
+// cap-12k's generated input: 12,005 sequential public IPv4 addresses starting
+// at 1.0.0.1, one per line, each appearing exactly once. Ported line-for-line
+// from generateCap12kFixture() in tests/ExtractIpsTest.php so both suites
+// build byte-identical input independently (nothing is committed).
+const CAP12K_BASE_IP = 16777217; // 1.0.0.1
+const CAP12K_TOTAL = 12005;
+const CAP12K_CAP = 10000;
+
+function ipFromLong(n) {
+  return [(n >>> 24) & 0xff, (n >>> 16) & 0xff, (n >>> 8) & 0xff, n & 0xff].join('.');
+}
+
+function generateCap12kFixture() {
+  const lines = [];
+  for (let i = 0; i < CAP12K_TOTAL; i++) {
+    lines.push(`hit from ${ipFromLong(CAP12K_BASE_IP + i)} on port 22`);
+  }
+  return lines.join('\n') + '\n';
 }
 
 describe('extractIps: matches PHP extract_ips() on every fixture', () => {
@@ -106,9 +125,19 @@ describe('extractIps: normalization', () => {
 
 describe('extractIps: cap-12k', () => {
   test('caps at 10000 but reports the full pre-cap unique total', () => {
-    const result = extractIps(readFixture('cap-12k'));
-    expect(result.ips.length).toBe(10000);
-    expect(result.totalUnique).toBe(12005);
+    const result = extractIps(generateCap12kFixture());
+    expect(result.ips.length).toBe(CAP12K_CAP);
+    expect(result.totalUnique).toBe(CAP12K_TOTAL);
+  });
+
+  test('projection is first-seen sequential addresses', () => {
+    const result = extractIps(generateCap12kFixture());
+    const expected = [];
+    for (let i = 0; i < CAP12K_CAP; i++) {
+      expected.push([ipFromLong(CAP12K_BASE_IP + i), 1]);
+    }
+    expect(result.ips).toEqual(expected);
+    expect(result.v6Count).toBe(0);
   });
 });
 

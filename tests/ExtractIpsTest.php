@@ -25,6 +25,12 @@ require_once __DIR__ . '/../includes/extract.php';
  * also asserted here for the IPv6-carrying fixtures (mixed-v4v6,
  * defanged-and-ports), and reused as-is by tests/js/extract-ips.test.js to
  * prove the JS extractor matches PHP exactly.
+ *
+ * cap-12k is the odd one out: rather than a committed 1.4 MB fixture, its
+ * input is generated deterministically by generateCap12kFixture() below
+ * (same "generate at test time, assert on the computed result" pattern as
+ * generate_worst_case_extract_fixture()), mirrored line-for-line in
+ * tests/js/extract-ips.test.js.
  */
 class ExtractIpsTest extends TestCase
 {
@@ -35,11 +41,25 @@ class ExtractIpsTest extends TestCase
         'netstat',
         'nginx-access',
         'mixed-v4v6',
-        'cap-12k',
         'private-only',
         'empty',
         'defanged-and-ports',
     ];
+
+    // cap-12k's generated input: 12,005 sequential public IPv4 addresses
+    // starting at 1.0.0.1, one per line, each appearing exactly once.
+    private const CAP12K_BASE_IP = 16777217; // long2ip(16777217) === '1.0.0.1'
+    private const CAP12K_TOTAL   = 12005;
+    private const CAP12K_CAP     = 10000;
+
+    private function generateCap12kFixture(): string
+    {
+        $lines = [];
+        for ($i = 0; $i < self::CAP12K_TOTAL; $i++) {
+            $lines[] = 'hit from ' . long2ip(self::CAP12K_BASE_IP + $i) . ' on port 22';
+        }
+        return implode("\n", $lines) . "\n";
+    }
 
     private function loadGolden(string $name): array
     {
@@ -165,12 +185,29 @@ class ExtractIpsTest extends TestCase
 
     public function testCap12kCapsAt10000ButReportsFullUniqueTotal(): void
     {
-        $text = file_get_contents(self::FIXTURE_DIR . '/cap-12k.txt');
-        $result = extract_ips($text);
+        $result = extract_ips($this->generateCap12kFixture());
 
-        $this->assertCount(10000, $result['ips']);
-        $this->assertGreaterThan(10000, $result['total_unique']);
-        $this->assertSame(12005, $result['total_unique']);
+        $this->assertCount(self::CAP12K_CAP, $result['ips']);
+        $this->assertGreaterThan(self::CAP12K_CAP, $result['total_unique']);
+        $this->assertSame(self::CAP12K_TOTAL, $result['total_unique']);
+    }
+
+    public function testCap12kProjectionIsFirstSeenSequentialAddresses(): void
+    {
+        $result = extract_ips($this->generateCap12kFixture());
+
+        $expected = [];
+        for ($i = 0; $i < self::CAP12K_CAP; $i++) {
+            $expected[] = [long2ip(self::CAP12K_BASE_IP + $i), 1];
+        }
+
+        $pairs = [];
+        foreach ($result['ips'] as $ip => $count) {
+            $pairs[] = [$ip, $count];
+        }
+
+        $this->assertSame($expected, $pairs, 'cap-12k projection diverged from the generated sequential addresses');
+        $this->assertSame(0, $result['v6_count']);
     }
 
     // ── empty / private-only ──────────────────────────────────────────────────
