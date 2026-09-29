@@ -70,10 +70,15 @@
       if (openFor === target) close(); else open(target);
     }
 
-    // Make labels keyboard-reachable wherever they render.
+    // Make labels keyboard-reachable wherever they render. role="button"
+    // matches the tap-to-explain disclosure interaction already implemented
+    // below (tabindex, click, Enter/Space) and is required for aria-expanded:
+    // plain <abbr> has no ARIA role that permits it (axe aria-allowed-attr,
+    // IPG-190).
     function prime(scope) {
       (scope || doc).querySelectorAll(SELECTOR).forEach(function (a) {
         if (!a.hasAttribute('tabindex')) a.setAttribute('tabindex', '0');
+        if (!a.hasAttribute('role')) a.setAttribute('role', 'button');
         if (!a.hasAttribute('aria-expanded')) a.setAttribute('aria-expanded', 'false');
       });
     }

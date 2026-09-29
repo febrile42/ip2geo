@@ -21,10 +21,24 @@ test.describe('D16: accessibility scan', () => {
 
   test('the Phase 2 workbench, after a lookup, has no serious/critical axe violations', async ({ page }) => {
     await page.route('**/u/**', (route) => route.fulfill({ status: 200, contentType: 'application/javascript', body: '/* stub */' }));
+    // A drop: true row so abbr.drop-tag and the .lookup-summary-drop abbr
+    // (the DROP explainer, tap-to-explain via assets/js/abbr-popover.js)
+    // render during this scan — they're skipped by non-DROP addresses,
+    // which is how IPG-190's aria-allowed-attr violation escaped CI.
+    await page.route('**/api/lookup.php', (route) => route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({ results: [
+        { ip: '45.93.20.223', country_iso_code: 'HK', country_name: 'Hong Kong', subdivision_1_name: null, city_name: null,
+          autonomous_system_number: 201738, autonomous_system_org: 'Ufo Technologies Limited', category: 'scanning', drop: true },
+        { ip: '8.8.8.8', country_iso_code: 'US', country_name: 'United States', subdivision_1_name: null, city_name: null,
+          autonomous_system_number: 15169, autonomous_system_org: 'Google LLC', category: 'cloud', drop: false },
+      ], unresolved: [] }),
+    }));
     await page.goto('/index.php');
-    await page.fill('#message', 'sample log with 203.0.113.9 and 2606:4700:4700::1111');
+    await page.fill('#message', 'sample log with 45.93.20.223 and 8.8.8.8');
     await page.click('.lookup-form .submit');
     await page.waitForSelector('#workbench-root:not([hidden])', { timeout: 10000 });
+    await expect(page.locator('abbr.drop-tag').first()).toBeVisible();
 
     const results = await new AxeBuilder({ page }).include('#workbench-root').analyze();
     expect(seriousOrCritical(results), JSON.stringify(seriousOrCritical(results), null, 2)).toEqual([]);

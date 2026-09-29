@@ -55,4 +55,10 @@ describe('abbr popover', () => {
     a.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     expect(document.getElementById('abbr-pop')).toBeNull();
   });
+
+  test('labels get role="button" so aria-expanded is valid ARIA (IPG-190)', () => {
+    document.querySelectorAll('abbr.drop-tag, .lookup-summary-drop abbr').forEach((a) => {
+      expect(a.getAttribute('role')).toBe('button');
+    });
+  });
 });
