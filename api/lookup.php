@@ -131,6 +131,7 @@ function handle_lookup_request(array $server, string $body, callable $lookup, ?c
         }
         $rawIps[$ip] = true;
     }
+    unset($data);
     $rawIps = array_keys($rawIps);
 
     if (count($rawIps) > LOOKUP_MAX_UNIQUE_IPS) {
@@ -191,10 +192,17 @@ function handle_lookup_request(array $server, string $body, callable $lookup, ?c
         $asnOrg  = (string)($fields['autonomous_system_org'] ?? '');
         $ip4Uint = lookup_endpoint_ip4_to_uint($ip);
 
-        $results[] = array_merge(['ip' => $ip], $fields, [
-            'category' => classify_asn($asnNum, $asnOrg),
-            'drop'     => $ip4Uint !== null && ip_in_spamhaus_drop($ip4Uint),
-        ]);
+        $results[] = [
+            'ip'                        => $ip,
+            'country_iso_code'          => $fields['country_iso_code'],
+            'country_name'              => $fields['country_name'],
+            'subdivision_1_name'        => $fields['subdivision_1_name'],
+            'city_name'                 => $fields['city_name'],
+            'autonomous_system_number'  => $fields['autonomous_system_number'],
+            'autonomous_system_org'     => $fields['autonomous_system_org'],
+            'category'                  => classify_asn($asnNum, $asnOrg),
+            'drop'                      => $ip4Uint !== null && ip_in_spamhaus_drop($ip4Uint),
+        ];
     }
 
     return [
