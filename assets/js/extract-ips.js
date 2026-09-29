@@ -268,9 +268,9 @@
       rawFreq[ip]++;
     }
 
-    // Each unique IP's private/reserved check is run once here and cached,
-    // so the capped output loop below (and a repeated IP later in the same
-    // text) never re-runs isPrivateV4/isPrivateV6 for an IP already tested.
+    // `order` is already de-duplicated, so each unique IP's private/reserved
+    // check runs once here; cache it so the capped output loop below reuses
+    // the result instead of re-running isPrivateV4/isPrivateV6.
     var privacyCache = Object.create(null);
     var totalUnique = 0;
     for (var k = 0; k < order.length; k++) {
