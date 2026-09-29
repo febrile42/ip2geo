@@ -2786,6 +2786,7 @@ button.button.small:hover {
   font-size: 11.5px;
   font-weight: 500;
   color: #0A0612;
+  white-space: nowrap; /* IPG-192: "Cloud exit" split in two on phones */
 }
 
 @media (max-width: 767px) {
