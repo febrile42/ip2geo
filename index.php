@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/asn_classification.php';
-require_once __DIR__ . '/report_functions.php'; // ip_in_spamhaus_drop(), REPUTATION_AXIS_ENABLED
+require_once __DIR__ . '/report_functions.php'; // ip2geo_ip_in_spamhaus_drop(), REPUTATION_AXIS_ENABLED
 require_once __DIR__ . '/includes/extract.php';  // extract_ips(), EXTRACT_IPS_CAP
 require_once __DIR__ . '/includes/lookup.php';   // lookup_ips(), GeoDbUnavailableException
 require_once __DIR__ . '/includes/summary.php';  // build_summary(), SUMMARY_CATEGORY_LABELS
@@ -16,10 +16,6 @@ if (is_file(__DIR__ . '/config.php')) {
     // the only thing it might still read from here is a GEOIP_MMDB_DIR
     // override.
     require_once __DIR__ . '/config.php';
-}
-
-function ipToLong(string $ip): string {
-    return sprintf('%u', ip2long($ip)); // Handles unsigned 32-bit int
 }
 
 /**
@@ -79,11 +75,7 @@ function ipv6_middle_truncate(string $ip): string
  */
 function extract_raw_ip_candidates(string $text): array
 {
-    preg_match_all(
-        "/\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b/",
-        $text,
-        $v4
-    );
+    preg_match_all(EXTRACT_IPS_V4_REGEX, $text, $v4);
     preg_match_all('/[0-9A-Fa-f:.]+/', $text, $v6c);
 
     $seen = [];
@@ -212,10 +204,7 @@ function render_lookup_results(array $post, string $visitor_ip = '', ?string $ci
         }
 
         $category = classify_asn((string) ($asn_num ?? ''), (string) $asn_org);
-        // Spamhaus DROP is an IPv4-only netblock list; v6 rows never match.
-        $drop = (!$is_v6 && REPUTATION_AXIS_ENABLED)
-            ? ip_in_spamhaus_drop((int) ipToLong($ip))
-            : false;
+        $drop = ip2geo_ip_in_spamhaus_drop($ip);
 
         $rows_for_summary[] = [
             'category' => $category,

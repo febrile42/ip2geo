@@ -37,6 +37,11 @@ declare(strict_types=1);
 
 const EXTRACT_IPS_CAP = 10000;
 
+// Strict dotted-quad IPv4 regex, shared with index.php's
+// extract_raw_ip_candidates() (which needs the same matches, but keeping
+// private hits instead of dropping them — see that function's docblock).
+const EXTRACT_IPS_V4_REGEX = "/\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b/";
+
 /**
  * IPv4 private/local test — identical to today's test_local() in index.php.
  * (Its regex also carries a dead `|::1$` alternative that can never match a
@@ -141,12 +146,7 @@ function extract_ips_validate_v6_candidate(string $token): ?string
 function extract_ips(string $text): array
 {
     // Step 1a: IPv4 — unchanged regex from index.php:214.
-    preg_match_all(
-        "/\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b/",
-        $text,
-        $v4_matches,
-        PREG_OFFSET_CAPTURE
-    );
+    preg_match_all(EXTRACT_IPS_V4_REGEX, $text, $v4_matches, PREG_OFFSET_CAPTURE);
 
     // Step 1b: IPv6 — linear candidate scan (two-step: find, then validate).
     //

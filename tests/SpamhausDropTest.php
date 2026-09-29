@@ -6,7 +6,7 @@ namespace Ip2Geo\Tests;
 
 use PHPUnit\Framework\TestCase;
 
-require_once __DIR__ . '/../report_functions.php';      // ip_in_spamhaus_drop(), apply_reputation_override()
+require_once __DIR__ . '/../report_functions.php';      // ip_in_spamhaus_drop(), ip2geo_ip_in_spamhaus_drop()
 require_once __DIR__ . '/../scripts/gen-spamhaus-drop.php'; // spamhaus_drop_ranges_from_ndjson() (CLI entry self-guards)
 
 /**
@@ -15,8 +15,8 @@ require_once __DIR__ . '/../scripts/gen-spamhaus-drop.php'; // spamhaus_drop_ran
  *
  * Covers the lookup (binary search), the generator (CIDR -> sorted/merged int
  * ranges, skipping metadata + IPv6), the attribution header written from the
- * feed's metadata record, the verdict override, the committed data files'
- * integrity, and a perf guard for the 10k hot loop.
+ * feed's metadata record, the committed data files' integrity, and a perf
+ * guard for the 10k hot loop.
  */
 class SpamhausDropTest extends TestCase
 {
@@ -323,45 +323,6 @@ class SpamhausDropTest extends TestCase
             strpos($yml, 'spamhaus_asndrop_block_is_safe('),
             'the block check must run before php -l and the commit'
         );
-    }
-
-    // --- apply_reputation_override() ---------------------------------------
-
-    public function testOverrideFlipsLowToModerateAndOpensCta(): void
-    {
-        $r = apply_reputation_override('LOW', false, 30, 3, '');
-        $this->assertSame('MODERATE', $r['verdict_level']);
-        $this->assertTrue($r['show_cta']);
-        $this->assertSame('3 IPs on the Spamhaus DROP list (hijacked/criminal netblocks).', $r['verdict_reason']);
-    }
-
-    public function testOverrideNoopWhenNoReputationHits(): void
-    {
-        // The regression guard: 0 hits must return inputs byte-identical.
-        $r = apply_reputation_override('LOW', false, 30, 0, '');
-        $this->assertSame(['verdict_level' => 'LOW', 'show_cta' => false, 'verdict_reason' => ''], $r);
-    }
-
-    public function testOverrideRespectsFiveIpFloor(): void
-    {
-        $r = apply_reputation_override('LOW', false, 4, 2, '');
-        $this->assertSame('LOW', $r['verdict_level']);
-        $this->assertFalse($r['show_cta']);
-    }
-
-    public function testOverrideKeepsHighAndDoesNotClobberReason(): void
-    {
-        $r = apply_reputation_override('HIGH', true, 300, 5, '90% of IPs are confirmed scanning.');
-        $this->assertSame('HIGH', $r['verdict_level']);
-        $this->assertTrue($r['show_cta']);
-        $this->assertSame('90% of IPs are confirmed scanning.', $r['verdict_reason']);
-    }
-
-    public function testOverrideOpensCtaForModerateAndSingularReason(): void
-    {
-        $r = apply_reputation_override('MODERATE', false, 5, 1, '');
-        $this->assertTrue($r['show_cta']);
-        $this->assertSame('1 IP on the Spamhaus DROP list (hijacked/criminal netblocks).', $r['verdict_reason']);
     }
 
     // --- committed data file integrity -------------------------------------
