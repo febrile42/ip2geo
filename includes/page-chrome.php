@@ -3,6 +3,8 @@
 // Provides render_page_open() and render_page_close() so every page renders
 // the same nav, head, theme toggle, smooth-scroll, and footer.
 
+require_once __DIR__ . '/version.php'; // APP_VERSION for ?v= asset URLs
+
 if (!function_exists('render_page_open')):
 
 /**
@@ -29,8 +31,23 @@ function render_page_open(string $title, string $meta_desc = '', array $og = [],
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
-    <?php if ($_SERVER['HTTP_HOST'] === 'ip2geo.org'): ?>
-    <script defer src="/u/script.js" data-website-id="656d7a15-6282-4079-af1e-b8ed857fba2e" data-domains="ip2geo.org"></script>
+    <!-- R3: strip a #v= share-link payload into memory before the Umami tracker
+         loads (matches the inline script in index.php's <head>; see
+         assets/js/workbench.js). Non-lookup pages rarely carry #v=, but this
+         keeps the protection uniform across every page that loads the tracker. -->
+    <script data-cfasync="false">
+    (function() {
+        var h = window.location.hash;
+        if (h.indexOf('#v=') === 0) {
+            window.__ip2geoSharedView = h.slice(3);
+            if (window.history && window.history.replaceState) {
+                window.history.replaceState(null, '', window.location.pathname + window.location.search);
+            }
+        }
+    })();
+    </script>
+    <?php if (($_SERVER['HTTP_HOST'] === 'ip2geo.org' || getenv('IP2GEO_E2E_FORCE_UMAMI') === '1')): ?>
+    <script data-cfasync="false" defer src="/u/script.js" data-website-id="656d7a15-6282-4079-af1e-b8ed857fba2e" data-domains="ip2geo.org" data-exclude-hash="true"></script>
     <?php endif; ?>
     <title><?php echo $safe_title; ?></title>
     <meta charset="utf-8" />
@@ -40,15 +57,15 @@ function render_page_open(string $title, string $meta_desc = '', array $og = [],
     <meta property="og:title" content="<?php echo htmlspecialchars($og['title'] ?? $title, ENT_QUOTES, 'UTF-8'); ?>">
     <meta property="og:description" content="<?php echo htmlspecialchars($og['description'] ?? $safe_desc, ENT_QUOTES, 'UTF-8'); ?>">
     <meta property="og:url" content="<?php echo htmlspecialchars($og['url'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
-    <meta property="og:image" content="https://ip2geo.org/assets/images/og-card.webp">
+    <meta property="og:image" content="https://ip2geo.org/assets/images/og-card.png">
     <meta property="og:type" content="website">
     <?php endif; ?>
     <link rel="preconnect" href="https://fonts.bunny.net" crossorigin>
     <link rel="stylesheet" href="https://fonts.bunny.net/css?family=geist:400,500,700,900|geist-mono:400,500&display=swap">
-    <link rel="stylesheet" href="/assets/css/v4.css" />
-    <link rel="stylesheet" href="/assets/css/ip2geo-print.css" media="print" />
+    <link rel="stylesheet" href="/assets/css/v4.css?v=<?php echo APP_VERSION; ?>" />
+    <link rel="stylesheet" href="/assets/css/ip2geo-print.css?v=<?php echo APP_VERSION; ?>" media="print" />
     <link rel="icon" href="/favicon.ico" />
-    <script>
+    <script data-cfasync="false">
     // Apply theme before paint to avoid a flash. An explicit saved choice wins;
     // otherwise follow the OS setting (prefers-color-scheme). Falls back to the
     // dark data-theme on <html> only if JS is off.
@@ -93,7 +110,7 @@ function render_page_close(): void { ?>
     <?php require __DIR__ . '/footer.php'; ?>
 
     <!-- Theme toggle -->
-    <script>
+    <script data-cfasync="false">
     (function() {
         var btn = document.getElementById('themeToggle');
         if (!btn) return;
@@ -107,7 +124,7 @@ function render_page_close(): void { ?>
     </script>
 
     <!-- Smooth in-page anchor scroll (fixed ~500ms regardless of distance) -->
-    <script>
+    <script data-cfasync="false">
     (function() {
         var DURATION = 500;
         var OFFSET = 72;

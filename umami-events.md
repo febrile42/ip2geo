@@ -4,72 +4,70 @@ Quick reference for every custom event we fire. Umami shows these under
 "Events" in the dashboard. Pageviews are automatic — only the custom events
 below need explanation.
 
+**v5 update:** Threat Reports were retired completely (R17) — `report.php`
+now returns HTTP 410 for every token. Every event that only ever fired from
+that page (`report_purchase`, `report_view`, `report_download`,
+`report_tab_switch`, `report_copy_link`, `report_view_all_ips`) and the
+Stripe checkout events (`cta_click`, `stripe_cancel`) no longer fire and are
+removed from this doc. The firewall-rules and filter events below now apply
+only to the home page — they used to fire from `report.php` too, but that
+page has nothing left to click.
+
 ---
 
 ## Home page (index.php)
 
 ### `lookup_submit`
-Someone hit the Submit button and got results. Includes a bucket for how many
-IPs they pasted in (`1-10`, `11-50`, `51-200`, `201-1000`, `1001-5000`, `5000+`).
+Someone hit the Submit button and got results. In v5 this fires from the
+workbench (`assets/js/workbench.js`) once the lookup returns; it also fires
+the `ip2geo:lookup_submit` DOM event that Recent lookups listens for. Fields:
+- `ip_count_bucket` — how many unique IPs they pasted in (`1`, `2-10`,
+  `11-50`, `51-100`, `101-500`, `501-1000`, `1001-5000`, `5000+`)
+- `sample` — `true` when the lookup came from "Try a sample log" without the
+  visitor editing the textarea afterward, `false` otherwise (D11/R13)
+
 This is the core usage metric — how often is the tool actually being used and
-at what scale.
+at what scale. `verdict_level` and `cta_shown` no longer appear: v5 has no
+CTA or verdict to report (R17).
 
 ### `download_csv`
-Someone downloaded the results table as a CSV from the home page. Signals a
+Someone downloaded the results table as a CSV from the no-JS results page. Signals a
 power user who wants the data for their own processing.
 
 ---
 
-## Report page (report.php)
+## Home page: workbench (workbench.js, v5)
 
-### `report_purchase`
-Fires **once** on the very first load after a successful Stripe checkout —
-when the token transitions from `paid` → `redeemed` and the report is generated
-for the first time. Never fires on return visits or demo reports.
+### `copy_export_<format>`
+Someone copied the current filtered rows in an export format. The suffix is
+the format key from `assets/js/export-templates.js`: `tsv`, `csv`, `kql`,
+`spl`, `iptables`, `ufw`, `nginx`. No properties; nothing from the paste.
 
-Fields:
-- `revenue` — `9.00` (USD)
-- `currency` — `"USD"`
-- `verdict` — the threat verdict (e.g. `"high"`, `"moderate"`, `"low"`, `"minimal"`)
-- `ip_count_bucket` — same buckets as `lookup_submit`
+### `share_link_created`
+Someone copied a `#v=` share link. No properties. The IPs live only in the URL
+fragment, and the fragment is stripped before the tracker loads (R3), so
+opening a shared link never sends its contents to analytics.
 
-This is the primary revenue signal. Compare it against `cta_click` to see the
-full funnel: click → Stripe cancel → purchase.
+### `filter_category` / `filter_country` / `filter_search`
+Someone used one of the workbench's own filter controls: the category chips,
+the country chips, or the free-text search box. No properties (D9): only the
+dimension that was touched is recorded, never the value — not the category
+name, not the country code, and never the search text, since a visitor can
+type an IP or hostname into search. `filter_search` is debounced 600ms after
+the last keystroke so a single search doesn't spam events per character.
 
-### `report_view`
-Fires once when the report page fully loads and renders. Carries three fields:
-- `is_demo` — true if it's the demo report, false if it's a real paid report
-- `verdict` — the threat verdict shown (e.g. `"high"`, `"moderate"`, `"low"`, `"minimal"`)
-- `ip_count_bucket` — same buckets as lookup_submit above
-
-This is how we tell real report views apart from demo views, and how we see
-what verdict mix users are actually encountering.
-
-### `report_download`
-Someone downloaded a firewall block list from their report. Two fields:
-- `format` — `iptables`, `ufw`, `nginx`, or `cidr` (the plain text list)
-- `scope` — `by-ip` (the per-IP download) or `by-range` (the CIDR/ASN range download)
-
-High download rate on a report = user found the report actionable and took it
-somewhere.
-
-### `report_tab_switch`
-Someone clicked one of the tabs on the report (Summary, Top IPs, By Range, etc.).
-The `tab` field has the tab name. Tells us which sections people actually look at
-beyond the default view.
-
-### `report_copy_link`
-Someone clicked the "Copy link" button to share their report URL. Useful for
-seeing whether paid reports are being shared.
-
-### `report_view_all_ips`
-Someone clicked through to view the full expanded IP list (the "view all" link
-that appears when there are more IPs than the default display cap). Signals they
-dug into the detail, not just skimmed the summary.
+This replaced a v5 gap: the workbench's filter chips (`assets/js/filters.js`)
+used to fire nothing, so filter usage went unmeasured once a browser-side
+lookup swapped the server-rendered `#results` table for `#workbench-root`.
+See `filter_category` / `filter_country` below for the older, still-present
+handlers on the server-rendered table — those fire only for visitors who
+get the server-rendered table because the workbench never took over (with JS
+fully off, neither set fires). Both sets send the same event names with no
+properties, so a dashboard counts them together.
 
 ---
 
-## Report page — firewall rules panel (ip2geo-app.js)
+## Home page — firewall rules panel (ip2geo-app.js)
 
 ### `show_rules_<block>`
 Someone expanded the firewall rules panel for a specific block. The suffix is the
@@ -82,32 +80,28 @@ This is the stronger signal — they actually grabbed the rules to use somewhere
 
 ---
 
-## Report page — filters (ip2geo-app.js)
+## Home page — filters, no-workbench fallback (ip2geo-app.js)
+
+These two handlers bind to the server-rendered results table
+(`#filter-countries`, `.filter-category`) inside `#results`. A visitor only
+sees that table — and these events only fire — when the workbench never took
+over, i.e. the browser-side lookup in `assets/js/workbench.js` never ran but
+`ip2geo-app.js` did. With JS fully disabled nothing fires at all. Once a lookup succeeds client-side, `#results` stays hidden and
+`#workbench-root` takes its place, so the same filter action instead fires
+the `filter_category` / `filter_country` / `filter_search` events documented
+above under workbench.
 
 ### `filter_country`
-Someone used the country filter on their report. The `country` field is the
-two-letter country code they selected. Shows which countries users are drilling
-into most.
+Someone used the country filter chips. No properties (R9/D8): the country
+code the user would drill into comes from their own paste, so as of v5 we
+only record that the filter was used, not which value. Still shows overall
+filter-usage volume; the per-country breakdown chart in Umami stops here.
 
 ### `filter_category`
 Someone toggled one of the category checkboxes (Scanning, VPN/Proxy, Cloud,
-Residential, etc.). Fields: `category` (the category name) and `checked`
-(true = turned on, false = turned off).
-
----
-
-## Checkout / payment (ip2geo-app.js)
-
-### `cta_click`
-Someone clicked the main "Get Report" / upgrade CTA button. Fires on click,
-before Stripe loads. Useful for comparing CTA clicks vs actual completed
-purchases (the gap = Stripe drop-off).
-
-### `stripe_cancel`
-Someone came back to the page with `?cancelled=1` in the URL — i.e. they opened
-the Stripe checkout and then clicked the back/cancel button without paying.
-We strip the query param immediately after firing so it doesn't persist in
-browser history.
+Residential, etc.). No properties (D9): which category and whether it was
+turned on or off are not sent (IPG-134; before that it sent `category` and
+`checked`).
 
 ---
 
@@ -132,3 +126,30 @@ Someone clicked Clear on the list.
 
 ### `recent_lookups_undo`
 Someone clicked Undo on the toast after turning it off or clearing it.
+
+---
+
+## Checking events on staging
+
+Staging never loads the tracker, and that is deliberate: keeping staging
+traffic out of the production Umami site. Two things stop it:
+
+- `index.php` and `includes/page-chrome.php` only render the tracker tag when
+  `HTTP_HOST` is exactly `ip2geo.org`.
+- The `/u/` proxy to Umami exists only on the production vhost, so
+  `https://staging.ip2geo.org/u/script.js` returns 404.
+
+So `window.umami` is undefined on staging and no `/u/` request appears in
+DevTools. Don't file that as a bug. To check which events fire and with what
+fields, stub the tracker in the console after the page loads and before you
+interact. Every call site is `window.umami && umami.track(...)`, so the stub
+catches all of them:
+
+```js
+window.umami = { track: (name, data) => console.log('umami', name, data ?? '') };
+```
+
+Reload clears the stub. The privacy guarantee (no log text or `#v=`
+fragment in any `/u/` request) is covered by `tests/e2e/privacy.spec.js`,
+which runs in CI against a stubbed `/u/` with `IP2GEO_E2E_FORCE_UMAMI=1`.
+Only production shows real sends.

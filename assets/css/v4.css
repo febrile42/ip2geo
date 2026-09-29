@@ -121,6 +121,12 @@ a {
 a:hover { text-decoration-color: var(--accent-purple); color: var(--accent-purple); }
 a:focus-visible { outline: 2px solid var(--accent-purple); outline-offset: 2px; border-radius: 2px; }
 
+/* "Try a sample log" under the paste box: the placeholder points at it, so it
+   must not blend in with body-text links (default a: --text + --border underline). */
+.sample-log-link { margin: 0.6em 0 0; font-size: 0.9em; }
+.sample-log-link a { color: var(--accent-purple); text-decoration-color: currentColor; font-weight: 500; }
+.sample-log-link a:hover { text-decoration-thickness: 2px; }
+
 /* Content link: inline links inside body prose. Accent-purple text + visible
    1.5px underline. Hover thickens to 2.5px. */
 .lead a,
@@ -447,24 +453,34 @@ main {
   user-select: none;
 }
 .opt-in input { accent-color: var(--accent-purple); }
-.opt-in .muted-tag { color: var(--text-muted); opacity: 0.7; }
+/* D16: the extra opacity on top of --text-muted pushed contrast below WCAG
+   AA (2.21:1 on light) — dropped so the token's own contrast applies
+   unmodified. Caught by tests/e2e/a11y.spec.js's axe scan. */
+.opt-in .muted-tag { color: var(--text-muted); }
 
 /* Wrapper row for the recent-lookups opt-in checkbox: sits directly below the
-   submit button in the .actions column. Fades on hover so the row stays
-   discoverable without competing with the primary CTA. */
+   submit button in the .actions column. Small, muted text keeps it quiet;
+   no opacity dimming, which pushed it below 4.5:1 contrast. */
 .opt-in-toggle {
   margin-top: 0.6em;
   font-size: 0.75em;
-  opacity: 0.7;
-  transition: opacity 0.15s;
-}
-.opt-in-toggle:hover,
-.opt-in-toggle:focus-within {
-  opacity: 1;
 }
 .opt-in-toggle label {
   cursor: pointer;
 }
+
+/* Recent lookups menu (IPG-30): reuses .wb-menu; these are layout-only.
+   align-items: stretch matters — without it the .alt button's 1px border
+   makes it 2px taller than the primary submit button. */
+.actions-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; position: relative; width: 100%; }
+.wb-menu.rl-menu { left: 0; right: 0; width: auto; max-width: none; }
+.rl-menu-list { max-height: 320px; overflow-y: auto; overscroll-behavior: contain; }
+.rl-menu-sep { height: 1px; background: var(--border); margin: 6px 0; }
+.rl-menu .rl-item-head { display: inline-flex; gap: .5em; align-items: baseline; }
+.rl-menu .rl-item-preview { font-family: var(--font-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.rl-menu .wb-menu-item[aria-disabled="true"] { cursor: default; }
+.rl-menu .wb-menu-item[aria-disabled="true"]:hover { background: none; }
+@media (max-width: 767px) { .rl-menu-list { max-height: min(320px, 50vh); } }
 
 /* ============================================================
    10. GENERIC SECTIONS
@@ -693,7 +709,12 @@ section#results .table-wrapper {
   overflow-x: auto;
 }
 
-#results-table {
+/* #wb-results-table (Phase 2 workbench, §21) reuses every rule below —
+   its first 7 columns (IP, CC, Region, City, ASN, ASN Org, Category) are
+   in the same order as #results-table's, so the nth-child column rules
+   line up; its 8th (Hits) is styled separately, just below. */
+#results-table,
+#wb-results-table {
   width: 100%;
   border-collapse: collapse;
   font-family: var(--font-sans);
@@ -701,7 +722,8 @@ section#results .table-wrapper {
   margin: 0;
 }
 
-#results-table thead th {
+#results-table thead th,
+#wb-results-table thead th {
   text-align: left;
   font-family: var(--font-mono);
   font-weight: 500;
@@ -714,7 +736,8 @@ section#results .table-wrapper {
   background: var(--surface-2);
   white-space: nowrap;
 }
-#results-table tbody td {
+#results-table tbody td,
+#wb-results-table tbody td {
   padding: 8px 14px;
   border-bottom: 1px solid var(--border);
   vertical-align: middle;
@@ -722,23 +745,69 @@ section#results .table-wrapper {
      .asn-category--scanning/cloud/vpn/etc. set their own color, and a
      specific selector here would override them. */
 }
-#results-table tbody tr:last-child td { border-bottom: 0; }
+#results-table tbody tr:last-child td,
+#wb-results-table tbody tr:last-child td { border-bottom: 0; }
 
 /* IP, CC, ASN columns -> mono so digits align across rows */
 #results-table tbody td:first-child,
 #results-table tbody td:nth-child(2),
-#results-table tbody td:nth-child(5) {
+#results-table tbody td:nth-child(5),
+#wb-results-table tbody td:first-child,
+#wb-results-table tbody td:nth-child(2),
+#wb-results-table tbody td:nth-child(5) {
   font-family: var(--font-mono);
   font-size: 12px;
   font-feature-settings: "tnum" 1;
 }
-#results-table tbody td:nth-child(2) { color: var(--text-muted); }
+#results-table tbody td:nth-child(2),
+#wb-results-table tbody td:nth-child(2) { color: var(--text-muted); }
+
+/* Hits column (workbench-only, 8th): right-aligned mono counts. */
+#wb-results-table th[data-key="hits"] { text-align: right; }
+#wb-results-table td.num {
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-feature-settings: "tnum" 1;
+  color: var(--text-muted);
+}
+
+/* Sticky header: the workbench table can run to thousands of rows. */
+#wb-results-table thead th {
+  position: sticky;
+  top: 0; /* the table sits in an overflow-x wrapper, which becomes the sticky
+             container; top:56px pushed the header down over the first rows */
+  z-index: 2;
+}
 
 /* abbr tooltips inside results table */
-#results-table abbr[title] {
+#results-table abbr[title],
+#wb-results-table abbr[title],
+.lookup-summary abbr[title] {
     text-decoration: underline dotted;
     text-decoration-color: var(--text-muted);
     cursor: help;
+}
+
+/* Tap-to-explain popover for DROP labels (assets/js/abbr-popover.js): title
+   tooltips never show on touch screens. */
+.abbr-pop {
+    position: absolute;
+    z-index: 60;
+    max-width: min(320px, calc(100vw - 16px));
+    padding: 8px 10px;
+    background: var(--surface-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    font-size: 13px;
+    line-height: 1.45;
+}
+abbr.drop-tag:focus-visible,
+.lookup-summary-drop abbr:focus-visible {
+    outline: 2px solid var(--accent-purple);
+    outline-offset: 2px;
 }
 
 /* No row hover: the table is for scanning and reading, not interaction.
@@ -748,22 +817,28 @@ section#results .table-wrapper {
 /* JS-driven stripe (ip2geo-app.js toggles .row-stripe on visible rows,
    .row-hidden on filtered rows). The nth-child reset stops the theme's
    default odd-row stripe from leaking back in once rows hide. */
-#results-table tbody tr:nth-child(2n + 1) { background-color: transparent; }
-#results-table tbody tr.row-stripe        { background-color: rgba(255,255,255,0.03); }
+#results-table tbody tr:nth-child(2n + 1),
+#wb-results-table tbody tr:nth-child(2n + 1) { background-color: transparent; }
+#results-table tbody tr.row-stripe,
+#wb-results-table tbody tr:nth-child(2n)     { background-color: rgba(255,255,255,0.03); }
 #results-table tbody tr.row-hidden        { display: none; }
-[data-theme="light"] #results-table tbody tr.row-stripe { background-color: rgba(26,19,48,0.03); }
+[data-theme="light"] #results-table tbody tr.row-stripe,
+[data-theme="light"] #wb-results-table tbody tr:nth-child(2n) { background-color: rgba(26,19,48,0.03); }
 
 /* Column overflow absorption — ASN Org is the prime overflow culprit; State and
    City are secondary. Truncate at a fixed em cap, expose full text via the
    markup's title attribute on hover. */
-#results-table .cell-asn-org {
+#results-table .cell-asn-org,
+#wb-results-table .cell-asn-org {
     max-width: 14em;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 #results-table .cell-region,
-#results-table .cell-city {
+#results-table .cell-city,
+#wb-results-table .cell-region,
+#wb-results-table .cell-city {
     max-width: 10em;
     white-space: nowrap;
     overflow: hidden;
@@ -784,6 +859,62 @@ section#results .table-wrapper {
 #empty-filter-msg {
   color: var(--text-muted);
   font-size: 13px;
+}
+
+/* ---------- 16b-2. Summary line, notice bar, DROP + "(you)" tags (v5, D4/D5/D6/D14; slimmed IPG-33) ----------
+   IPG-33: no card. Plain line, same token map as .notice: --text-muted for
+   labels, --text for the counts (mono) and the ASN string. */
+.lookup-summary {
+  margin: 20px 0 0;           /* no-JS spacing unchanged */
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--text-muted);
+  font-size: 13.5px;          /* same as .notice */
+  line-height: 1.5;
+}
+.lookup-summary-n   { color: var(--text); font-family: var(--font-mono); }
+.lookup-summary-asn { color: var(--text); }
+/* Desktop: one line, facts joined by " · ". */
+.lookup-summary-fact + .lookup-summary-fact::before {
+  content: "\00b7";
+  margin: 0 0.5em; /* spacing via margin: spaces inside content collapsed on staging */
+  color: var(--text-muted);
+}
+
+/* IPv6 middle-truncation (D15): full address is always in the DOM and in
+   the cell's title; only the truncated span is hidden/shown by width. */
+.cell-ip .ip-truncated { display: none; }
+
+.notice {
+  margin: 20px 0 0;
+  padding: 12px 20px;
+  background: var(--surface-2);
+  border-radius: var(--r-md);
+  color: var(--text-muted);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+.notice .button { margin-left: 0.5em; }
+
+.drop-tag {
+  display: inline-block;
+  margin-left: 0.5em;
+  padding: 1px 6px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  border-radius: var(--r-sm);
+  vertical-align: middle;
+}
+
+.you-tag {
+  color: var(--text-muted);
+  font-family: var(--font-sans);
+  font-size: 0.85em;
+  font-style: italic;
 }
 
 /* ---------- 16c. Filter & Export panel ---------- */
@@ -1007,6 +1138,62 @@ button.button.small:hover {
   button.button.small {
     min-height: 44px;
     padding: 8px 14px;
+  }
+}
+
+/* ---------- 16b-3. Mobile results (D15, ≤767px) ---------- */
+@media (max-width: 767px) {
+  /* Summary: one fact per line, no separator (IPG-33: at most two facts now). */
+  .lookup-summary-fact {
+    display: block;
+  }
+  .lookup-summary-fact + .lookup-summary-fact::before {
+    content: none; /* no " · " separator once facts stack vertically */
+  }
+
+  /* Over-10k / private-only / network-failure / 503 notices run full-width. */
+  .notice {
+    margin-left: -20px; /* matches main's ≤767px container padding */
+    margin-right: -20px;
+    border-radius: 0;
+  }
+
+  /* IPv6: show the middle-truncated form; the full address stays in the
+     title attribute and (via .ip-full, stripped out of .ip-truncated
+     instead) in CSV/copy. */
+  .cell-ip .ip-full { display: none; }
+  .cell-ip .ip-truncated { display: inline; }
+
+  /* Sticky IP column inside the existing horizontally scrolling table. */
+  section#results .table-wrapper {
+    -webkit-overflow-scrolling: touch;
+  }
+  /* Both tables: the no-JS #results-table and the workbench's #wb-results-table. */
+  #results-table thead th:first-child,
+  #results-table tbody td:first-child,
+  #wb-results-table thead th:first-child,
+  #wb-results-table tbody td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: var(--surface);
+    box-shadow: 1px 0 0 var(--border);
+  }
+  /* Corner cell sits above both the sticky header and the sticky column. */
+  #results-table thead th:first-child,
+  #wb-results-table thead th:first-child {
+    z-index: 3;
+    background: var(--surface-2);
+  }
+  /* Striped rows: the stripe tint over an opaque base. A bare translucent
+     tint let text scrolling underneath show through the pinned cell. */
+  #results-table tbody tr.row-stripe td:first-child,
+  #wb-results-table tbody tr:nth-child(2n) td:first-child {
+    background: linear-gradient(rgba(255,255,255,0.03), rgba(255,255,255,0.03)), var(--surface);
+  }
+  [data-theme="light"] #results-table tbody tr.row-stripe td:first-child,
+  [data-theme="light"] #wb-results-table tbody tr:nth-child(2n) td:first-child {
+    background: linear-gradient(rgba(26,19,48,0.03), rgba(26,19,48,0.03)), var(--surface);
   }
 }
 
@@ -1259,83 +1446,10 @@ button.button.small:hover {
     }
 }
 
-/* ---------- 16i. Recent lookups widget (opt-in localStorage) ----------
-   Pill-chip aesthetic. Each lookup is a compact rounded chip with count +
-   relative time; the IP preview moves to a title-attribute tooltip so chips
-   stay scannable. The widget only renders inside .hero, so no scoping is
-   needed in the selectors here. */
-#recent-lookups {
-    margin: 1.25em 0 0;
-    padding: 0;
-    border: none;
-    background: transparent;
-}
-#recent-lookups-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75em;
-    margin-bottom: 12px;
-}
-#recent-lookups-header h3 {
-    font-family: var(--font-mono);
-    font-size: 11px;
-    font-weight: 500;
-    line-height: 1.3;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--text-muted);
-    margin: 0;
-}
-#recent-lookups-header h3 small {
-    font-family: var(--font-sans);
-    font-size: 11px;
-    font-weight: 400;
-    letter-spacing: 0;
-    text-transform: none;
-    margin-left: 8px;
-    color: var(--text-muted);
-    opacity: 0.7;
-}
-#recent-lookups-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-}
-#recent-lookups-list li {
-    margin: 0;
-    padding: 0;
-}
-#recent-lookups-list .recent-lookup-item {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5em;
-    height: auto;
-    line-height: 1.4;
-    padding: 6px 14px;
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    color: var(--text);
-    font: inherit;
-    font-family: var(--font-sans);
-    font-size: 13px;
-    font-weight: 500;
-    text-transform: none;
-    letter-spacing: 0;
-    cursor: pointer;
-    transition: border-color 0.12s, background 0.12s;
-}
-#recent-lookups-list .recent-lookup-item:hover,
-#recent-lookups-list .recent-lookup-item:focus {
-    background: var(--surface-2);
-    border-color: var(--accent-purple);
-    color: var(--text);
-    outline: none;
-}
+/* ---------- 16i. Recent lookups menu (IPG-30) ----------
+   The pill widget is gone; entries are rendered inside #rl-menu (a .wb-menu,
+   see §21/.actions-row rules above). These classes are reused by the menu's
+   entry rows. */
 .recent-lookup-count {
     font-family: var(--font-mono);
     font-feature-settings: "tnum" 1;
@@ -1370,6 +1484,7 @@ button.button.small:hover {
     z-index: 2147483646;
     transition: transform 0.22s ease;
     max-width: calc(100vw - 2em);
+    width: max-content;
 }
 #rl-toast.rl-toast-visible {
     transform: translate(-50%, 0);
@@ -2425,4 +2540,295 @@ button.button.small:hover {
 .cbl-link:hover {
   color: var(--magenta);
   text-decoration-color: var(--magenta);
+}
+
+/* ============================================================
+   21. PHASE 2 WORKBENCH (design doc: results-workbench-20260923)
+   Tokens only — nothing here introduces a new color, radius or font;
+   see DESIGN.md's Component Token Map. Scoped under #workbench-root so
+   it can sit alongside the PR-1 #results markup without collision.
+   ============================================================ */
+
+/* Overrides the generic `section.block` rule (§10: 72px top padding + a
+   border-top divider, meant for separating major page sections like
+   Contact/About). The workbench sits directly under the paste bar as a
+   continuation of the same lookup flow, not a new section, so it gets a
+   small top margin and no divider — matching the mockup's tight spacing
+   between the paste bar and "Lookup Results". */
+#workbench-root.block {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 0;
+}
+
+#workbench-root .wb-toast-host {
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%);
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  pointer-events: none;
+}
+.wb-toast {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 9px 14px;
+  font-size: 13px;
+  color: var(--text);
+  opacity: 1;
+  transition: opacity 0.2s ease;
+}
+.wb-toast--out { opacity: 0; }
+
+.wb-recipient-banner {
+  background: var(--surface-2);
+  color: var(--text-muted);
+  border-radius: var(--r-md);
+  padding: 8px 12px;
+  margin: 8px 0;
+  font-size: 13px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.wb-paste-bar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  color: var(--text-muted);
+  font-size: 13px;
+  margin: 10px 0 14px;
+  flex-wrap: wrap;
+}
+.wb-paste-pill {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 7px 12px;
+  font-family: var(--font-mono);
+  color: var(--text);
+}
+.wb-paste-pill > span { white-space: nowrap; }
+/* Over-cap notice sits under the pill it explains, 12px above the filters
+   like .wb-summary. Longhands, so the ≤767px full-bleed side margins on
+   .notice survive (IPG-75). */
+.wb-overcap { margin-top: 0; margin-bottom: 12px; }
+.wb-paste-time { margin-left: auto; font-variant-numeric: tabular-nums; }
+
+.wb-state .notice { margin: 8px 0; }
+
+/* .wb-summary is a bare DOM hook (assets/js/workbench.js queries it to
+   render the summary line, and sets it hidden when there are no facts);
+   it also carries .lookup-summary (§16b-2), which is what actually styles
+   the line, the mono numerals and the " · " fact separator — reused as-is
+   rather than duplicated here so the two summary renderers (PHP's
+   build_summary() and JS's ip2geoSummary) always look identical. */
+.wb-summary { margin: 12px 0; }
+
+.wb-filters { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.wb-chips-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  overflow-x: auto;
+}
+/* Each .wb-chips-row has one child (index.php), so the row's gap never
+   reached the chips; the inner div is the real flex container. 6px between
+   chips, 8px between wrapped lines to match .wb-filters (IPG-78). */
+.wb-chips-category,
+.wb-chips-country {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 6px;
+  min-width: 0;
+}
+.wb-chip-label {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  margin-right: 6px;
+  white-space: nowrap;
+}
+.wb-chip {
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  padding: 3px 10px;
+  font-size: 12.5px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+.wb-chip input[type="checkbox"] {
+  /* Native checkbox for a11y (D16) but visually replaced by the ✓ prefix
+     and the selected background — kept in the accessibility tree, not
+     display:none, so screen readers and keyboard users still see a real
+     checkbox state. */
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0; border: 0;
+  clip: rect(0,0,0,0);
+  overflow: hidden;
+}
+.wb-chip:focus-within { outline: 2px solid var(--accent-purple); outline-offset: 2px; }
+.wb-chip--sel {
+  background: var(--surface-2);
+  border-color: var(--accent-purple);
+}
+.wb-chip i { font-style: normal; color: var(--text-muted); font-family: var(--font-mono); margin-left: 4px; }
+.wb-chip--more { color: var(--text-muted); cursor: default; }
+
+.wb-search {
+  margin-left: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 6px 10px;
+  width: 260px;
+  max-width: 100%;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.wb-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+  position: relative;
+}
+.wb-spacer { flex: 1; }
+.wb-shown-count { color: var(--text-muted); font-size: 12.5px; }
+.wb-clear-filters {
+  background: none;
+  border: none;
+  color: var(--accent-purple);
+  font-size: 12.5px;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+}
+.wb-share-btn--disabled { color: var(--text-muted); cursor: not-allowed; }
+.wb-share-notice { color: var(--text-muted); font-size: 12px; margin: -2px 0 10px; }
+
+.wb-export { position: relative; display: inline-block; }
+.wb-export-btn { display: inline-flex; gap: 6px; align-items: center; }
+.wb-export-count { color: var(--text-muted); font-family: var(--font-mono); font-size: 11px; }
+.wb-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 6px;
+  width: 320px;
+  max-width: 90vw;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  z-index: 20;
+}
+.wb-menu-item {
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--text);
+  padding: 8px;
+  border-radius: var(--r-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  cursor: pointer;
+  font-size: 13px;
+}
+/* IPG-92: the translucent accent-purple overlay this used to paint lightened
+   --surface-2 enough that --text-muted note/timestamp text (e.g. the Recent
+   menu's .recent-lookup-time and .rl-item-preview) dropped to a 4.39:1
+   contrast ratio, below the WCAG AA 4.5:1 floor, whenever an item held
+   real keyboard focus. var(--surface) is already the hover highlight used
+   by .button.alt and keeps --text-muted at 6.23:1 (dark) / 7.22:1 (light). */
+.wb-menu-item:hover, .wb-menu-item:focus-visible {
+  background: var(--surface);
+  outline: none;
+}
+.wb-menu-note { color: var(--text-muted); font-size: 11px; }
+.wb-menu-group-label {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  padding: 6px 8px 4px;
+}
+.wb-menu-group + .wb-menu-group {
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+  padding-top: 4px;
+}
+
+.wb-table th { cursor: default; }
+.wb-cat {
+  border-radius: var(--r-sm);
+  padding: 1px 7px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: #0A0612;
+}
+
+@media (max-width: 767px) {
+  .wb-toast-host { left: 50%; right: auto; }
+  .wb-recipient-banner { font-size: 12.5px; }
+  .wb-export { position: static; }
+  .wb-menu {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: auto;
+    width: 100%;
+    max-width: none;
+    border-radius: var(--r-lg) var(--r-lg) 0 0;
+  }
+  .wb-menu-item { padding: 12px 10px; min-height: 44px; }
+
+  /* Toolbar (D15/bug 5): Export and Copy share link sit side by side
+     (each half-width, matching row); Download view file / Show unresolved
+     / Clear filters stack full-width below; "N shown" gets its own line.
+     No wb-toolbar child is allowed to force horizontal overflow — only
+     the results table itself scrolls sideways (.table-wrapper). */
+  .wb-toolbar {
+    position: static;
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  .wb-toolbar .wb-export,
+  .wb-toolbar .wb-share-btn {
+    flex: 1 1 calc(50% - 4px);
+    min-width: 0;
+  }
+  .wb-export-btn { width: 100%; justify-content: space-between; }
+  .wb-export-count { display: none; }
+  .wb-toolbar .wb-share-download,
+  .wb-toolbar .wb-toggle-unresolved {
+    flex: 1 1 100%;
+  }
+  .wb-spacer { flex-basis: 100%; height: 0; }
+  .wb-shown-count { flex: 1 1 100%; order: 5; }
+  .wb-clear-filters { flex: 1 1 100%; text-align: left; order: 6; }
+
+  .wb-chips-row { flex-wrap: nowrap; }
+  .wb-search { width: 100%; margin-left: 0; order: 99; }
 }

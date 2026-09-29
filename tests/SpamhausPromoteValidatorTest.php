@@ -156,6 +156,18 @@ class SpamhausPromoteValidatorTest extends TestCase
                 fn(string $s) => self::replaceLine($s, '~^    // Last sync: ~', '    // Last sync: soon'),
                 1,
             ],
+            '?> in the feed copyright line' => [
+                fn(string $s) => self::replaceLine($s, '~^    // Copyright: ~', "    // Copyright: (c) Spamhaus ?> <?php system('id'); ?>"),
+                1,
+            ],
+            'non-ASCII feed copyright line' => [
+                fn(string $s) => self::replaceLine($s, '~^    // Copyright: ~', "    // Copyright: \u{00A9} 2026 The Spamhaus Project SLU"),
+                1,
+            ],
+            'feed terms that are not an https URL' => [
+                fn(string $s) => self::replaceLine($s, '~^    // Terms: ~', '    // Terms: javascript:alert(1)'),
+                1,
+            ],
             'duplicate BEGIN marker' => [
                 fn(string $s) => self::insertBefore($s, self::END, self::BEGIN),
                 1,
@@ -262,6 +274,7 @@ class SpamhausPromoteValidatorTest extends TestCase
         $out = spamhaus_drop_render(
             [[16777216, 16777471], [3758096384, 3758096639]],
             [[16777216, 16777471, '1.0.0.0/24'], [3758096384, 3758096639, '224.0.0.0/24']],
+            ['copyright' => '(c) 2031 The Spamhaus Project SLU', 'timestamp' => 1790518442, 'terms' => 'https://www.spamhaus.org/drop/terms/'],
         );
         [$code, $err] = $this->runDrop($out);
         $this->assertSame(0, $code, $err);
@@ -305,6 +318,25 @@ class SpamhausPromoteValidatorTest extends TestCase
             ],
             'malformed date line' => [
                 fn(string $s) => self::replaceLine($s, '~^// Last sync:~', '// Last sync: 2026-09-21 ?>'),
+            ],
+            '?> in the feed copyright line' => [
+                fn(string $s) => self::replaceLine($s, '~^// Copyright:~', "// Copyright: (c) Spamhaus ?> <?php system('id'); ?>"),
+            ],
+            'non-ASCII feed copyright line' => [
+                fn(string $s) => self::replaceLine($s, '~^// Copyright:~', "// Copyright: \u{00A9} 2026 The Spamhaus Project SLU"),
+            ],
+            'malformed feed timestamp line' => [
+                fn(string $s) => self::replaceLine($s, '~^// Feed timestamp:~', '// Feed timestamp: soon'),
+            ],
+            'missing NOTICE line' => [
+                fn(string $s) => self::replaceLine($s, '~^// Spamhaus data, not covered~'),
+            ],
+            'v4 header (no feed attribution)' => [
+                fn(string $s) => self::replaceLine(
+                    self::replaceLine(self::replaceLine(self::replaceLine($s, '~^// Copyright:~'), '~^// Feed timestamp:~'), '~^// Spamhaus data, not covered~'),
+                    '~^// Terms:~',
+                    '// Terms:  https://www.spamhaus.org/drop/terms/  (c) The Spamhaus Project SLU',
+                ),
             ],
             'missing trailing newline' => [
                 fn(string $s) => rtrim($s, "\n"),

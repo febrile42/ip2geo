@@ -81,13 +81,51 @@ jobs:
           END_MARKER="// --- END AUTO-SYNC SPAMHAUS ASN-DROP ---"
 
           # Spamhaus ASN-DROP — current bad-actor AS list (NDJSON, one object per line).
-          # Each ASN is written into PHP source below, so the feed is validated by
-          # scripts/spamhaus-asns.sh (from the trusted main checkout): it emits only
-          # "AS<integer>" lines and fails the job (emitting nothing) on any unexpected
-          # value or an empty list, so a tampered feed can neither inject code nor
-          # empty the auto-sync block.
-          SPAMHAUS_ASNS=$(curl -sf --max-time 60 https://www.spamhaus.org/drop/asndrop.json \
-            | bash .trusted/scripts/spamhaus-asns.sh)
+          TMP_FEED=$(mktemp)
+          if ! curl -sf --max-time 60 https://www.spamhaus.org/drop/asndrop.json -o "$TMP_FEED"; then
+            echo "Spamhaus ASN-DROP fetch failed — aborting to avoid emptying the auto-sync block."
+            exit 1
+          fi
+
+          # Each ASN is written into PHP source below, so spamhaus_asndrop_asns()
+          # refuses the whole feed unless every .asn is an integer in 1..4294967295
+          # (a string .asn would otherwise land in asn_classification.php as code,
+          # IPG-154). It skips the metadata record, which has no .asn, and also
+          # refuses a feed with no ASNs so the auto-sync block is never emptied.
+          # sort -u (lexical) because comm below needs it.
+          SPAMHAUS_ASNS=$(php -r '
+            require ".trusted/scripts/gen-spamhaus-drop.php";
+            $asns = spamhaus_asndrop_asns(stream_get_contents(STDIN));
+            if ($asns === null) {
+                fwrite(STDERR, "ASN-DROP feed has no ASNs, a line that is not JSON, or an asn that is not an integer in 1..4294967295.\n");
+                exit(1);
+            }
+            echo implode("\n", $asns), "\n";
+          ' < "$TMP_FEED" | sort -u)
+
+          # Second fence, independent of the PHP helper: every line must be AS + digits.
+          if [ -z "$SPAMHAUS_ASNS" ] \
+            || [ "$(grep -cxE 'AS[0-9]{1,10}' <<< "$SPAMHAUS_ASNS")" != "$(wc -l <<< "$SPAMHAUS_ASNS")" ]; then
+            echo "Spamhaus ASN list is empty or has a line that is not AS<digits> — aborting."
+            exit 1
+          fi
+
+          # That metadata record's copyright, timestamp and terms go into the block's
+          # header verbatim. Same parser as the DROP generator, so a missing or
+          # malformed record (or one that could break out of the // comment) aborts
+          # the sync here instead of committing the block without attribution.
+          ATTRIBUTION=$(php -r '
+            require ".trusted/scripts/gen-spamhaus-drop.php";
+            $meta = spamhaus_feed_metadata(stream_get_contents(STDIN));
+            if ($meta === null) {
+                fwrite(STDERR, "ASN-DROP feed has no usable metadata record (copyright, timestamp, terms).\n");
+                exit(1);
+            }
+            foreach (spamhaus_feed_header_lines($meta) as $line) {
+                echo "    // {$line}\n";
+            }
+          ' < "$TMP_FEED")
+          rm -f "$TMP_FEED"
 
           # Manual entries = ASNs in $known_asns ABOVE the BEGIN marker.
           # Anything below the marker is owned by this workflow and gets replaced.
@@ -109,6 +147,8 @@ jobs:
             echo "    // Synced monthly from https://www.spamhaus.org/drop/asndrop.json by"
             echo "    // .github/workflows/sync-spamhaus.yml. To override an entry's classification,"
             echo "    // move it OUT of this block into the appropriate manual section above."
+            echo "$ATTRIBUTION"
+            echo "    // Spamhaus data, not covered by this repository's license; see NOTICE."
             echo "    // Last sync: $(date -u +%Y-%m-%d)"
             while IFS= read -r asn; do
               [ -n "$asn" ] && echo "    '$asn' => 'scanning',"
@@ -130,9 +170,22 @@ jobs:
           if not pattern.search(src):
               sys.stderr.write("ERROR: BEGIN/END markers not found in " + fp + "\n")
               sys.exit(2)
-          open(fp, "w").write(pattern.sub(new_block, src))
+          # Callable replacement: the block now carries feed text, so it must not be
+          # read as a template (a backslash in it would otherwise be an escape).
+          open(fp, "w").write(pattern.sub(lambda m: new_block, src))
           PY
           rm -f "$BLOCK_FILE"
+
+          # php -l checks syntax only, and auto-promote ignores the block when it
+          # compares develop with main, so check the block holds nothing but
+          # comments and 'AS<digits>' => 'scanning', entries before committing.
+          php -r '
+            require ".trusted/scripts/gen-spamhaus-drop.php";
+            if (!spamhaus_asndrop_block_is_safe(file_get_contents($argv[1]))) {
+                fwrite(STDERR, "ERROR: the auto-sync block in {$argv[1]} has a line that is not a comment or an AS entry.\n");
+                exit(1);
+            }
+          ' "$CLASSIFICATION_FILE"
 
           # Validate PHP still parses before pushing.
           php -l "$CLASSIFICATION_FILE"

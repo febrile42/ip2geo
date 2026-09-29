@@ -1,7 +1,8 @@
 name: Spamhaus validators
 
 # Runs the tests for the scripts that guard the Spamhaus auto-promote to
-# production (scripts/spamhaus-asns.sh, scripts/validate-spamhaus-promote.sh)
+# production (scripts/validate-spamhaus-promote.sh, and the feed checks in
+# scripts/gen-spamhaus-drop.php)
 # whenever they, the generator, the data files or the sync workflows change.
 # The committed data files are the passing fixtures, so a hand edit to them that
 # the validator would reject fails here too, before it reaches develop.
@@ -9,12 +10,11 @@ name: Spamhaus validators
 on:
   pull_request:
     paths:
-      - 'scripts/spamhaus-asns.sh'
       - 'scripts/validate-spamhaus-promote.sh'
       - 'scripts/gen-spamhaus-drop.php'
       - 'asn_classification.php'
       - 'spamhaus_drop_data.php'
-      - 'tests/SpamhausAsnsScriptTest.php'
+      - 'tests/SpamhausDropTest.php'
       - 'tests/SpamhausPromoteValidatorTest.php'
       - '.github/workflows/sync-spamhaus.yml'
       - '.github/workflows/sync-spamhaus-drop.yml'
@@ -24,12 +24,11 @@ on:
       - main
       - develop
     paths:
-      - 'scripts/spamhaus-asns.sh'
       - 'scripts/validate-spamhaus-promote.sh'
       - 'scripts/gen-spamhaus-drop.php'
       - 'asn_classification.php'
       - 'spamhaus_drop_data.php'
-      - 'tests/SpamhausAsnsScriptTest.php'
+      - 'tests/SpamhausDropTest.php'
       - 'tests/SpamhausPromoteValidatorTest.php'
       - '.github/workflows/sync-spamhaus.yml'
       - '.github/workflows/sync-spamhaus-drop.yml'
@@ -57,5 +56,5 @@ jobs:
 
       - name: Run tests
         run: |
-          vendor/bin/phpunit tests/SpamhausAsnsScriptTest.php
+          vendor/bin/phpunit tests/SpamhausDropTest.php
           vendor/bin/phpunit tests/SpamhausPromoteValidatorTest.php
