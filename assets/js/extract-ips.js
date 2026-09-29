@@ -268,10 +268,15 @@
       rawFreq[ip]++;
     }
 
+    // Each unique IP's private/reserved check is run once here and cached,
+    // so the capped output loop below (and a repeated IP later in the same
+    // text) never re-runs isPrivateV4/isPrivateV6 for an IP already tested.
+    var privacyCache = Object.create(null);
     var totalUnique = 0;
     for (var k = 0; k < order.length; k++) {
       var ipk = order[k];
       var isPriv = rawType[ipk] === 'v4' ? isPrivateV4(ipk) : isPrivateV6(ipk);
+      privacyCache[ipk] = isPriv;
       if (!isPriv) totalUnique++;
     }
 
@@ -282,8 +287,7 @@
     for (var c = 0; c < cappedOrder.length; c++) {
       var cip = cappedOrder[c];
       var ctype = rawType[cip];
-      var priv = ctype === 'v4' ? isPrivateV4(cip) : isPrivateV6(cip);
-      if (priv) continue;
+      if (privacyCache[cip]) continue;
       ips.push([cip, rawFreq[cip]]);
       if (ctype === 'v6') v6Count++;
     }
