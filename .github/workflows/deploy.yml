@@ -102,12 +102,24 @@ jobs:
             # slower (a 10k-IP lookup takes ~3.5s instead of ~0.2-0.5s without
             # php-maxminddb), so the HTTP-level smoke/performance checks in
             # test-staging below would not reliably catch either being absent.
+            # This runs against the CLI SAPI over SSH, which is only a proxy for
+            # the FPM/web SAPI that actually serves requests: a CLI-only
+            # extension gap wouldn't show here, and CLI's opcache.enable is
+            # unrelated to opcache.enable_cli, so it doesn't reflect FPM state
+            # either way. It is therefore a warning annotation, not a failing
+            # check — failing here on a false mismatch would turn this deploy
+            # step red and skip test-staging below. A definitive check needs
+            # the FPM binary directly (`php-fpm8.4 -m`/`-i`), which needs the
+            # owner to confirm the binary name and path first.
             php -r '
               $missing = [];
               if (!extension_loaded("maxminddb")) { $missing[] = "php-maxminddb (10k-IP lookups fall back to ~3.5s instead of ~0.2-0.5s)"; }
-              if (!filter_var(ini_get("opcache.enable"), FILTER_VALIDATE_BOOLEAN)) { $missing[] = "OPcache"; }
-              if ($missing) { fwrite(STDERR, "Missing/disabled: " . implode(", ", $missing) . "\n"); exit(1); }
-              echo "php-maxminddb and OPcache are loaded\n";
+              if (!filter_var(ini_get("opcache.enable"), FILTER_VALIDATE_BOOLEAN)) { $missing[] = "OPcache (opcache.enable)"; }
+              if ($missing) {
+                echo "::warning::CLI PHP proxy check found missing/disabled: " . implode(", ", $missing) . ". This checks the CLI SAPI, not FPM — verify against the FPM binary before treating this as confirmed.\n";
+              } else {
+                echo "CLI PHP proxy check: php-maxminddb and OPcache appear loaded (informational only; does not confirm FPM state)\n";
+              }
             '
 
   test-staging:
@@ -257,12 +269,24 @@ jobs:
             # slower (a 10k-IP lookup takes ~3.5s instead of ~0.2-0.5s without
             # php-maxminddb), so the HTTP-level smoke checks below would not
             # reliably catch either being absent.
+            # This runs against the CLI SAPI over SSH, which is only a proxy for
+            # the FPM/web SAPI that actually serves requests: a CLI-only
+            # extension gap wouldn't show here, and CLI's opcache.enable is
+            # unrelated to opcache.enable_cli, so it doesn't reflect FPM state
+            # either way. It is therefore a warning annotation, not a failing
+            # check — failing here on a false mismatch would turn this deploy
+            # step red and skip the smoke checks below. A definitive check needs
+            # the FPM binary directly (`php-fpm8.4 -m`/`-i`), which needs the
+            # owner to confirm the binary name and path first.
             php -r '
               $missing = [];
               if (!extension_loaded("maxminddb")) { $missing[] = "php-maxminddb (10k-IP lookups fall back to ~3.5s instead of ~0.2-0.5s)"; }
-              if (!filter_var(ini_get("opcache.enable"), FILTER_VALIDATE_BOOLEAN)) { $missing[] = "OPcache"; }
-              if ($missing) { fwrite(STDERR, "Missing/disabled: " . implode(", ", $missing) . "\n"); exit(1); }
-              echo "php-maxminddb and OPcache are loaded\n";
+              if (!filter_var(ini_get("opcache.enable"), FILTER_VALIDATE_BOOLEAN)) { $missing[] = "OPcache (opcache.enable)"; }
+              if ($missing) {
+                echo "::warning::CLI PHP proxy check found missing/disabled: " . implode(", ", $missing) . ". This checks the CLI SAPI, not FPM — verify against the FPM binary before treating this as confirmed.\n";
+              } else {
+                echo "CLI PHP proxy check: php-maxminddb and OPcache appear loaded (informational only; does not confirm FPM state)\n";
+              }
             '
 
       - name: Smoke test — production origin returns HTTP 200
