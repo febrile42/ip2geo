@@ -52,7 +52,7 @@ cp tests/fixtures/mmdb/GeoLite2-ASN-Test.mmdb data/geoip/GeoLite2-ASN.mmdb
 
 ### Database
 
-v5 needs no database. The tables below belong to the retired Community Block List and are kept for now; `scripts/migrate-community.sql` created them:
+v5 needs no database. The tables below belong to the retired Community Block List and are kept for now; the now-removed `scripts/migrate-community.sql` created them (see git history):
 
 | Table | Contents |
 |-------|----------|

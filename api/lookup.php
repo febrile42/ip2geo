@@ -27,7 +27,7 @@
  *          │                                                       (never logs the body;
  *          │                                                        error_log gets counts only)
  *          ▼
- *   classify_asn() + ip_in_spamhaus_drop() (IPv4 only; v6 rows get drop=false)
+ *   classify_asn() + ip2geo_ip_in_spamhaus_drop() (IPv4 only; v6 rows get drop=false)
  *          │
  *          ▼
  *   200  {"results": [{ip, country_iso_code, country_name, subdivision_1_name,
@@ -43,7 +43,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../includes/lookup.php';
 require_once __DIR__ . '/../asn_classification.php';
-require_once __DIR__ . '/../report_functions.php'; // ip_in_spamhaus_drop()
+require_once __DIR__ . '/../report_functions.php'; // ip2geo_ip_in_spamhaus_drop()
 require_once __DIR__ . '/../includes/client-ip.php';  // lookup_endpoint_client_ip()
 require_once __DIR__ . '/../includes/rate-limit.php'; // default_lookup_rate_limiter(), cost budget per IP
 
@@ -53,22 +53,6 @@ if (!defined('LOOKUP_MAX_UNIQUE_IPS')) {
 }
 if (!defined('LOOKUP_MAX_BODY_BYTES')) {
     define('LOOKUP_MAX_BODY_BYTES', 2 * 1024 * 1024); // 2 MB
-}
-
-/**
- * Convert an IPv4 string to its unsigned 32-bit int form for
- * ip_in_spamhaus_drop(), which is IPv4-only. Mirrors index.php's ipToLong()
- * (kept local here since we don't require index.php — that would execute
- * the whole HTML page). Returns null for IPv6 or unparseable input, which
- * callers must treat as "not in DROP" (drop = false), per R4's scope note.
- */
-function lookup_endpoint_ip4_to_uint(string $ip): ?int
-{
-    $long = ip2long($ip);
-    if ($long === false) {
-        return null;
-    }
-    return (int)sprintf('%u', $long);
 }
 
 function lookup_endpoint_json_error(int $status, string $message, array $extraHeaders = []): array
@@ -131,6 +115,7 @@ function handle_lookup_request(array $server, string $body, callable $lookup, ?c
         }
         $rawIps[$ip] = true;
     }
+    unset($data);
     $rawIps = array_keys($rawIps);
 
     if (count($rawIps) > LOOKUP_MAX_UNIQUE_IPS) {
@@ -189,12 +174,18 @@ function handle_lookup_request(array $server, string $body, callable $lookup, ?c
         ];
         $asnNum  = (string)($fields['autonomous_system_number'] ?? '');
         $asnOrg  = (string)($fields['autonomous_system_org'] ?? '');
-        $ip4Uint = lookup_endpoint_ip4_to_uint($ip);
 
-        $results[] = array_merge(['ip' => $ip], $fields, [
-            'category' => classify_asn($asnNum, $asnOrg),
-            'drop'     => $ip4Uint !== null && ip_in_spamhaus_drop($ip4Uint),
-        ]);
+        $results[] = [
+            'ip'                        => $ip,
+            'country_iso_code'          => $fields['country_iso_code'],
+            'country_name'              => $fields['country_name'],
+            'subdivision_1_name'        => $fields['subdivision_1_name'],
+            'city_name'                 => $fields['city_name'],
+            'autonomous_system_number'  => $fields['autonomous_system_number'],
+            'autonomous_system_org'     => $fields['autonomous_system_org'],
+            'category'                  => classify_asn($asnNum, $asnOrg),
+            'drop'                      => ip2geo_ip_in_spamhaus_drop($ip),
+        ];
     }
 
     return [

@@ -89,7 +89,7 @@ function shownRows() {
 
 describe('R14 characterization: today\'s chip behavior', () => {
     // ip2geo-app.js wires its filter logic via document-level delegated
-    // listeners (addEventListener('click', ...) etc.) and a MutationObserver,
+    // listeners (addEventListener('click', ...), addEventListener('change', ...)),
     // all attached once at require-time. Re-requiring it per test (even with
     // jest.resetModules) stacks a fresh set of listeners onto the same jsdom
     // `document` each time, so every later click fires N handlers at once —
@@ -104,6 +104,16 @@ describe('R14 characterization: today\'s chip behavior', () => {
 
     beforeEach(() => {
         buildDom();
+        // A real page load runs applyFilters() once at require-time (see the
+        // bottom of ip2geo-app.js), which the module above already did
+        // against the beforeAll() DOM. Every later buildDom() here swaps in
+        // a fresh #results without re-requiring the module (see above), so
+        // this dispatches a real 'change' event ip2geo-app.js's delegated
+        // listener already reacts to — same effect as a fresh page load,
+        // without toggling any actual filter state. (Production used to get
+        // this for free from a MutationObserver watching for a retired AJAX
+        // #results replace, removed in IPG-210.)
+        countryChip('US').dispatchEvent(new Event('change', { bubbles: true }));
         window.umami = { track: jest.fn() };
     });
 

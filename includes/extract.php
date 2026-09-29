@@ -37,6 +37,11 @@ declare(strict_types=1);
 
 const EXTRACT_IPS_CAP = 10000;
 
+// Strict dotted-quad IPv4 regex, shared with index.php's
+// extract_raw_ip_candidates() (which needs the same matches, but keeping
+// private hits instead of dropping them — see that function's docblock).
+const EXTRACT_IPS_V4_REGEX = "/\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b/";
+
 /**
  * IPv4 private/local test — identical to today's test_local() in index.php.
  * (Its regex also carries a dead `|::1$` alternative that can never match a
@@ -141,42 +146,62 @@ function extract_ips_validate_v6_candidate(string $token): ?string
 function extract_ips(string $text): array
 {
     // Step 1a: IPv4 — unchanged regex from index.php:214.
-    preg_match_all(
-        "/\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b/",
-        $text,
-        $v4_matches,
-        PREG_OFFSET_CAPTURE
-    );
+    preg_match_all(EXTRACT_IPS_V4_REGEX, $text, $v4_matches, PREG_OFFSET_CAPTURE);
 
     // Step 1b: IPv6 — linear candidate scan (two-step: find, then validate).
-    preg_match_all('/[0-9A-Fa-f:.]+/', $text, $v6_candidates, PREG_OFFSET_CAPTURE);
+    //
+    // The class-run is split around a mandatory literal ':' instead of
+    // reusing one [0-9A-Fa-f:.]+ class for the whole run: a run with no
+    // colon at all (plain hex/decimal noise, which dominates real logs) is
+    // rejected without ever being added to the match array, instead of
+    // being captured and then discarded via strpos() as before. The
+    // negative lookbehind anchors every attempt to a true run start, and
+    // the possessive quantifiers forbid backtracking within an attempt, so
+    // a long colonless run (e.g. a pasted hash) is still only walked once,
+    // not re-attempted from every offset inside it — see the file header
+    // for the fixture that specifically stresses this.
+    preg_match_all('/(?<![0-9A-Fa-f:.])[0-9A-Fa-f.]*+:[0-9A-Fa-f:.]*+/', $text, $v6_candidates, PREG_OFFSET_CAPTURE);
 
-    // Merge both passes into one (offset, type, ip) stream so the combined
-    // map preserves true first-seen order across v4 and v6.
-    $hits = [];
-    foreach ($v4_matches[0] as [$ip, $offset]) {
-        $hits[] = [$offset, 'v4', $ip];
-    }
+    $v4_hits = $v4_matches[0];
+    $v6_hits = [];
     foreach ($v6_candidates[0] as [$token, $offset]) {
-        // A candidate must contain a colon to be an IPv6 literal at all;
-        // skip the cheap rejects before the strict validation call.
-        if (strpos($token, ':') === false) {
-            continue;
-        }
         $normalized = extract_ips_validate_v6_candidate($token);
         if ($normalized === null) {
             continue;
         }
-        $hits[] = [$offset, 'v6', $normalized];
+        $v6_hits[] = [$offset, $normalized];
     }
 
-    usort($hits, static fn(array $a, array $b): int => $a[0] <=> $b[0]);
+    // Merge the two offset-ordered hit lists linearly instead of
+    // concatenating and usort()-ing them.
+    $hits = [];
+    $v4_len = count($v4_hits);
+    $v6_len = count($v6_hits);
+    $i = 0;
+    $j = 0;
+    while ($i < $v4_len && $j < $v6_len) {
+        if ($v4_hits[$i][1] <= $v6_hits[$j][0]) {
+            $hits[] = ['v4', $v4_hits[$i][0]];
+            $i++;
+        } else {
+            $hits[] = ['v6', $v6_hits[$j][1]];
+            $j++;
+        }
+    }
+    while ($i < $v4_len) {
+        $hits[] = ['v4', $v4_hits[$i][0]];
+        $i++;
+    }
+    while ($j < $v6_len) {
+        $hits[] = ['v6', $v6_hits[$j][1]];
+        $j++;
+    }
 
     // Raw, uncapped, unfiltered counts — first-seen order preserved by
     // insertion order (matches array_count_values semantics).
     $raw_freq = [];
     $raw_type = [];
-    foreach ($hits as [, $type, $ip]) {
+    foreach ($hits as [$type, $ip]) {
         if (!isset($raw_freq[$ip])) {
             $raw_freq[$ip] = 0;
             $raw_type[$ip] = $type;
@@ -184,23 +209,17 @@ function extract_ips(string $text): array
         $raw_freq[$ip]++;
     }
 
-    // total_unique: unique PUBLIC ips (v4+v6) before the cap.
-    $total_unique = 0;
-    foreach ($raw_freq as $ip => $count) {
-        $is_private = $raw_type[$ip] === 'v4'
-            ? extract_ips_is_private_v4($ip)
-            : extract_ips_is_private_v6($ip);
-        if (!$is_private) {
-            $total_unique++;
-        }
-    }
-
     // Cap first (today's order), then filter private — see file header.
     $capped = array_slice($raw_freq, 0, EXTRACT_IPS_CAP, true);
 
+    // Single pass over every raw (uncapped) unique IP: the private check
+    // runs once per IP here, feeding both total_unique (all public ips)
+    // and the capped+public $ips result (a subset of the same iteration),
+    // instead of running the check again in a second loop over $capped.
+    $total_unique = 0;
     $ips = [];
     $v6_count = 0;
-    foreach ($capped as $ip => $count) {
+    foreach ($raw_freq as $ip => $count) {
         $type = $raw_type[$ip];
         $is_private = $type === 'v4'
             ? extract_ips_is_private_v4($ip)
@@ -208,9 +227,12 @@ function extract_ips(string $text): array
         if ($is_private) {
             continue;
         }
-        $ips[$ip] = $count;
-        if ($type === 'v6') {
-            $v6_count++;
+        $total_unique++;
+        if (isset($capped[$ip])) {
+            $ips[$ip] = $count;
+            if ($type === 'v6') {
+                $v6_count++;
+            }
         }
     }
 

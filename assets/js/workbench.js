@@ -75,6 +75,17 @@
     return e;
   }
 
+  // B5: same count as rawText.split('\n').length (including the trailing
+  // empty segment a trailing newline produces) but without allocating an
+  // array of every line's text just to read its .length.
+  function countLines(text) {
+    var n = 1;
+    for (var i = 0; i < text.length; i++) {
+      if (text.charCodeAt(i) === 10) n++; // '\n'
+    }
+    return n;
+  }
+
   function formatLookupTime(ms) {
     var r = Math.round(ms);
     if (r < 1) return '<1 ms';
@@ -94,6 +105,19 @@
     // Mirrors index.php's ipv6_middle_truncate(): "2001:db8::7334" -> "2001:db8…:7334".
     if (ip.length <= 15) return ip;
     return ip.slice(0, 8) + '…:' + ip.slice(-4);
+  }
+
+  // B4: a cheap pre-check so a huge visible set skips the full pack+base64
+  // encode in Share.buildShareLink(). 5 bytes/IP (1 type byte + 4 IPv4
+  // address bytes) is the smallest any IP can encode to — IPv6 costs more
+  // (17 bytes) and the filters JSON adds more still — so this is always <=
+  // the real encoded size. If even this lower bound is over the cap, the
+  // real encode is guaranteed to be over cap too.
+  var SHARE_MIN_BYTES_PER_IP = 5;
+  function shareLinkGuaranteedOverCap(ipCount) {
+    var minBytes = 1 + 4 + ipCount * SHARE_MIN_BYTES_PER_IP; // version + count + IPs
+    var minChars = Math.floor(minBytes * 4 / 3); // base64url, ignoring padding removal (only shrinks it further)
+    return minChars > Share.URL_CAP_CHARS;
   }
 
   function catColor(category) {
@@ -255,26 +279,31 @@
 
     var menu = el('div', { class: 'wb-menu', role: 'menu', 'aria-labelledby': 'wb-export-btn', hidden: 'hidden' });
 
+    // B1: exportLabel() builds the full export text and UTF-8 encodes it just
+    // to report a byte size — for all 7 formats. Only the plain format name
+    // (FORMAT_META, no build/encode) is needed until the menu is actually
+    // opened, so defer the expensive call to computeLabels() below.
+    var menuItems = []; // {format, labelSpan, itemEl}
+
     EXPORT_GROUPS.forEach(function (group) {
       var groupEl = el('div', { class: 'wb-menu-group', role: 'group', 'aria-labelledby': group.id }, [
         el('div', { class: 'wb-menu-group-label', id: group.id, role: 'presentation' }, [group.label])
       ]);
       group.formats.forEach(function (format) {
-        var info = Exp.exportLabel(format, visibleRows);
+        var meta = Exp.FORMAT_META[format] || { label: format };
+        var labelSpan = el('span', {}, [meta.label]);
         var item = el('button', {
           class: 'wb-menu-item',
           type: 'button',
           role: 'menuitem',
           tabindex: '-1'
-        }, [
-          el('span', {}, [info.label]),
-          info.over64kNote ? el('span', { class: 'wb-menu-note' }, ['over the 64 KB alert-rule limit']) : null
-        ]);
+        }, [labelSpan]);
         item.addEventListener('click', function () {
           copyExport(root, format, visibleRows);
           closeMenu();
         });
         groupEl.appendChild(item);
+        menuItems.push({ format: format, labelSpan: labelSpan, itemEl: item });
       });
       menu.appendChild(groupEl);
     });
@@ -282,9 +311,23 @@
     wrap.appendChild(btn);
     wrap.appendChild(menu);
 
+    var labelsComputed = false;
+    function computeLabels() {
+      if (labelsComputed) return;
+      labelsComputed = true;
+      menuItems.forEach(function (mi) {
+        var info = Exp.exportLabel(mi.format, visibleRows);
+        mi.labelSpan.textContent = info.label;
+        if (info.over64kNote) {
+          mi.itemEl.appendChild(el('span', { class: 'wb-menu-note' }, ['over the 64 KB alert-rule limit']));
+        }
+      });
+    }
+
     function items() { return Array.from(menu.querySelectorAll('.wb-menu-item')); }
 
     function openMenu() {
+      computeLabels();
       menu.hidden = false;
       btn.setAttribute('aria-expanded', 'true');
       var first = items()[0];
@@ -542,12 +585,14 @@
     };
 
     var shareBtn = root.querySelector('.wb-share-btn');
-    var shareResult = Share.buildShareLink({
-      ips: visible.map(function (r) { return r.ip; }),
-      categories: Array.from(state.filters.categories),
-      countries: Array.from(state.filters.countries),
-      search: state.filters.search
-    });
+    var shareResult = shareLinkGuaranteedOverCap(visible.length)
+      ? { payload: null, chars: 0, overCap: true, cap: Share.URL_CAP_CHARS }
+      : Share.buildShareLink({
+          ips: visible.map(function (r) { return r.ip; }),
+          categories: Array.from(state.filters.categories),
+          countries: Array.from(state.filters.countries),
+          search: state.filters.search
+        });
     shareBtn.classList.toggle('wb-share-btn--disabled', shareResult.overCap);
     if (shareResult.overCap) {
       shareBtn.textContent = Share.overCapLabel(visible.length);
@@ -755,7 +800,7 @@
       }
 
       var extracted = window.extractIps(rawText);
-      var lines = rawText.split('\n').length;
+      var lines = countLines(rawText);
 
       if (extracted.ips.length === 0) {
         root.hidden = false;
@@ -846,6 +891,13 @@
 
     var state = makeState();
     state.recipient = { count: decoded.ips.length, categories: decoded.categories, countries: decoded.countries };
+    // B3: set the shared filters before the lookup runs, so runLookup's own
+    // renderAll() (on success) already reflects them — no second render pass.
+    state.filters = {
+      categories: new Set(decoded.categories),
+      countries: new Set(decoded.countries),
+      search: decoded.search || ''
+    };
     root.hidden = false;
 
     if (onRestoreBanner) {
@@ -856,19 +908,7 @@
           : ''));
     }
 
-    return runLookup(root, state, decoded.ips, hitCounts, meta).then(function (ok) {
-      if (ok) {
-        state.filters = {
-          categories: new Set(decoded.categories),
-          countries: new Set(decoded.countries),
-          search: decoded.search || ''
-        };
-        renderSummary(root, state);
-        renderUnresolved(root, state);
-        renderAll(root, state);
-      }
-      return ok;
-    });
+    return runLookup(root, state, decoded.ips, hitCounts, meta);
   }
 
   // ── public API (also what Jest reaches through the UMD export) ─────────

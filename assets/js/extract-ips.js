@@ -32,7 +32,14 @@
   var EXTRACT_IPS_CAP = 10000;
 
   var IPV4_RE = /\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b/g;
-  var V6_CANDIDATE_RE = /[0-9A-Fa-f:.]+/g;
+  // Anchored to a true run start (negative lookbehind) with a mandatory
+  // literal ':' splitting the class in two, mirroring includes/extract.php:
+  // a colonless run (plain hex/decimal noise, which dominates real logs)
+  // is never matched at all instead of being captured then discarded via
+  // indexOf(':'). JS has no possessive quantifier, but the split classes
+  // make backtracking unnecessary: the ':'-free prefix class can only stop
+  // where the colon (or run end) is, so there's nothing to backtrack into.
+  var V6_CANDIDATE_RE = /(?<![0-9A-Fa-f:.])[0-9A-Fa-f.]*:[0-9A-Fa-f:.]*/g;
   var HEX_GROUP_RE = /^[0-9A-Fa-f]{1,4}$/;
   var PRIVATE_V4_RE = /^(127\.|192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.|::1$)/;
 
@@ -216,28 +223,36 @@
    * filter), then with private/local addresses dropped.
    */
   function extractIps(text) {
-    var hits = []; // [offset, type, ip]
-
+    var v4Hits = []; // [offset, type, ip]
     var m;
     IPV4_RE.lastIndex = 0;
     while ((m = IPV4_RE.exec(text)) !== null) {
-      hits.push([m.index, 'v4', m[0]]);
+      v4Hits.push([m.index, 'v4', m[0]]);
       if (m[0].length === 0) IPV4_RE.lastIndex++; // guard against zero-length loops
     }
 
+    var v6Hits = []; // [offset, type, ip]
     V6_CANDIDATE_RE.lastIndex = 0;
     while ((m = V6_CANDIDATE_RE.exec(text)) !== null) {
-      var token = m[0];
-      if (token.indexOf(':') !== -1) {
-        var normalized = validateV6Candidate(token);
-        if (normalized !== null) {
-          hits.push([m.index, 'v6', normalized]);
-        }
+      var normalized = validateV6Candidate(m[0]);
+      if (normalized !== null) {
+        v6Hits.push([m.index, 'v6', normalized]);
       }
-      if (m[0].length === 0) V6_CANDIDATE_RE.lastIndex++;
     }
 
-    hits.sort(function (a, b) { return a[0] - b[0]; });
+    // Linear merge: both lists are already offset-ordered.
+    var hits = [];
+    var vi = 0;
+    var wi = 0;
+    while (vi < v4Hits.length && wi < v6Hits.length) {
+      if (v4Hits[vi][0] <= v6Hits[wi][0]) {
+        hits.push(v4Hits[vi++]);
+      } else {
+        hits.push(v6Hits[wi++]);
+      }
+    }
+    while (vi < v4Hits.length) hits.push(v4Hits[vi++]);
+    while (wi < v6Hits.length) hits.push(v6Hits[wi++]);
 
     var rawFreq = Object.create(null);
     var rawType = Object.create(null);
@@ -253,10 +268,15 @@
       rawFreq[ip]++;
     }
 
+    // `order` is already de-duplicated, so each unique IP's private/reserved
+    // check runs once here; cache it so the capped output loop below reuses
+    // the result instead of re-running isPrivateV4/isPrivateV6.
+    var privacyCache = Object.create(null);
     var totalUnique = 0;
     for (var k = 0; k < order.length; k++) {
       var ipk = order[k];
       var isPriv = rawType[ipk] === 'v4' ? isPrivateV4(ipk) : isPrivateV6(ipk);
+      privacyCache[ipk] = isPriv;
       if (!isPriv) totalUnique++;
     }
 
@@ -267,8 +287,7 @@
     for (var c = 0; c < cappedOrder.length; c++) {
       var cip = cappedOrder[c];
       var ctype = rawType[cip];
-      var priv = ctype === 'v4' ? isPrivateV4(cip) : isPrivateV6(cip);
-      if (priv) continue;
+      if (privacyCache[cip]) continue;
       ips.push([cip, rawFreq[cip]]);
       if (ctype === 'v6') v6Count++;
     }
