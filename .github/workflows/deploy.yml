@@ -97,6 +97,18 @@ jobs:
             printf "User-agent: *\nDisallow: /\n" > robots.txt
             # .mmdb lookup data (v5): only downloads when missing or >35 days old
             if [ -f scripts/fetch-mmdb.sh ]; then bash scripts/fetch-mmdb.sh "$PWD"; fi
+            # php-maxminddb and OPcache (IPG-209): both are silent, non-fatal
+            # regressions if missing — lookups still return 200, just ~7-17x
+            # slower (a 10k-IP lookup takes ~3.5s instead of ~0.2-0.5s without
+            # php-maxminddb), so the HTTP-level smoke/performance checks in
+            # test-staging below would not reliably catch either being absent.
+            php -r '
+              $missing = [];
+              if (!extension_loaded("maxminddb")) { $missing[] = "php-maxminddb (10k-IP lookups fall back to ~3.5s instead of ~0.2-0.5s)"; }
+              if (!filter_var(ini_get("opcache.enable"), FILTER_VALIDATE_BOOLEAN)) { $missing[] = "OPcache"; }
+              if ($missing) { fwrite(STDERR, "Missing/disabled: " . implode(", ", $missing) . "\n"); exit(1); }
+              echo "php-maxminddb and OPcache are loaded\n";
+            '
 
   test-staging:
     name: Test Staging
@@ -240,6 +252,18 @@ jobs:
             ~/bin/composer install --no-dev --no-interaction --quiet
             # .mmdb lookup data (v5): only downloads when missing or >35 days old
             if [ -f scripts/fetch-mmdb.sh ]; then bash scripts/fetch-mmdb.sh "$PWD"; fi
+            # php-maxminddb and OPcache (IPG-209): both are silent, non-fatal
+            # regressions if missing — lookups still return 200, just ~7-17x
+            # slower (a 10k-IP lookup takes ~3.5s instead of ~0.2-0.5s without
+            # php-maxminddb), so the HTTP-level smoke checks below would not
+            # reliably catch either being absent.
+            php -r '
+              $missing = [];
+              if (!extension_loaded("maxminddb")) { $missing[] = "php-maxminddb (10k-IP lookups fall back to ~3.5s instead of ~0.2-0.5s)"; }
+              if (!filter_var(ini_get("opcache.enable"), FILTER_VALIDATE_BOOLEAN)) { $missing[] = "OPcache"; }
+              if ($missing) { fwrite(STDERR, "Missing/disabled: " . implode(", ", $missing) . "\n"); exit(1); }
+              echo "php-maxminddb and OPcache are loaded\n";
+            '
 
       - name: Smoke test — production origin returns HTTP 200
         run: |
