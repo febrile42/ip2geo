@@ -87,9 +87,9 @@ $known_asns = [
     // move it OUT of this block into the appropriate manual section above.
     // Copyright: (c) 2026 The Spamhaus Project SLU
     // Terms: https://www.spamhaus.org/drop/terms/
-    // Feed timestamp: 1790522042 (2026-09-27T15:14:02Z)
+    // Feed timestamp: 1790846042 (2026-10-01T09:14:02Z)
     // Spamhaus data, not covered by this repository's license; see NOTICE.
-    // Last sync: 2026-09-27
+    // Last sync: 2026-10-01
     'AS245' => 'scanning',
     'AS2601' => 'scanning',
     'AS2702' => 'scanning',
@@ -423,7 +423,6 @@ $known_asns = [
     'AS211238' => 'scanning',
     'AS211663' => 'scanning',
     'AS211720' => 'scanning',
-    'AS211736' => 'scanning',
     'AS211762' => 'scanning',
     'AS211860' => 'scanning',
     'AS211922' => 'scanning',
@@ -468,7 +467,6 @@ $known_asns = [
     'AS215376' => 'scanning',
     'AS215402' => 'scanning',
     'AS215460' => 'scanning',
-    'AS215462' => 'scanning',
     'AS215474' => 'scanning',
     'AS215730' => 'scanning',
     'AS215731' => 'scanning',
