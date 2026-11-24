@@ -154,6 +154,44 @@
     });
   }
 
+  // ── "Countries to exclude" (the form field) ──────────────────────────
+
+  /**
+   * Parses the form's "Countries to exclude" text the same way index.php's
+   * no-JS path does: whitespace-separated, upper-cased, and only exact
+   * 2-letter codes kept (anything else never matches a row there either).
+   * Duplicates are dropped so the notice lists each code once.
+   */
+  function parseExcludeCountries(text) {
+    var seen = {};
+    return String(text == null ? '' : text).split(/\s+/)
+      .map(function (c) { return c.trim().toUpperCase(); })
+      .filter(function (c) {
+        if (!/^[A-Z]{2}$/.test(c) || seen[c]) return false;
+        seen[c] = true;
+        return true;
+      });
+  }
+
+  /**
+   * Drops rows whose country is in codes, before anything renders, exports
+   * or shares them — matching the no-JS path, where excluded IPs never reach
+   * the table, the summary line or the CSV. Rows with no country are kept
+   * (they can't match a code). Returns {rows, excluded}.
+   */
+  function applyCountryExclusion(rows, codes) {
+    if (!codes || !codes.length) return { rows: rows, excluded: 0 };
+    var drop = {};
+    codes.forEach(function (c) { drop[c] = true; });
+    var kept = rows.filter(function (r) { return !(r.country && drop[r.country]); });
+    return { rows: kept, excluded: rows.length - kept.length };
+  }
+
+  function excludedNoticeText(excluded, codes) {
+    return excluded.toLocaleString('en-US') + ' IP' + (excluded === 1 ? '' : 's') +
+      ' excluded by country filter (' + codes.join(' ') + ').';
+  }
+
   // ── state ────────────────────────────────────────────────────────────
 
   function makeState() {
@@ -674,6 +712,16 @@
       var notice = el('p', { class: 'notice wb-overcap', role: 'status' }, [m.overCapNotice]);
       bar.parentNode.insertBefore(notice, bar.nextSibling);
     }
+
+    // Country-exclusion notice, same stale-drop rule as the over-cap one.
+    var existingExcluded = root.querySelector('.wb-excluded');
+    if (existingExcluded) existingExcluded.remove();
+    if (m.excludeCountries && m.excludeCountries.length) {
+      var excludedNotice = el('p', { class: 'notice wb-excluded', role: 'status' },
+        [excludedNoticeText(m.excludedCount || 0, m.excludeCountries)]);
+      var anchor = root.querySelector('.wb-overcap') || bar;
+      anchor.parentNode.insertBefore(excludedNotice, anchor.nextSibling);
+    }
   }
 
   // ── D6 lookup states, rendered into the results slot, never alert() ────
@@ -739,7 +787,14 @@
         });
       }
       return resp.json().then(function (data) {
-        state.rows = buildRows(data.results || [], hitCounts);
+        // "Countries to exclude" (meta.excludeCountries, set by startLookup
+        // from the form field) is applied here, before rows reach state, so
+        // the table, chips, summary, exports and share links all agree with
+        // the no-JS path. v5.0.0-5.0.1 skipped this and silently ignored the
+        // field for every JS visitor.
+        var excl = applyCountryExclusion(buildRows(data.results || [], hitCounts), meta.excludeCountries);
+        state.rows = excl.rows;
+        meta.excludedCount = excl.excluded;
         state.unresolved = data.unresolved || [];
         // A share-link recipient doesn't see the timer (IPG-96): their
         // re-lookup time says nothing about the sender's paste.
@@ -821,7 +876,11 @@
       var v6 = extracted.v6Count;
       var v4 = uniqueIps.length - v6;
       var overCap = extracted.totalUnique > uniqueIps.length;
-      var meta = { lines: lines, v4: v4, v6: v6, overCap: overCap, lookupMs: null, rawText: rawText };
+      var excludeField = form.elements && form.elements.countries_filter;
+      var meta = {
+        lines: lines, v4: v4, v6: v6, overCap: overCap, lookupMs: null, rawText: rawText,
+        excludeCountries: parseExcludeCountries(excludeField ? excludeField.value : '')
+      };
       if (overCap) {
         var skipped = extracted.totalUnique - uniqueIps.length;
         meta.overCapNotice = 'Looked up the first ' + uniqueIps.length.toLocaleString('en-US') + ' of ' +
@@ -915,6 +974,8 @@
 
   return {
     buildRows: buildRows,
+    parseExcludeCountries: parseExcludeCountries,
+    applyCountryExclusion: applyCountryExclusion,
     makeState: makeState,
     renderAll: renderAll,
     renderSummary: renderSummary,
