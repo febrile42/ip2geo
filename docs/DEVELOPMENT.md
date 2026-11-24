@@ -108,6 +108,7 @@ npx playwright test                              # browser specs; starts php -S 
 | `tests/js/*.test.js` | Filters, exports, share links, summary, workbench rendering, DROP popover, Recent lookups |
 | `tests/e2e/privacy.spec.js` | No paste text in any request; IPs only in the `/api/lookup.php` body; no `#v=` content in analytics |
 | `tests/e2e/a11y.spec.js` | axe scan of the results page and workbench (fails on serious or critical issues) |
+| `tests/js/country-exclude.test.js`, `tests/e2e/country-exclude.spec.js` | "Countries to exclude" through the real submit path; the same paste must show the same IPs with and without JS (5.0.2 regression) |
 | `tests/e2e/drop-tap.spec.js` | On phones: tap a DROP label for the explanation; the IP column stays pinned while scrolling sideways |
 
 ### CI/CD Pipeline

@@ -10,6 +10,9 @@ render_page_open('Changelog — ip2geo.org', 'Release notes for ip2geo.org.');
         </div>
 
         <div class="prose">
+            <h3>5.0.2 — 2026-11-24</h3>
+            <p>Squashed a filtering bug.</p>
+
             <h3>5.0.1 — 2026-09-29</h3>
             <p>Faster lookups on large pastes. Minor UI fix.</p>
 
