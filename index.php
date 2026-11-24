@@ -154,13 +154,15 @@ function render_lookup_results(array $post, string $visitor_ip = '', ?string $ci
             . ' skipped. Paste the rest separately to check them.</p>';
     }
 
-    // Country exclude filter — sanitized 2-letter codes. The DB whitelist
+    // Country exclude filter — sanitized 2-letter codes, separated by any mix
+    // of whitespace, commas, semicolons or pipes (keep in step with
+    // parseExcludeCountries() in assets/js/workbench.js). The DB whitelist
     // query this used to validate against is gone with MySQL; an unknown
     // code simply never matches any row, same net effect.
     $good_countries = array_values(array_filter(
         array_map(
             static fn(string $c): string => strtoupper(trim($c)),
-            preg_split('/\s+/', (string) ($post['countries_filter'] ?? ''), -1, PREG_SPLIT_NO_EMPTY) ?: []
+            preg_split('/[\s,;|]+/', (string) ($post['countries_filter'] ?? ''), -1, PREG_SPLIT_NO_EMPTY) ?: []
         ),
         static fn(string $c): bool => (bool) preg_match('/^[A-Z]{2}$/', $c)
     ));
@@ -555,7 +557,7 @@ if (isset($_POST['ip_list'])) {
 							<div class="field">
 								<label for="countries_filter">Countries to exclude</label>
 								<input type="text" id="countries_filter" name="countries_filter" placeholder="e.g. US CA GB" value="<?php if (isset($_POST['countries_filter'])) { echo htmlspecialchars(strtoupper($_POST['countries_filter']), ENT_QUOTES, 'UTF-8'); } ?>" />
-								<div class="field-hint"><a href="https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2" target="_blank" rel="noopener noreferrer">2-letter ISO codes</a> separated by spaces. Use to filter out non-suspicious IPs.</div>
+								<div class="field-hint"><a href="https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2" target="_blank" rel="noopener noreferrer">2-letter ISO codes</a> separated by spaces or commas. Use to filter out non-suspicious IPs.</div>
 							</div>
 
 							<div class="actions">
