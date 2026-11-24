@@ -10,6 +10,9 @@ render_page_open('Changelog — ip2geo.org', 'Release notes for ip2geo.org.');
         </div>
 
         <div class="prose">
+            <h3>5.0.3 — 2026-11-24</h3>
+            <p>Country codes can now be separated a few different ways without breaking the filtering.</p>
+
             <h3>5.0.2 — 2026-11-24</h3>
             <p>Squashed a filtering bug.</p>
 

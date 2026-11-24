@@ -25,6 +25,9 @@ const CASES = [
   { exclude: 'gb', expected: ['175.16.199.0', '2001:218::1', '216.160.83.56', '89.160.20.112'], excluded: 2 },
   { exclude: 'US CN jp', expected: ['2.125.160.216', '81.2.69.142', '89.160.20.112'], excluded: 3 },
   { exclude: 'ZZ', expected: ['175.16.199.0', '2.125.160.216', '2001:218::1', '216.160.83.56', '81.2.69.142', '89.160.20.112'], excluded: 0 },
+  // 5.0.3: other separators, which must behave identically on both paths
+  { exclude: 'GB,JP', expected: ['175.16.199.0', '216.160.83.56', '89.160.20.112'], excluded: 3 },
+  { exclude: 'us, cn; se', expected: ['2.125.160.216', '2001:218::1', '81.2.69.142'], excluded: 3 },
 ];
 
 async function jsPath(page, exclude) {
@@ -59,7 +62,11 @@ for (const c of CASES) {
     const nojs = await noJsPath(browser, c.exclude);
     expect(nojs).toEqual(c.expected);
     expect(js.ips).toEqual(c.expected);
-    expect(js.notice).toContain(`${c.excluded} IP${c.excluded === 1 ? '' : 's'} excluded by country filter`);
+    if (c.excluded === 0) {
+      expect(js.notice).toBe(''); // nothing matched: no "0 IPs excluded" notice
+    } else {
+      expect(js.notice).toContain(`${c.excluded} IP${c.excluded === 1 ? '' : 's'} excluded by country filter`);
+    }
   });
 }
 

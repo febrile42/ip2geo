@@ -158,13 +158,14 @@
 
   /**
    * Parses the form's "Countries to exclude" text the same way index.php's
-   * no-JS path does: whitespace-separated, upper-cased, and only exact
+   * no-JS path does: separated by any mix of whitespace, commas, semicolons
+   * or pipes, upper-cased, and only exact
    * 2-letter codes kept (anything else never matches a row there either).
    * Duplicates are dropped so the notice lists each code once.
    */
   function parseExcludeCountries(text) {
     var seen = {};
-    return String(text == null ? '' : text).split(/\s+/)
+    return String(text == null ? '' : text).split(/[\s,;|]+/)
       .map(function (c) { return c.trim().toUpperCase(); })
       .filter(function (c) {
         if (!/^[A-Z]{2}$/.test(c) || seen[c]) return false;
@@ -714,9 +715,11 @@
     }
 
     // Country-exclusion notice, same stale-drop rule as the over-cap one.
+    // Only shown when something was actually excluded: a field holding only
+    // codes that matched nothing ("ZZ") would otherwise read "0 IPs excluded".
     var existingExcluded = root.querySelector('.wb-excluded');
     if (existingExcluded) existingExcluded.remove();
-    if (m.excludeCountries && m.excludeCountries.length) {
+    if (m.excludeCountries && m.excludeCountries.length && m.excludedCount > 0) {
       var excludedNotice = el('p', { class: 'notice wb-excluded', role: 'status' },
         [excludedNoticeText(m.excludedCount || 0, m.excludeCountries)]);
       var anchor = root.querySelector('.wb-overcap') || bar;
