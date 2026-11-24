@@ -318,4 +318,34 @@ class IndexResultsTest extends TestCase
             'HTTP_CF_CONNECTING_IP' => '198.51.100.9',
         ]));
     }
+
+    // ── Countries to exclude: separators (5.0.3) ────────────────────────────
+
+    /**
+     * @dataProvider excludeSeparatorProvider
+     */
+    public function testCountryExcludeAcceptsSeveralSeparators(string $field): void
+    {
+        // 81.2.69.142 and 2.125.160.216 are GB, 216.160.83.56 US, 89.160.20.112 SE.
+        $html = render_lookup_results(
+            ['ip_list' => '81.2.69.142 2.125.160.216 216.160.83.56 89.160.20.112', 'countries_filter' => $field],
+            '', self::CITY_DB, self::ASN_DB
+        );
+
+        $this->assertStringNotContainsString('81.2.69.142', $html);
+        $this->assertStringNotContainsString('216.160.83.56', $html);
+        $this->assertStringContainsString('89.160.20.112', $html);
+        $this->assertStringContainsString('excluded countries: GB US', $html);
+    }
+
+    public static function excludeSeparatorProvider(): array
+    {
+        return [
+            'spaces'      => ['GB US'],
+            'comma'       => ['GB,US'],
+            'comma space' => ['gb, us'],
+            'semicolon'   => ['GB;US'],
+            'pipe, mixed' => [' GB | us '],
+        ];
+    }
 }

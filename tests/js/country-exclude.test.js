@@ -95,7 +95,13 @@ describe('parseExcludeCountries (mirrors index.php)', () => {
     ['us ca  gb', ['US', 'CA', 'GB']],
     ['  us\tCa\nGB  ', ['US', 'CA', 'GB']],
     ['US us US', ['US']],
-    ['USA U1 X 12 US,CA de', ['DE']], // only exact A-Z pairs survive, like the PHP regex
+    ['USA U1 X 12 de', ['DE']], // only exact A-Z pairs survive, like the PHP regex
+    // 5.0.3: commas, semicolons and pipes separate codes too, in any mix
+    ['GB,JP', ['GB', 'JP']],
+    ['us, jp', ['US', 'JP']],
+    ['US;CA | gb', ['US', 'CA', 'GB']],
+    [',US,,CA,', ['US', 'CA']],
+    ['US.CA', []], // a dot is not a separator: one invalid token, as in PHP
   ])('%j -> %j', (input, expected) => {
     expect(WB.parseExcludeCountries(input)).toEqual(expected);
   });
@@ -161,6 +167,24 @@ describe('startLookup honors the "Countries to exclude" field (5.0.2 regression)
     d.form.dispatchEvent(new Event('submit', { cancelable: true }));
     expect(await finished).toBe(true);
     expect(shownIps(d.root)).toEqual(['1.1.1.1', '202.12.27.33', '81.2.69.142']);
+  });
+
+  test('codes that match nothing show no notice (no "0 IPs excluded")', async () => {
+    var d = buildDom();
+    d.field.value = 'ZZ';
+    var handle = WB.mount(d.root, d.form, d.textarea);
+    await handle.startLookup(PASTE);
+    expect(shownIps(d.root)).toHaveLength(5);
+    expect(d.root.querySelector('.wb-excluded')).toBeNull();
+  });
+
+  test('comma-separated codes exclude through the real submit path', async () => {
+    var d = buildDom();
+    d.field.value = 'us,jp';
+    var handle = WB.mount(d.root, d.form, d.textarea);
+    await handle.startLookup(PASTE);
+    expect(shownIps(d.root)).toEqual(['1.1.1.1', '81.2.69.142']);
+    expect(d.root.querySelector('.wb-excluded').textContent).toBe('3 IPs excluded by country filter (US JP).');
   });
 
   test('only IPs are sent to the API; the exclusion stays client-side', async () => {
